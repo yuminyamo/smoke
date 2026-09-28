@@ -1,0 +1,91 @@
+{
+  "_comment": "skills の生成設定。tools/build-skills/build-skills.mjs が読む。手順の内容(何を同梱するか)は stages.md の各節の「参照付録」「参照テンプレート」の行が正で、ここには skill の名前・説明・生成先だけを書く。",
+
+  "targets": [
+    {
+      "id": "copilot",
+      "label": "GitHub Copilot",
+      "dir": ".github/skills",
+      "frontmatter": "copilot"
+    },
+    {
+      "id": "kiro",
+      "label": "Kiro",
+      "dir": ".kiro/skills",
+      "frontmatter": "kiro"
+    }
+  ],
+
+  "shared_references": {
+    "common": "procedure/00_common.md",
+    "vocab": "procedure/vocab.yaml",
+    "pipeline": "procedure/pipeline.dot",
+    "stages": "procedure/stages.md",
+    "templates_dir": "procedure/templates"
+  },
+
+  "router": {
+    "name": "pms-regression",
+    "source": "procedure/router/SKILL.md",
+    "description": "PMS(プリント管理システム)の回帰テストを作る・続きをする・進み具合を知るときの入口。「〇〇機能の回帰テストを作って」「F-003の続き」「続けて」「いまどうなってる?」「EXT-002を再探索して」などの依頼で使う。どの作業(シナリオ生成と探索/健全性の是正/コード生成 など)を行うかはこのskillが決め、作業ごとのskill(pms-10-explore 等)を使う。",
+    "references": ["pipeline", "vocab"]
+  },
+
+  "skills": [
+    {
+      "name": "pms-01-kb",
+      "section": "01",
+      "title": "知見蓄積",
+      "description": "PMS回帰テスト作成の作業01(知見蓄積)。管理者が調査対象を指示したとき、または作業10で知見不足(escalation=knowledge_gap)になったときに使う。後段の作業が必要とする知見を逆算して調べ、KB(kb/)に記録する。",
+      "invocation": "auto"
+    },
+    {
+      "name": "pms-02-nd",
+      "section": "02",
+      "title": "非決定値カタログ抽出",
+      "description": "PMS回帰テスト作成の作業02(非決定値カタログ抽出)。初回フロー前の初期作成、または作業10が増分実施を求めたとき(nd_needed=yes)に使う。同じ操作を繰り返して、画面・DBの値ごとの検証強度を観測で決める。",
+      "invocation": "auto"
+    },
+    {
+      "name": "pms-10-explore",
+      "section": "10",
+      "title": "シナリオ生成と探索",
+      "description": "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について単機能シナリオを作り、playwright-cli で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。",
+      "invocation": "auto"
+    },
+    {
+      "name": "pms-15-health",
+      "section": "15",
+      "title": "健全性の是正",
+      "description": "PMS回帰テスト作成の作業15(健全性の是正)。通常は入口skill pms-regression から使う。作業10の探索で健全性シグナル(期待結果は満たしたが自データのジョブがエラーになっている等)が出たシナリオについて、問い合わせskillに再現手順と解決してほしいことを渡し、回答を踏まえて正常な結果が得られる操作を編み出し直す。解消しなければ記録を残して作業20へ進む。",
+      "invocation": "auto"
+    },
+    {
+      "name": "pms-20-codegen",
+      "section": "20",
+      "title": "回帰テストコード生成",
+      "description": "PMS回帰テスト作成の作業20(回帰テストコード生成)。通常は入口skill pms-regression から使う。作業10の探索記録と status.yaml から、実行時にAIを使わない Playwright の回帰テストを生成し、実行確認と突合表の更新を行う。",
+      "invocation": "auto"
+    },
+    {
+      "name": "pms-30-catalog",
+      "section": "30",
+      "title": "状態カタログ案生成",
+      "description": "PMS回帰テスト作成の作業30(状態カタログ案生成)。管理者が指示したときだけ使う(複数フロー完了後)。累積した探索記録から前提状態のカタログ案を作る。フェーズ2の完了時に必ず停止する。",
+      "invocation": "auto"
+    },
+    {
+      "name": "pms-40-improve",
+      "section": "40",
+      "title": "手順改善",
+      "description": "PMS回帰テスト作成の作業40(手順改善)。管理者が指示したときだけ、回帰テストを作ったセッションとは別の新しいセッションで使う。手順改善シグナルを集約し、手順書の正本(procedure/)を差分で改訂して skills を再生成する。",
+      "invocation": "manual",
+      "extra_notes": [
+        "**このskillは、回帰テストを作ったセッションとは別の新しいセッションで使う**(実行時の推論の経緯を持ち込まないため。stages.md §40 スロット2)。同じセッションで作業10・20を行っていたら、新しいセッションを開き直すよう利用者に伝えて止まる。",
+        "**手順書の改訂は、このskillの references/ ではなく正本 `procedure/` に対して行う。** references/ は生成物であり、直接編集しても次の生成で消える(lint `skills_in_sync` の違反になる)。改訂の対象: `procedure/00_common.md`・`procedure/vocab.yaml`・`procedure/pipeline.dot`・`procedure/stages.md`・`procedure/templates/`。000 改訂履歴は `procedure/docs/000_overview.md`。",
+        "改訂したら、版(`procedure/vocab.yaml` の `meta.procedure_version`)を上げたうえで `node tools/build-skills/build-skills.mjs` を実行して skills を再生成し、`node tools/build-skills/build-skills.mjs --check` が成功することを確かめる。正本と生成した skills を同じコミットに含め、版と同じ名前のタグを付ける(00 ■手順書の版と配備)。",
+        "改訂対象の節を読むときは `procedure/stages.md` の該当節だけを開く(丸ごと読まない。stages.md §40 スロット3)。"
+      ]
+    }
+  ]
+}

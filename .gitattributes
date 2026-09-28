@@ -1,0 +1,7 @@
+# 手順書の正本と生成した skills は改行を LF に固定する(build-skills.mjs --check の比較を安定させるため)
+procedure/** text eol=lf
+.github/skills/pms-*/** text eol=lf
+.kiro/skills/pms-*/** text eol=lf
+tools/build-skills/** text eol=lf
+# git のフックは sh が実行するため LF に固定する(CRLF だと Windows の Git で動かない)
+tools/git-hooks/** text eol=lf

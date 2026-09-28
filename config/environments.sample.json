@@ -1,0 +1,29 @@
+{
+  "_comment": "検証環境の情報の例(00_common.md ■検証環境の情報)。このファイル(.sample.json)は読まれない。実際の設定は node tools/env/env.mjs set で作る(共有: config/environments.json / 各自: config/environments.local.json。秘密情報(kind: secret)は既定で各自の方に保存され、git に入らない)。環境ID(environments の名前)と属性のキー(<対象>.<属性>)は任意に決めてよい。kind は endpoint / account / secret / other(vocab.env_attr_kind)。値は文字列だけでも書ける(kind は other として扱う)。基本キー(vocab.env_base_keys): pms.url / pms.user / pms.password / db.server / db.name",
+  "default": "vm01",
+  "environments": {
+    "vm01": {
+      "description": "検証環境1(Hyper-V ホスト hv01 上の PMS サーバ VM と、検証用の複合機A)",
+      "attributes": {
+        "pms.url": { "kind": "endpoint", "value": "https://pms-test-01.example.local/pms", "description": "PMS の Web UI の URL" },
+        "pms.user": { "kind": "account", "value": "e2e-user01" },
+        "pms.password": { "kind": "secret", "description": "値は config/environments.local.json に保存する(ここには書かない)" },
+        "db.server": { "kind": "endpoint", "value": "pms-test-01\\SQLEXPRESS" },
+        "db.name": { "kind": "endpoint", "value": "PMS" },
+        "mfp.a.host": { "kind": "endpoint", "value": "192.0.2.10", "description": "複合機A(実機)" },
+        "mfp.a.admin.user": { "kind": "account", "value": "admin" },
+        "mfp.a.admin.password": { "kind": "secret" },
+        "printer.queue.test": { "kind": "other", "value": "E2E-Test-Queue", "description": "テスト用プリンタキュー" }
+      }
+    },
+    "vm-yamada": {
+      "description": "山田さんの検証環境(1人1台の VM)。環境ごとに必要な属性だけを書けばよい",
+      "attributes": {
+        "pms.url": { "kind": "endpoint", "value": "https://pms-yamada.example.local/pms" },
+        "pms.user": { "kind": "account", "value": "e2e-user01" },
+        "db.server": { "kind": "endpoint", "value": "pms-yamada\\SQLEXPRESS" },
+        "db.name": { "kind": "endpoint", "value": "PMS" }
+      }
+    }
+  }
+}

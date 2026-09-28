@@ -1,0 +1,30 @@
+#!/bin/sh
+# pre-commit — コミットの前の lint(00_common.md ■lint 実行の契機)。
+#
+# 手順書の正本(procedure/)と生成した skills が一致していることを確かめる(lint skills_in_sync)。
+# ランナーは起動時に、00_common.md の lint 表の「実装:」とランナーの実装が一致していることも確かめる。
+# フローの成果物の lint は、作業と入口 skill が行うのでここでは行わない(途中のフローでもコミットできるように)。
+#
+# 有効にする(リポジトリごとに1回):
+#   git config core.hooksPath tools/git-hooks
+# Windows の Git でも動く(Git に同梱の sh が実行する。node が PATH にあること)。
+#
+# 注意: 検査するのは作業ツリーの内容である。正本を直したら、再生成した skills も同じコミットに含めること。
+
+root=$(git rev-parse --show-toplevel) || exit 1
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-commit: node が見つかりません。Node.js 18 以上を PATH に入れてください。" >&2
+  exit 1
+fi
+
+node "$root/tools/lint/lint.mjs" --root "$root" --rule skills_in_sync
+code=$?
+if [ "$code" -ne 0 ]; then
+  echo "" >&2
+  echo "pre-commit: lint(skills_in_sync)が通らないため、コミットを中止しました。" >&2
+  echo "  手順書を直した場合は node tools/build-skills/build-skills.mjs で skills を再生成し、正本と一緒にコミットしてください。" >&2
+  echo "  skills を直接編集した場合は、正本(procedure/)を直してから再生成してください。" >&2
+  exit 1
+fi
+exit 0

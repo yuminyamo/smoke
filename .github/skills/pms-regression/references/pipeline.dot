@@ -1,0 +1,289 @@
+/*
+ * pipeline.dot — ステップ1パイプラインの構造定義(単一ソース)
+ *
+ * 実行順序・分岐条件・停止点・差し戻し先は本ファイルにのみ書く。
+ * 00_common.md と stages.md はここを参照し、順序を再掲しない。
+ *
+ * 1回の実行 = 1フロー(人間が指示した対象領域について 10 → 20 を1巡)。
+ * 作業10で健全性シグナルが出たときだけ、10 と 20 の間に hlt(15)を挟む(注記11)。
+ * フローには通常フロー(context.flow_kind=new)と再探索フロー(reexplore)がある。
+ * 本線は exp(10) → cod(20) の2ノードだけ。kb(01) / nd(02) / hlt(15) / cat(30) / imp(40) は
+ * 条件付き起動の枝であり、本線には置かない。
+ *
+ * 条件式で使える演算子は = / != / && のみ。判断はノード(AI)の中で行い、
+ * 辺は status.yaml に出力された列挙値でルーティングするだけにする。
+ * 使用するコンテキストキーと取りうる値は vocab.yaml の context_key を正とする。
+ *
+ * 手順の改訂の区分(00 ■手順改訂の統制): 「/* <protected:ID> *\/」〜「/* </protected:ID> *\/」
+ * で囲んだ部分は保護ブロック(区分C)。本ファイルのそれ以外の部分は区分B(人間採否)である。
+ *
+ * 描画:  dot -Tsvg pipeline.dot -o pipeline.svg
+ * 改訂:  2026-09-28 / 版 v10(検証環境の情報: 注記13を追加。構造の変更なし)
+ *        2026-09-28 / 版 v9(ゴールデンイメージの定義の拡張: 注記12を更新。構造の変更なし)
+ *        2026-09-28 / 版 v8(作業15の環境の変更と開始前シナリオ: 人間の指示により保護ブロック HUMAN_APPROVAL に
+ *                          hlt → perm・perm → hlt を追加し、hlt から出る辺の条件に escalation=none を加えた。
+ *                          注記11を更新し、注記12(開始前シナリオ)を追加)
+ *        2026-09-28 / 版 v7(健全性の是正: hlt(15)を追加。exp → cod の条件に health_signal=none を加え、
+ *                          exp → hlt・hlt → cod・hlt → exp(パートP)・hlt の自己辺(lint)・hlt → inv・
+ *                          inv → hlt と注記11を追加。保護ブロックの中は変更していない)
+ *        2026-09-26 / 版 v6(lint の関所: exp → cod と cod → exit・cat の条件に lint_error=no を加え、
+ *                          lint の指摘による exp・cod の自己辺と注記10を追加)
+ *        2026-09-26 / 版 v5(作業20の開始前の禁止操作リストの照合: exp → cod の条件に
+ *                          prohibition_recheck=no を加え、exp の自己辺(パートP)と注記9を追加)
+ *        2026-09-24 / 版 v4(注記4に入口 skill による辺の利用を追記。構造の変更なし)
+ *        2026-09-23 / 版 v3(作業40 手順改善の枝を追加。保護ブロックの目印を追加)
+ *        2026-09-23 / 版 v2(再探索フローの経路を追加。外部操作の用語に統一)
+ *        2026-09-22 / 版 v1(フェーズ0を廃止し、初回フロー初期化を条件分岐へ移行)
+ */
+
+digraph pms_e2e_step1 {
+
+  graph [
+    label = "ステップ1 — 単機能シナリオ(1フロー分)",
+    goal  = "人間が指示した対象領域について、シナリオ型E2Eの回帰テストを生成し、累積スイートへ追加する",
+
+    default_fidelity = "compact",
+
+    /* 差し戻し先が個別に設定されていない場合の既定 */
+    retry_target = "exp",
+
+    /* モデル割り当て。値は運用環境に合わせて記入する */
+    model_stylesheet = "
+      *        { reasoning_effort: high }
+      .operate { llm_model: MODEL_OPERATE }   /* UI・外部操作を伴う。マルチモーダル */
+      .text    { llm_model: MODEL_TEXT }      /* テキスト処理のみ。長文向け */
+      .improve { llm_model: MODEL_IMPROVE }   /* 作業40。実行AIとは別のセッションで実行する。既定は MODEL_TEXT と同じでよい */
+    "
+  ]
+
+  rankdir = LR
+  node [shape = box, timeout = "14400s"]
+
+  start [shape = Mdiamond, label = "フロー開始\n(領域指示 / 再探索指示)"]
+  exit  [shape = Msquare,  label = "フロー完了"]
+
+  /* ── 手順改善・事前作業の要否判定(作業ではない。ルーティングのみ) ── */
+  due [shape = diamond, label = "手順改善の要否"]
+  pre [shape = diamond, label = "事前作業の要否"]
+
+  /* ── 作業ノード ───────────────────────────────────────── */
+  imp [label = "40 手順改善",           class = "text,improve"]
+  kb  [label = "01 知見蓄積",           class = "operate,text"]
+  nd  [label = "02 非決定値カタログ",   class = "operate"]
+
+  exp [label = "10 シナリオ生成と探索\n(再探索フローはパートR→C、\n禁止操作の再判定はパートP→C)", class = "operate",
+       goal_gate = true, allow_partial = true, retry_target = "exp"]
+
+  hlt [label = "15 健全性の是正\n(問い合わせ → 操作のやり直し)", class = "operate",
+       allow_partial = true]
+
+  cod [label = "20 回帰テストコード生成", class = "text",
+       goal_gate = true, retry_target = "exp"]
+
+  cat [label = "30 状態カタログ案",     class = "text"]
+
+  /* <protected:HUMAN_APPROVAL> */
+  /* ── 人間の承認が必要な停止点(2つだけ) ────────────────────── */
+  perm [shape = hexagon, type = "wait.human",
+        label = "要許可操作の許可判断"]
+  chg  [shape = hexagon, type = "wait.human",
+        label = "30フェーズ3 データ変更の許可"]
+  /* </protected:HUMAN_APPROVAL> */
+
+  /* <protected:INV_NO_RETRY> */
+  /* ── 不変条件違反の人間判断(自動リトライしない) ──────────────── */
+  inv  [shape = hexagon, type = "wait.human",
+        label = "DB不変条件違反の判断"]
+  /* </protected:INV_NO_RETRY> */
+
+  /* ══ 手順改善(フロー開始時の枝。注記7) ══════════════════════ */
+  start -> due
+
+  due -> imp [condition = "context.improvement_due=yes"]
+  due -> pre [condition = "context.improvement_due=no"]
+
+  imp -> pre
+
+  /* ══ 事前作業 ═════════════════════════════════════════════ */
+  pre -> kb  [condition = "context.kb_requested=yes"]
+  pre -> nd  [condition = "context.kb_requested=no && context.nd_needed=yes"]
+  pre -> exp [condition = "context.kb_requested=no && context.nd_needed=no"]
+
+  kb -> nd   [condition = "context.nd_needed=yes"]
+  kb -> exp  [condition = "context.nd_needed=no"]
+
+  nd -> exp
+
+  /* ══ 本線 ════════════════════════════════════════════════ */
+
+  /* <protected:HUMAN_APPROVAL> */
+  /* 探索中に要許可操作が必要になった場合のみ停止する。
+     禁止 / 操作手段なし は申し送り台帳へ記録して blocked とし、停止せず続行する。
+     操作手段なし(使える外部操作 skill がない)は外部操作需要リストにも記録する */
+  exp -> perm [condition = "context.escalation=permission_required", weight = 30]
+  perm -> exp [label = "[A] 許可して再開"]
+  perm -> exp [label = "[G] 申し送りに回して続行", weight = 10]
+  /* 作業15(健全性の是正)でも同じ。止まった作業へ戻る(proc-v008 で人間の指示により追加) */
+  hlt -> perm [condition = "context.escalation=permission_required", weight = 30]
+  perm -> hlt [label = "[A] 許可して再開(作業15で止まったとき)"]
+  perm -> hlt [label = "[G] 申し送りに回して続行(作業15で止まったとき)", weight = 10]
+  /* </protected:HUMAN_APPROVAL> */
+
+  /* 知見不足で探索が進まない場合は 01 を挟んで戻る */
+  exp -> kb   [condition = "context.escalation=knowledge_gap", weight = 20]
+
+  /* <protected:INV_NO_RETRY> */
+  /* 不変条件違反は差し戻しではなく人間判断へ。自動リトライで揉み消さない */
+  exp -> inv  [condition = "context.invariant_violation=found", weight = 25]
+  inv -> cod  [label = "[C] 不具合として起票し続行"]
+  inv -> exit [label = "[S] 中断"]
+  /* </protected:INV_NO_RETRY> */
+
+  /* 作業15・20へ進む前に、禁止操作リストを照合し(注記9)、続けて作業10の成果物の lint を行う(注記10) */
+  exp -> cod  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=no && context.lint_error=no && context.health_signal=none"]
+  exp -> hlt  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=no && context.lint_error=no && context.health_signal=found"]
+  exp -> exp  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=yes",
+               label = "禁止操作の再判定(パートP)", weight = 15]
+  exp -> exp  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=no && context.lint_error=yes",
+               label = "lint の指摘の修正", weight = 14]
+
+  /* 健全性の是正(注記11)。解消しなかったシナリオは記録を残して作業20へ進む(停止しない)。
+     作業20へ進む前に、照合(注記9)と、作業10・15の成果物の lint(注記10)を行う */
+  hlt -> cod  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=no && context.lint_error=no"]
+  hlt -> exp  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=yes",
+               label = "禁止操作の再判定(パートP)", weight = 15]
+  hlt -> hlt  [condition = "context.escalation=none && context.invariant_violation=none && context.prohibition_recheck=no && context.lint_error=yes",
+               label = "lint の指摘の修正", weight = 14]
+  /* 探索し直しで不変条件の違反が見つかった場合も、人間判断へ回す(INV_NO_RETRY と同じ扱い) */
+  hlt -> inv  [condition = "context.invariant_violation=found", weight = 25]
+  /* 作業10が健全性シグナルと不変条件の違反を両方出した場合、[C] のあとは作業15を経て作業20へ進む */
+  inv -> hlt  [label = "[C] 不具合として起票し続行(作業10の health_signal=found で、作業15が未実施)"]
+
+  /* 突合で未対応が残る場合は作業10へ差し戻す(goal_gate / retry_target)。
+     外部操作 skill の不備は差し戻さない(注記6) */
+  cod -> exp  [condition = "context.rework_required=yes", label = "差し戻し", weight = 20]
+
+  /* フロー完了の前に、作業20の成果物の lint を行う(注記10) */
+  cod -> cod  [condition = "context.rework_required=no && context.lint_error=yes", label = "lint の指摘の修正", weight = 15]
+
+  /* ══ 事後作業 ═════════════════════════════════════════════ */
+  cod -> cat  [condition = "context.rework_required=no && context.lint_error=no && context.state_catalog_requested=yes"]
+  cod -> exit [condition = "context.rework_required=no && context.lint_error=no"]
+
+  /* <protected:HUMAN_APPROVAL> */
+  cat -> chg  [condition = "context.escalation=permission_required"]
+  chg -> cat  [label = "[A] 範囲を許可して継続"]
+  chg -> exit [label = "[S] フェーズ2までで終了"]
+  /* </protected:HUMAN_APPROVAL> */
+  cat -> exit
+
+  /* ── 注記 ──────────────────────────────────────────────
+   *
+   * 1. goal_gate は「実際に訪問したノード」だけを検査する。[S] 中断で exit に
+   *    入った場合は未訪問ゲートが残るため、中断は status.yaml に
+   *    outcome: fail として記録し、達成と区別する。
+   *
+   * 2. 初回フロー(F-001)の機能一覧・機能コード確定は、パイロットではなく
+   *    初期化処理である。ノードを分けず、exp の中で context.flow_seq=first の
+   *    ときだけ実施する(stages.md §10 の A2)。
+   *
+   * 3. 30(cat)は本来フロー単位の作業ではなく、複数フロー完了後の横断集約である。
+   *    単一グラフで到達可能にするため cod の後ろに条件付きで置いているが、
+   *    実際には人間の指示で独立に起動してよい。
+   *
+   * 4. 現時点でランナーは導入していない。本ファイルは人間とAIが読む仕様であり、
+   *    辺の条件は「次にどの作業の skill を使うか」の判断基準として使う。
+   *    入口 skill(pms-regression)は、flow.md と直近の status.yaml の
+   *    context_updates を本ファイルの辺に当てはめて、次の作業を決める。
+   *
+   * 5. 再探索フロー(context.flow_kind=reexplore)は、外部操作 skill が無くて
+   *    blocked になったシナリオへ戻る経路である。
+   *      外部操作需要リスト(未整備)
+   *        → [人間] skill を整備し、需要リストに整備記録を記入(整備済)
+   *        → [人間] 需要IDを指定して再探索フローを指示(start)
+   *        → exp(パートR: 対象シナリオの特定 → パートC: 探索し直し)
+   *        → cod(コード化)→ exit
+   *    辺は通常フローと同じで、exp の中で flow_kind により手順を切り替える
+   *    (F-001 の初期化と同じ扱い。ノードを分けない)。skill の整備そのものは
+   *    パイプラインの外の人間の作業であり、需要の発生とは切り離して任意の時期に行う。
+   *
+   * 6. cod で外部操作 skill の不備(未配備・実行体なし)が見つかった場合は、
+   *    rework_required にしない。exp をやり直しても解消しないためである。
+   *    未配備は人間が配備した後に cod を再実行し、実行体なしは skill の改修後に
+   *    再探索フロー(注記5)で拾う(stages.md §20 外部操作 skill の確認)。
+   *
+   * 7. imp(40 手順改善)は、フローの成果物ではなく手順書そのものを改訂する枝である
+   *    (stages.md §40)。フローの開始時に置くのは、改訂をそのフローから効かせるため
+   *    である(手順書の配備はフローの境界でのみ行う。00 ■手順書の版と配備)。
+   *      - context.improvement_due は lint(improvement_due)が判定する。
+   *        lint が未実装の間は、人間の指示で yes にする
+   *      - imp は実行AIとは別のセッションで実行する(.improve)
+   *      - imp は停止しない。人間の採否が必要な改訂案は手順改善台帳に積むだけで、
+   *        フローは現行版の手順で進む。停止点は増えない
+   *      - 人間の明示的な指示による手順書の改訂は、このグラフの外でいつでも行える
+   *        (00 ■手順改訂の統制)。配備はフローの境界で行う
+   *
+   * 8. 保護ブロック(HUMAN_APPROVAL / INV_NO_RETRY)は、00 ■手順改訂の統制 により
+   *    作業40が自律的に変更しない。変更は人間の直接改訂、または人間の明示的な
+   *    指示によるAIの改訂に限る。
+   *
+   * 9. context.prohibition_recheck は、作業の status.yaml ではなく、作業20の開始前の
+   *    照合(node tools/checks/prohibited-ops.mjs --compare <作業10の status.yaml>)の
+   *    終了コードで決まる(0 → no / 3 → yes。それ以外は照合できないため進まず人間に伝える)。
+   *    作業10が「禁止操作」で blocked にしたステップがあり、その後に人間が禁止操作リストを
+   *    書き換えていたら、作業20へ進まずに exp へ戻り、パートPでそのステップを判定し直す。
+   *    これは停止点ではない(人間の判断を待たずに exp へ戻る)。exp はパートPのあと、
+   *    通常どおり完了報告を出して停止する。
+   *      - 照合は入口 skill が次の作業を選ぶときに行い、作業20も起動条件として自分で行う。
+   *        inv の [C] を経由して cod に入る場合も、作業20の起動条件で照合される
+   *      - 照合の結果をAIが解釈で省略しない(「関係のない変更だ」等)。スクリプトの
+   *        終了コードだけで決める(00 ■外部操作 禁止操作リストの版と blocked の再判定)
+   *
+   * 10. context.lint_error は、作業の status.yaml ではなく、lint のランナー
+   *    (node tools/lint/lint.mjs)の終了コードで決まる(0 → no / 1 → yes。
+   *    2 は lint を実行できないため進まず人間に伝える)。00 ■lint 実行の契機。
+   *      - exp → cod の前: 禁止操作リストの照合(注記9)で prohibition_recheck=no と
+   *        分かったあとに、--flow <F> --stage 10 で作業10の成果物を検査する。
+   *        ERROR があれば cod へ進まず、exp で指摘を直す(工程0から。フローIDは変えない)。
+   *        入口 skill が行い、作業20も起動条件として自分で行う。inv の [C] を経由して
+   *        cod に入る場合も、作業20の起動条件で検査される
+   *      - cod → exit(・cat)の前: --flow <F> --stage 20 で作業20の成果物を検査する。
+   *        ERROR があればフローを完了にせず、cod で指摘を直す(工程0から)。入口 skill が行う
+   *      - これは停止点ではない(人間の判断を待たずに差し戻す)。ただし、同じフローの
+   *        同じ関所での差し戻しは1回までとし、差し戻したあとも ERROR が残る場合は進まず
+   *        人間に伝える。skills_in_sync だけが ERROR の場合も差し戻さず人間に伝える
+   *        (手順書と skills の食い違いは作業が直すものではないため)
+   *      - exp と cod は、完了報告の前に自分でも lint を実行して直す(stages.md §10・§20)。
+   *    関所の lint は、それが省かれた場合の備えである
+   *
+   * 11. hlt(15 健全性の是正)は、作業10の探索で健全性シグナル(00 ■健全性シグナルと
+   *    問い合わせ)が出たシナリオについて、問い合わせ skill に聞いて操作を編み出し直す枝である。
+   *      - exp のあとの関所(照合・lint)を通ったあと、作業10の status.yaml の
+   *        context.health_signal=found なら hlt、none なら cod へ進む
+   *      - hlt が必要かどうかは、作業15の status.yaml の stage10_restore_id が作業10の
+   *        env_restore.restore_id と一致するかで決める(一致すれば、その作業10のあとに
+   *        作業15を実施済み)。作業10をやり直す(差し戻し・パートP)と restore_id が変わるため、
+   *        やり直しで新たに出た健全性シグナルも hlt で扱われる
+   *      - hlt は、解消しないことを理由に止まらない。解消しなかったシナリオ・問い合わせ skill が
+   *        ない場合は、記録だけを残して cod へ進む(未解消のシナリオは human-check のまま。
+   *        as-is の判断は人間)。止まるのは、操作・環境の変更に要許可操作・包括原則に当たる
+   *        操作が必要になったとき(hlt → perm。exp と同じ停止点で、停止点の数は増えない)だけである
+   *      - hlt は環境を復元しない(作業10の環境をそのまま使う。00 ■回帰実行の環境前提)
+   *      - hlt → cod の前の関所では、照合に続けて --stage 10 と --stage 15 の lint を行い、
+   *        ERROR があれば hlt へ差し戻す(作業10の成果物は hlt の前の関所で検査済みのため)
+   *      - inv の [C] のあとは、作業10が health_signal=found を出していて作業15が未実施なら hlt、
+   *        それ以外は cod へ進む(inv → cod と inv → hlt の選び分けは入口 skill が行う)
+   *
+   * 12. 開始前シナリオ(00 ■回帰実行の環境前提)は、exp・cod の工程0(VM の復元と起動完了の
+   *    確認)のあとに、設定されたテストシナリオ(機器のゴールデンイメージ復元など)を実行する仕組みで
+   *    ある。restores を書いた復元エントリは、VM の復元と合わせてゴールデンイメージの復元をなす
+   *    (復元範囲。包括原則4の判断に使う)。ノードでも辺でもなく、工程0の一部として扱う。設定がなければ何もしない。
+   *    失敗したら作業を始めず、利用者に伝えて止まる(環境の前提が満たされないため。行為の許可ではなく、
+   *    ■人間の承認が必要な例外 の停止点ではない)
+   *
+   * 13. 検証環境の情報(接続先・アカウント。00 ■検証環境の情報)が足りないときは、その作業の中で
+   *    足りない値をまとめて人間に聞き、回答を設定ファイルに保存してから続ける(主に exp の開始時と
+   *    シナリオ生成のあと)。ノードでも辺でもない。待つ間は止まるが、行為の許可ではなく
+   *    ■人間の承認が必要な例外 の停止点ではない(起動確認待ちと同じ扱い)。再開しても復元はやり直さない
+   */
+}

@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>シナリオ策定方式の分離</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#F3F5F6; --surface:#FFFFFF; --ink:#18212B; --muted:#5A6673; --line:#D3DAE0; --code-bg:#E8ECEF;
+  --inv:#2F5D8A; --inv-soft:#E2EBF4; --var:#A8640F; --var-soft:#FBEDD9;
+  --font-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --font-display:"Zen Kaku Gothic New","Noto Sans JP","Hiragino Sans",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#10151B; --surface:#18202A; --ink:#E4E9EE; --muted:#9AA6B3; --line:#2B3642; --code-bg:#222C37;
+    --inv:#86AEDA; --inv-soft:#1C2C3D; --var:#E2A458; --var-soft:#3A2915;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#10151B; --surface:#18202A; --ink:#E4E9EE; --muted:#9AA6B3; --line:#2B3642; --code-bg:#222C37;
+  --inv:#86AEDA; --inv-soft:#1C2C3D; --var:#E2A458; --var-soft:#3A2915;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.85;padding-inline:20px;padding-block:0 72px}
+.wrap{max-width:940px;margin:0 auto}
+header{padding-block:56px 36px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,5vw,42px);line-height:1.3;text-wrap:balance;margin:10px 0 16px}
+h2{font-family:var(--font-display);font-weight:700;font-size:23px;line-height:1.4;text-wrap:balance;margin:0 0 16px}
+h3{font-family:var(--font-display);font-weight:700;font-size:17px;margin:0 0 8px}
+p{margin:0 0 14px;max-width:42em}
+.lead{font-size:16px;color:var(--ink);max-width:40em}
+.meta{font-size:13px;color:var(--muted);margin-top:18px}
+code{font-family:var(--font-mono);font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:3px;white-space:nowrap}
+section{padding-block:44px;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+.legend{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:22px;font-size:13px}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.sw{width:14px;height:14px;border-radius:3px;border:1.5px solid;display:inline-block}
+.sw.var{background:var(--var-soft);border-color:var(--var)}
+.sw.inv{background:var(--inv-soft);border-color:var(--inv)}
+
+.points{display:grid;gap:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);margin:0;padding:0;list-style:none}
+.points li{display:grid;grid-template-columns:5.5em 1fr;gap:16px;padding:16px 20px;border-top:1px solid var(--line)}
+.points li:first-child{border-top:0}
+.points b{font-family:var(--font-display);font-size:13px;letter-spacing:.04em;color:var(--muted);font-weight:700;padding-top:2px}
+@media (max-width:560px){.points li{grid-template-columns:1fr;gap:2px}}
+
+figure{margin:22px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px 18px 14px}
+.scroll{overflow-x:auto}
+figure svg{display:block;width:100%;height:auto}
+.wide svg{min-width:760px}
+figcaption{font-size:13px;color:var(--muted);margin-top:10px}
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.pair h3{font-size:14px;letter-spacing:.04em;color:var(--muted);margin-bottom:6px}
+
+svg text{font-family:var(--font-body);fill:var(--ink)}
+svg .mono{font-family:var(--font-mono)}
+svg .mute{fill:var(--muted)}
+svg .b{font-weight:700}
+svg .s-inv{fill:var(--inv-soft);stroke:var(--inv);stroke-width:1.5}
+svg .s-var{fill:var(--var-soft);stroke:var(--var);stroke-width:1.5}
+svg .s-neu{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+svg .s-ghost{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:5 4}
+svg .s-frame{fill:none;stroke:var(--inv);stroke-width:1.5;stroke-dasharray:2 0}
+svg .edge{fill:none;stroke:var(--muted);stroke-width:1.5}
+svg .edge-var{fill:none;stroke:var(--var);stroke-width:1.5}
+svg .head{fill:var(--muted)}
+svg .head-var{fill:var(--var)}
+svg .faded{opacity:.5}
+svg .t-var{fill:var(--var)}
+svg .t-inv{fill:var(--inv)}
+
+.tbl{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.7}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-top:1px solid var(--line)}
+thead th{border-top:0;font-size:12px;letter-spacing:.05em;color:var(--muted);font-weight:700;background:var(--bg)}
+td:first-child{white-space:nowrap}
+td.num{font-family:var(--font-mono);color:var(--muted);width:2.5em}
+
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:18px}
+.col{border:1.5px solid;border-radius:6px;padding:16px 18px;background:var(--surface)}
+.col.inv{border-color:var(--inv)}
+.col.var{border-color:var(--var)}
+.col h3{display:flex;align-items:center;gap:8px}
+.col ul{margin:0;padding-left:1.2em}
+.col li{margin:4px 0}
+
+.methods{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:20px}
+.method{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.method .id{font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--var)}
+.method h3{margin:0}
+.method p{font-size:14px;margin:0;color:var(--ink)}
+.method .note{font-size:13px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;letter-spacing:.05em;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);align-self:flex-start}
+.tag.warn{border-color:var(--var);color:var(--var)}
+
+.stamp{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:18px;padding:0;list-style:none}
+.stamp li{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:14px}
+.stamp li b{display:block;font-family:var(--font-mono);font-weight:500;font-size:13px;color:var(--inv);margin-bottom:2px}
+
+.steps{list-style:none;padding:0;margin:20px 0 0;counter-reset:s;display:grid;gap:0}
+.steps li{counter-increment:s;display:grid;grid-template-columns:48px 1fr;gap:14px;padding-block:14px;border-top:1px solid var(--line)}
+.steps li:first-child{border-top:0}
+.steps li::before{content:counter(s);font-family:var(--font-display);font-weight:700;font-size:22px;line-height:1;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--inv);color:var(--inv);display:flex;align-items:center;justify-content:center}
+.steps h3{margin-bottom:4px}
+.steps p{margin:0;font-size:14px}
+.steps .ver{font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-left:8px;font-weight:400}
+
+.alts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:18px}
+.alt{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.alt p{font-size:14px;margin:0}
+.alt .why{margin-top:8px;color:var(--muted);font-size:13px}
+
+.options{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px}
+.opt{background:var(--surface);border:1.5px solid var(--line);border-radius:6px;padding:18px}
+.opt.adopted{border-color:var(--inv)}
+.opt.rejected{opacity:.72}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;padding:1px 9px;border-radius:999px;margin-left:8px;vertical-align:2px}
+.badge.yes{background:var(--inv);color:var(--surface)}
+.badge.no{border:1px solid var(--line);color:var(--muted)}
+.decided{margin-top:18px;padding:16px 20px;border:1.5px solid var(--inv);background:var(--inv-soft);border-radius:6px;font-size:14px}
+.decided h3{margin-bottom:6px}
+.decided ul{margin:0;padding-left:1.2em}
+.decided li{margin:4px 0}
+.opt .k{font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);letter-spacing:.05em}
+.opt p{font-size:14px;margin:8px 0 0}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px;font-size:13px}
+.chain span{padding:3px 10px;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.chain span.stop{border-color:var(--var);color:var(--var)}
+.chain i{font-style:normal;color:var(--muted)}
+.callout{margin-top:18px;padding:14px 18px;border-left:3px solid var(--var);background:var(--var-soft);font-size:14px;border-radius:0 6px 6px 0}
+.callout p{margin:0}
+footer{padding-top:28px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">検討資料 · 手順版 proc-v010 時点 · 作成 2026-10-02 · 改訂 2026-10-02</div>
+  <h1>シナリオ策定方式の分離</h1>
+  <p class="lead">テストシナリオの作り方は、マニュアル起点のほかに、既存テストスクリプト起点や新機能の仕様書起点へと増やしていきたい。一方で、シナリオ・探索記録・KB・テストコードは、どの作り方でも同じ場所に同じ書式で蓄積したい。そのために、手順書に「シナリオ策定方式」の層を足し、作業10のパートBから方式に依存する部分を切り出すことを提案する。</p>
+  <div class="legend">
+    <span><i class="sw var"></i>可変: 方式ごとに差し替える部分</span>
+    <span><i class="sw inv"></i>固定: どの方式でも共通の規約と蓄積物</span>
+  </div>
+  <p class="meta">対象: <code>procedure/</code> の正本と、そこから生成する <code>.kiro/skills</code>・<code>.github/skills</code>。改訂: 2026-10-02 新機能起点の方式の前提を決定し、「決定事項」の節に記録した。<br>反映: 2026-10-02 手順版 proc-v011 として正本に反映した(<code>procedure/docs/000_overview.md</code> 21章)。反映時の変更点は末尾の「正本への反映」に記した。</p>
+</header>
+
+<section id="summary">
+  <h2>結論</h2>
+  <ul class="points">
+    <li><b>現状</b><span>蓄積の規約は、いまの4層構成ですでに方式から独立している。付録A・B・C・E・F、<code>00_common.md</code>、<code>vocab.yaml</code>、lint は、シナリオをどう作ったかを問わない。</span></li>
+    <li><b>課題</b><span>方式が焼き付いているのは、実質 <code>stages.md</code> §10 のパートBとその周辺だけである。ここに「マニュアルから基本ユースケースを抽出する」やり方が直接書かれている。</span></li>
+    <li><b>提案</b><span>手順書に5層目「方式」(<code>procedure/methods/</code>)を足し、パートBを方式に依存しない共通契約だけに絞る。方式はフローごとに選び、flow.md に記録する。</span></li>
+    <li><b>決定</b><span>新機能起点の方式は、検証環境に機能が配備済みであることを前提にし、現行どおりシナリオ生成と探索を連続して行う。</span></li>
+    <li><b>変えないもの</b><span><code>pipeline.dot</code> の構造、status.yaml の骨格、作業15・20以降、lint の規則。成果物の置き場所と書式も変えない。</span></li>
+  </ul>
+</section>
+
+<section id="overview">
+  <h2>提案の全体像</h2>
+  <p>方式は「シナリオ候補をどこから、どう抽出するか」だけを担う。抽出した候補は、どの方式でも同じ共通契約(スコープ・記載ルール・ID書式など)を通って scenarios.md になる。そこから先の探索・コード生成・蓄積は、今と同じ規約で動く。</p>
+  <figure class="wide">
+    <div class="scroll">
+    <svg viewBox="0 0 960 400" role="img" aria-label="3つの方式が共通契約を通り、同じ蓄積物に積まれる図">
+      <defs>
+        <marker id="h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+        <marker id="h1v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head-var"/></marker>
+      </defs>
+      <text x="16" y="26" font-size="13" class="b t-var">可変: シナリオ策定方式</text>
+
+      <rect x="16" y="44" width="250" height="64" rx="5" class="s-var"/>
+      <text x="32" y="70" font-size="13" class="mono b">manual_usecase</text>
+      <text x="32" y="92" font-size="12">マニュアル起点の基本ユースケース</text>
+
+      <rect x="16" y="124" width="250" height="64" rx="5" class="s-var"/>
+      <text x="32" y="150" font-size="13" class="mono b">legacy_script</text>
+      <text x="32" y="172" font-size="12">既存テストスクリプト起点</text>
+
+      <rect x="16" y="204" width="250" height="64" rx="5" class="s-var"/>
+      <text x="32" y="230" font-size="13" class="mono b">spec_new_feature</text>
+      <text x="32" y="252" font-size="12">新機能の仕様書起点</text>
+
+      <rect x="16" y="284" width="250" height="64" rx="5" class="s-ghost"/>
+      <text x="32" y="310" font-size="13" class="mono mute">…</text>
+      <text x="32" y="332" font-size="12" class="mute">今後追加する方式</text>
+
+      <text x="16" y="378" font-size="12" class="mute">flow.md の scenario_source で1つを選ぶ</text>
+
+      <path d="M266 76 C294 76 290 200 316 200" class="edge-var" marker-end="url(#h1v)"/>
+      <path d="M266 156 C294 156 290 200 316 200" class="edge-var" marker-end="url(#h1v)"/>
+      <path d="M266 236 C294 236 290 200 316 200" class="edge-var" marker-end="url(#h1v)"/>
+      <path d="M266 316 C294 316 290 200 316 200" class="edge-var faded" stroke-dasharray="4 4"/>
+
+      <text x="318" y="108" font-size="13" class="b t-inv">固定: 方式に依存しない契約</text>
+      <rect x="318" y="120" width="210" height="160" rx="5" class="s-inv"/>
+      <text x="334" y="148" font-size="14" class="b">§10 パートB 共通契約</text>
+      <text x="334" y="176" font-size="12">・ステップ1のスコープ</text>
+      <text x="334" y="200" font-size="12">・1ステップ = 1検証意図</text>
+      <text x="334" y="224" font-size="12">・根拠と検証手段は必須</text>
+      <text x="334" y="248" font-size="12">・ID書式・requires・禁止操作</text>
+      <text x="318" y="304" font-size="12" class="mute">方式は候補の抽出だけを担う</text>
+
+      <path d="M528 200 L616 200" class="edge" marker-end="url(#h1)"/>
+      <text x="572" y="190" font-size="11" class="mute" text-anchor="middle">パートC・§20</text>
+
+      <rect x="620" y="40" width="324" height="336" rx="6" class="s-inv"/>
+      <text x="636" y="66" font-size="14" class="b">蓄積物: 同じ場所・同じ書式</text>
+
+      <rect x="636" y="84" width="292" height="38" rx="4" class="s-neu"/>
+      <text x="650" y="108" font-size="12" class="mono">scenarios.md</text>
+      <text x="914" y="108" font-size="12" class="mute" text-anchor="end">付録C</text>
+
+      <rect x="636" y="130" width="292" height="38" rx="4" class="s-neu"/>
+      <text x="650" y="154" font-size="12" class="mono">exploration / setup-log</text>
+      <text x="914" y="154" font-size="12" class="mute" text-anchor="end">付録A・B</text>
+
+      <rect x="636" y="176" width="292" height="38" rx="4" class="s-neu"/>
+      <text x="650" y="200" font-size="12" class="mono">kb/</text>
+      <text x="914" y="200" font-size="12" class="mute" text-anchor="end">付録E</text>
+
+      <rect x="636" y="222" width="292" height="38" rx="4" class="s-neu"/>
+      <text x="650" y="246" font-size="12" class="mono">tests/specs/</text>
+      <text x="914" y="246" font-size="12" class="mute" text-anchor="end">付録F</text>
+
+      <rect x="636" y="268" width="292" height="38" rx="4" class="s-neu"/>
+      <text x="650" y="292" font-size="12" class="mono">traceability/</text>
+      <text x="914" y="292" font-size="12" class="mute" text-anchor="end">突合表</text>
+
+      <rect x="636" y="314" width="292" height="38" rx="4" class="s-neu"/>
+      <text x="650" y="338" font-size="12" class="mono">work/_common/</text>
+      <text x="914" y="338" font-size="12" class="mute" text-anchor="end">台帳 91・93・94</text>
+    </svg>
+    </div>
+    <figcaption>図1 方式と蓄積の分離。左の方式だけを差し替え、中央の契約と右の蓄積物は共通にする。</figcaption>
+  </figure>
+</section>
+
+<section id="current">
+  <h2>現状で方式が焼き付いている箇所</h2>
+  <p>手順書と生成器を読むと、マニュアル起点を前提にした記述は次の箇所に集まっている。いずれも作業10の入口と、作業10を起動する前の準備に限られる。</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>箇所</th><th>前提になっていること</th></tr></thead>
+      <tbody>
+        <tr><td><code>stages.md</code> §10 パートB</td><td>妥当性基準・選定指針・根拠の表記・既存テストスクリプトの扱いが、マニュアル起点の書き方で本文に入っている</td></tr>
+        <tr><td><code>stages.md</code> §10 A2</td><td>初回フローの機能一覧を、マニュアルの目次構造から確定する</td></tr>
+        <tr><td><code>stages.md</code> §10 DoD パートB</td><td>根拠の種類(文書名+章番号・既存テスト・推測・画面観察)が列挙で固定されている</td></tr>
+        <tr><td><code>stages.md</code> §10 入力表</td><td>既存テストスクリプトは「参考情報」の1行としてだけ扱われる</td></tr>
+        <tr><td><code>router/SKILL.md</code></td><td>新しいフローの開始に、方式を選ぶ手順がない</td></tr>
+        <tr><td>テンプレート92</td><td>flow.md とフロー台帳に、方式を記録する欄がない</td></tr>
+        <tr><td><code>vocab.yaml</code></td><td><code>flow_kind</code> と <code>context_key</code> に方式の語彙がない</td></tr>
+        <tr><td><code>build-skills.mjs</code></td><td>skill に同梱できるのは「節・付録・テンプレート」だけで、方式のような別ファイルを同梱する仕組みがない</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:18px">逆に、方式を変えても触らなくてよいものは、付録A・B・C・E・F、<code>00_common.md</code> の資産流用・オラクル・KB規約、§15・§20、lint の全規則である。これが「蓄積規約」の実体であり、すでに方式から独立している。</p>
+</section>
+
+<section id="structure">
+  <h2>手順書の構成の変化</h2>
+  <p>いまの4層(既定・語彙・構造・差分)に、5層目として「方式」を足す。差分層の §10 パートBからは、方式に依存する記述を抜いて共通契約だけを残す。生成スクリプトは、方式ファイルを作業10の skill に同梱する。</p>
+  <figure>
+    <div class="pair">
+      <div>
+        <h3>現状(proc-v010)</h3>
+        <svg viewBox="0 0 440 430" role="img" aria-label="現状の手順書構成。§10 パートBにマニュアル起点の手順が埋め込まれている">
+          <defs><marker id="h2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+          <rect x="20" y="16" width="400" height="40" rx="4" class="s-inv"/>
+          <text x="36" y="41" font-size="13" class="mono">00_common.md</text><text x="404" y="41" font-size="12" class="mute" text-anchor="end">既定</text>
+          <rect x="20" y="64" width="400" height="40" rx="4" class="s-inv"/>
+          <text x="36" y="89" font-size="13" class="mono">vocab.yaml</text><text x="404" y="89" font-size="12" class="mute" text-anchor="end">語彙</text>
+          <rect x="20" y="112" width="400" height="40" rx="4" class="s-inv"/>
+          <text x="36" y="137" font-size="13" class="mono">pipeline.dot</text><text x="404" y="137" font-size="12" class="mute" text-anchor="end">構造</text>
+          <rect x="20" y="160" width="400" height="96" rx="4" class="s-inv"/>
+          <text x="36" y="184" font-size="13" class="mono">stages.md</text><text x="404" y="184" font-size="12" class="mute" text-anchor="end">差分(作業ごと)</text>
+          <rect x="36" y="196" width="368" height="48" rx="4" class="s-var"/>
+          <text x="52" y="216" font-size="13" class="b">§10 パートB</text>
+          <text x="52" y="236" font-size="12">マニュアル起点の抽出手順が埋め込み</text>
+          <rect x="20" y="272" width="400" height="60" rx="4" class="s-ghost"/>
+          <text x="220" y="307" font-size="12" class="mute" text-anchor="middle">方式の層はない</text>
+          <path d="M220 336 L220 358" class="edge" marker-end="url(#h2a)"/>
+          <rect x="20" y="362" width="400" height="56" rx="4" class="s-neu"/>
+          <text x="220" y="386" font-size="12" class="mono" text-anchor="middle">build-skills.mjs</text>
+          <text x="220" y="406" font-size="12" class="mute" text-anchor="middle">pms-10-explore を生成</text>
+        </svg>
+      </div>
+      <div>
+        <h3>提案</h3>
+        <svg viewBox="0 0 440 430" role="img" aria-label="提案の手順書構成。methods層を新設し、§10 パートBは共通契約だけになる">
+          <defs><marker id="h2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+          <rect x="20" y="16" width="400" height="40" rx="4" class="s-inv"/>
+          <text x="36" y="41" font-size="13" class="mono">00_common.md</text><text x="404" y="41" font-size="12" class="mute" text-anchor="end">既定(5層に改訂)</text>
+          <rect x="20" y="64" width="400" height="40" rx="4" class="s-inv"/>
+          <text x="36" y="89" font-size="13" class="mono">vocab.yaml</text><text x="404" y="89" font-size="12" class="mute" text-anchor="end">語彙(scenario_source)</text>
+          <rect x="20" y="112" width="400" height="40" rx="4" class="s-inv"/>
+          <text x="36" y="137" font-size="13" class="mono">pipeline.dot</text><text x="404" y="137" font-size="12" class="mute" text-anchor="end">構造(注記のみ)</text>
+          <rect x="20" y="160" width="400" height="96" rx="4" class="s-inv"/>
+          <text x="36" y="184" font-size="13" class="mono">stages.md</text><text x="404" y="184" font-size="12" class="mute" text-anchor="end">差分(作業ごと)</text>
+          <rect x="36" y="196" width="368" height="48" rx="4" class="s-neu" style="stroke:var(--inv)"/>
+          <text x="52" y="216" font-size="13" class="b">§10 パートB</text>
+          <text x="52" y="236" font-size="12">方式に依存しない共通契約だけ</text>
+          <rect x="20" y="272" width="400" height="60" rx="4" class="s-var"/>
+          <text x="36" y="296" font-size="13" class="mono b">methods/</text><text x="404" y="296" font-size="12" class="t-var b" text-anchor="end">方式(新設)</text>
+          <text x="36" y="318" font-size="11" class="mono">manual_usecase · legacy_script · spec_new_feature</text>
+          <path d="M220 336 L220 358" class="edge" marker-end="url(#h2b)"/>
+          <rect x="20" y="362" width="400" height="56" rx="4" class="s-neu"/>
+          <text x="220" y="386" font-size="12" class="mono" text-anchor="middle">build-skills.mjs</text>
+          <text x="220" y="406" font-size="12" class="mute" text-anchor="middle">pms-10-explore に methods/ も同梱</text>
+        </svg>
+      </div>
+    </div>
+    <figcaption>図2 手順書の層構成。琥珀色の部分が方式に依存する記述。提案では methods/ に集め、stages.md からは抜く。</figcaption>
+  </figure>
+</section>
+
+<section id="methods">
+  <h2>方式ファイルの書式</h2>
+  <p><code>procedure/methods/&lt;method_id&gt;.md</code> に、1方式を1ファイルで書く。stages.md の8スロット規約と同じ考え方で、方式ファイルも固定のスロットを持つ。該当がなくても見出しを残し「なし」と書く。生成スクリプトはスロットの有無を検査する。</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>#</th><th>スロット</th><th>書くこと</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>入力資料</td><td>何を読むか。所在は領域指示・KB T11・人間の指定のどれか</td></tr>
+        <tr><td class="num">2</td><td>候補の抽出手順</td><td>基本ユースケースをどう切り出し、どう妥当性を判断するか</td></tr>
+        <tr><td class="num">3</td><td>根拠の書き方</td><td>付録Cの「根拠」列に許す表記</td></tr>
+        <tr><td class="num">4</td><td>代表値と範囲外の扱い</td><td>代表1値の選び方と、申し送り台帳へ回す基準</td></tr>
+        <tr><td class="num">5</td><td>方式固有の禁止事項</td><td>例: 既存スクリプトの操作手順を scenarios.md に転記しない</td></tr>
+        <tr><td class="num">6</td><td>方式固有のDoD</td><td>共通DoDに加えて確かめる項目</td></tr>
+        <tr><td class="num">7</td><td>方式固有のKB・DISC</td><td>使うKBカテゴリ(T11 など)と DISC 種別(実画面≠既存テスト など)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:32px">最初に用意する3方式</h3>
+  <div class="methods">
+    <div class="method">
+      <span class="id">manual_usecase</span>
+      <h3>マニュアル起点</h3>
+      <p>マニュアル・仕様書から基本ユースケースを抽出する。現行の方式そのもの。</p>
+      <p class="note">現行パートBの「妥当性基準と選定指針」と、A2 の機能一覧の確定元を移す。</p>
+      <span class="tag">段取り1で切り出し</span>
+    </div>
+    <div class="method">
+      <span class="id">legacy_script</span>
+      <h3>既存テストスクリプト起点</h3>
+      <p>既存の手動テスト手順書や過去の自動テストから、利用者の一連の作業と確認観点を拾う。</p>
+      <p class="note">現行の「既存テストスクリプトの扱い」を抽出手順として書き直す。「参考情報であり正解の根拠ではない」は 00 ■オラクルに残し、方式ファイルからは参照する。</p>
+      <span class="tag">段取り2で追加</span>
+    </div>
+    <div class="method">
+      <span class="id">spec_new_feature</span>
+      <h3>新機能の仕様書起点</h3>
+      <p>新しく実装した機能の仕様書から、追加された基本動作を拾う。</p>
+      <p class="note">前提条件: 対象の機能が検証環境に配備済みであること。現行どおり生成と探索を連続して行う(末尾の「決定事項」)。</p>
+      <span class="tag">段取り3で追加</span>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">パートBに残すもの、方式へ移すもの</h3>
+  <div class="split">
+    <div class="col inv">
+      <h3><i class="sw inv"></i>§10 パートBに残す(共通契約)</h3>
+      <ul>
+        <li>ステップ1のスコープ(シナリオ型・正常系・代表1値・単機能粒度)</li>
+        <li>1ステップ = 1検証意図、操作手順を書かない</li>
+        <li>全ステップに根拠と検証手段、期待結果は業務的な意味で書く</li>
+        <li>ID書式、<code>requires</code> は初期状態セットのみ</li>
+        <li>禁止操作の除外、未登録外部操作の需要リスト記録</li>
+        <li>環境情報の洗い出し、単発型候補は申し送りへ</li>
+      </ul>
+    </div>
+    <div class="col var">
+      <h3><i class="sw var"></i>方式ファイルへ移す</h3>
+      <ul>
+        <li>候補の抽出手順と妥当性の基準</li>
+        <li>根拠列に許す表記の具体</li>
+        <li>代表値の選び方</li>
+        <li>初回フローで機能一覧を確定する元の資料</li>
+        <li>方式固有の禁止事項とDoD</li>
+        <li>方式固有の DISC 種別と KB カテゴリ</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="runtime">
+  <h2>実行時の流れ</h2>
+  <p>入口 skill が依頼文から方式を決め、flow.md に記録する。作業10の skill は全方式のファイルを同梱しているが、flow.md が指す1つだけを開く。付録と同じ運用で、使わない方式の記述を読ませないためである。</p>
+  <figure class="wide">
+    <div class="scroll">
+    <svg viewBox="0 0 960 250" role="img" aria-label="依頼から入口skill、flow.md、pms-10-explore、作業20への流れ。作業10は方式ファイルを1つだけ開く">
+      <defs><marker id="h3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+      <rect x="16" y="24" width="160" height="76" rx="5" class="s-neu"/>
+      <text x="28" y="52" font-size="14" class="b">利用者の依頼</text>
+      <text x="28" y="76" font-size="12" class="mute">「手順書をもとに作って」</text>
+
+      <rect x="206" y="24" width="160" height="76" rx="5" class="s-neu"/>
+      <text x="218" y="52" font-size="14" class="b">入口 skill</text>
+      <text x="218" y="74" font-size="12">依頼から方式を決める</text>
+      <text x="218" y="92" font-size="12" class="mute">迷えば1回だけ確認</text>
+
+      <rect x="396" y="24" width="160" height="76" rx="5" class="s-inv"/>
+      <text x="408" y="52" font-size="14" class="b mono">flow.md</text>
+      <text x="408" y="74" font-size="12" class="mono">scenario_source</text>
+      <text x="408" y="92" font-size="12">を記録する</text>
+
+      <rect x="586" y="24" width="160" height="76" rx="5" class="s-inv"/>
+      <text x="598" y="52" font-size="14" class="b mono">pms-10-explore</text>
+      <text x="598" y="74" font-size="12">パートA・B・C</text>
+      <text x="598" y="92" font-size="12">Bで方式を1つ読む</text>
+
+      <rect x="776" y="24" width="160" height="76" rx="5" class="s-neu"/>
+      <text x="788" y="52" font-size="14" class="b">作業15・20</text>
+      <text x="788" y="74" font-size="12" class="mute">変更なし</text>
+
+      <path d="M176 62 L204 62" class="edge" marker-end="url(#h3)"/>
+      <path d="M366 62 L394 62" class="edge" marker-end="url(#h3)"/>
+      <path d="M556 62 L584 62" class="edge" marker-end="url(#h3)"/>
+      <path d="M746 62 L774 62" class="edge" marker-end="url(#h3)"/>
+
+      <path d="M666 100 L666 130" class="edge-var"/>
+      <rect x="576" y="132" width="180" height="30" rx="4" class="s-var"/>
+      <text x="588" y="152" font-size="12" class="mono">manual_usecase.md</text>
+      <text x="744" y="152" font-size="11" class="b t-var" text-anchor="end">開く</text>
+      <g class="faded">
+        <rect x="576" y="168" width="180" height="30" rx="4" class="s-neu"/>
+        <text x="588" y="188" font-size="12" class="mono">legacy_script.md</text>
+        <text x="744" y="188" font-size="11" class="mute" text-anchor="end">読まない</text>
+        <rect x="576" y="204" width="180" height="30" rx="4" class="s-neu"/>
+        <text x="588" y="224" font-size="12" class="mono">spec_new_feature.md</text>
+        <text x="744" y="224" font-size="11" class="mute" text-anchor="end">読まない</text>
+      </g>
+      <text x="770" y="152" font-size="11" class="mono mute">references/methods/</text>
+      <text x="770" y="170" font-size="11" class="mute">flow.md が指す1つだけ</text>
+    </svg>
+    </div>
+    <figcaption>図3 方式の選択と参照。pipeline.dot の辺は変えず、flow_kind と同じく作業10の中で手順を切り替える。</figcaption>
+  </figure>
+
+  <h3 style="margin-top:32px">方式を成果物に刻印する場所</h3>
+  <p>蓄積物は方式によらず同じ場所に積むので、どの方式で作ったかだけを残す。後から方式ごとの成果(blocked の率、作業20での差し戻し率など)を比べる材料になる。</p>
+  <ul class="stamp">
+    <li><b>vocab.yaml</b>統制語彙 <code>scenario_source</code> を追加し、<code>context_key</code> にも載せる</li>
+    <li><b>flow.md・フロー台帳</b>フロントマターと台帳の列に方式を記録する</li>
+    <li><b>scenarios.md</b>付録Cのフロントマターに方式を記録する。既存行は変えない</li>
+    <li><b>status.yaml</b>§10 スロット8の <code>context_updates</code> に追加する。lint の <code>status_yaml_valid</code> がそのまま検査する</li>
+  </ul>
+</section>
+
+<section id="changes">
+  <h2>変更箇所の一覧</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>ファイル</th><th>変更</th></tr></thead>
+      <tbody>
+        <tr><td><code>procedure/methods/*.md</code></td><td>新設。1方式1ファイル、7スロット</td></tr>
+        <tr><td><code>procedure/stages.md</code> §10</td><td>パートBを共通契約に絞る。A2を「方式の入力資料から機能一覧を確定する」に一般化する。DoDパートBの根拠の列挙を方式参照にする。スロット8に <code>scenario_source</code> を加える</td></tr>
+        <tr><td><code>procedure/00_common.md</code></td><td>■文書の4層構成を5層にする。■AIへの渡し方に方式ファイルの同梱と「1つだけ開く」規約を加える</td></tr>
+        <tr><td><code>procedure/vocab.yaml</code></td><td><code>scenario_source</code> の語彙と <code>context_key</code> を追加する</td></tr>
+        <tr><td><code>procedure/pipeline.dot</code></td><td>注記を1つ追加する。構造は変えない</td></tr>
+        <tr><td><code>procedure/router/SKILL.md</code></td><td>新しいフローの開始に「方式を決める」手順を足す。手がかりがなければ <code>manual_usecase</code> を既定にする</td></tr>
+        <tr><td>テンプレート92</td><td>flow.md のフロントマターとフロー台帳に方式の欄を加える</td></tr>
+        <tr><td><code>skills.config.json</code></td><td><code>pms-10-explore</code> に <code>methods_dir</code> を加える</td></tr>
+        <tr><td><code>build-skills.mjs</code></td><td>方式ファイルの同梱、スロット検査、保護ブロックの照合を加える</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="alternatives">
+  <h2>検討して退けた案</h2>
+  <div class="alts">
+    <div class="alt">
+      <h3>§10 にパートを増やす</h3>
+      <p>パートB-1、B-2、B-3 のように方式ごとのパートを §10 に並べる。</p>
+      <p class="why">stages.md §10 が肥大し、全方式が常に読み込まれる。方式を足すたびに DoD も伸びる。00 の「他の関心を混ぜない」に反する。</p>
+    </div>
+    <div class="alt">
+      <h3>生成と探索を別の作業に分ける</h3>
+      <p>シナリオ生成を新しい作業(例: §12)として §10 から独立させる。</p>
+      <p class="why">方式の切り替えだけなら過剰である。status.yaml 契約、pipeline.dot、lint の <code>--stage</code>、テンプレート92、入口 skill のすべてに波及する。新機能起点の方式は配備済みを前提にすると決めたため(末尾の「決定事項」)、当面この分割は要らない。</p>
+    </div>
+  </div>
+  <p style="margin-top:18px">全方式を1つの skill に同梱する理由は、作業10の本文(パートA・C、DoD、status 契約)が方式によらず同じで、方式ファイルは数KBに収まる見込みだからである。方式ごとに固有のツールや長い手順が要るようになった時点で、<code>pms-10-explore-&lt;method&gt;</code> の変種を生成する形に切り替えればよい。その場合も正本の構造は変わらない。</p>
+</section>
+
+<section id="rollout">
+  <h2>導入の段取り</h2>
+  <ol class="steps">
+    <li>
+      <div>
+        <h3>挙動を変えない切り出し<span class="ver">proc-v011</span></h3>
+        <p>現行パートBを <code>methods/manual_usecase.md</code> に切り出し、語彙・テンプレート・生成器・入口を対応させる。skills を再生成し、<code>build-skills.mjs --check</code> と lint が通ることを確かめる。フローの結果は現行と同じになるはずである。</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>legacy_script の追加</h3>
+        <p>現行の「既存テストスクリプトの扱い」を、抽出手順として書き直して方式にする。既存スクリプトを持つ機能で1フロー試す。</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>spec_new_feature の追加</h3>
+        <p>方式ファイルのスロット1に「対象の機能が検証環境に配備済みであること」を前提条件として書く。§10 の連続実行、<code>pipeline.dot</code>、<code>flow_kind</code> は変えない。</p>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<section id="decision">
+  <h2>決定事項: 新機能起点の方式の前提</h2>
+  <p>新機能起点の方式では、シナリオを作る時点でゴールデンイメージにその機能が入っていない可能性がある。その場合パートC(探索)が実行できない。いまの §10 は「シナリオ生成と探索を連続して行う」前提なので、そのままでは完了報告が出せない。</p>
+  <div class="options">
+    <div class="opt rejected">
+      <div class="k">選択肢A<span class="badge no">不採用</span></div>
+      <h3>生成で止め、配備後に探索だけを行う</h3>
+      <div class="chain"><span>シナリオ生成</span><i>→</i><span class="stop">停止</span><i>→</i><span>機能の配備</span><i>→</i><span>探索のみのフロー</span><i>→</i><span>作業20</span></div>
+      <p>仕様が固まった段階でシナリオを先に作れる。代わりに §10 を生成と探索に実質分割することになり、上で退けた案の後半に近づく。方式層とは別に、<code>flow_kind</code> の拡張として設計するのが筋である。</p>
+    </div>
+    <div class="opt adopted">
+      <div class="k">選択肢B<span class="badge yes">採用</span></div>
+      <h3>検証環境への配備済みを前提にする</h3>
+      <div class="chain"><span>機能の配備</span><i>→</i><span>シナリオ生成</span><i>→</i><span>探索</span><i>→</i><span>作業20</span></div>
+      <p>方式ファイルのスロット1に前提条件として書くだけで、現行の連続実行を維持できる。今回の方式層の追加だけで済む。</p>
+    </div>
+  </div>
+  <div class="decided">
+    <h3>決定(2026-10-02)</h3>
+    <p style="margin-bottom:8px">新機能起点の方式は「検証環境に機能が配備済み」を前提条件にして、現行の連続実行を維持する。</p>
+    <ul>
+      <li>前提条件は <code>methods/spec_new_feature.md</code> のスロット1(入力資料)に書く。</li>
+      <li>§10 の「シナリオ生成と探索を連続して行う」規約、<code>pipeline.dot</code>、<code>flow_kind</code> は変えない。</li>
+      <li>生成と探索を別の作業に分ける案は、当面検討しない。</li>
+      <li>段取り1と2はこの決定の影響を受けない。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="applied">
+  <h2>正本への反映(proc-v011)</h2>
+  <p>本提案は 2026-10-02 に手順版 proc-v011 として正本 <code>procedure/</code> に反映し、skills を再生成した。反映の際に、提案から次の3点を変えた。</p>
+  <ul class="stamp">
+    <li><b>既存テストスクリプトの扱い</b>§10 パートBの共通契約に残した。manual_usecase でもスクリプトを参考情報として読めるようにするため。legacy_script の方式ファイルには抽出のしかただけを書いた</li>
+    <li><b>scenarios.md の方式の記録</b>フロントマターではなく、シナリオごとの「策定方式」の行にした。1つの scenarios.md に複数のフローが追記するため</li>
+    <li><b>導入の段取り</b>3方式を1つの版でまとめて加えた。manual_usecase は現行のやり方の書き出しなので、現行のフローの挙動は変わらない</li>
+  </ul>
+</section>
+
+<footer>改訂の詳細と指示の原文は <code>procedure/docs/000_overview.md</code> 21章にある。</footer>
+
+</div>
+</body>
+</html>

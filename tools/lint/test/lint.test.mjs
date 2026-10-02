@@ -675,6 +675,22 @@ test('status_yaml_valid: proc-v010 以降の作業10・20は environment(検証�
   assertHas(sv2, /env_keys_added はリストでなければなりません/);
 });
 
+test('status_yaml_valid: proc-v011 以降の作業10は scenario_source(シナリオ策定方式)が必須で、値は vocab の列挙', () => {
+  const v11 = (rel) => edit(rel, 'procedure_version: proc-v005', 'procedure_version: proc-v011');
+  const root = makeRepo({ ...v11('work/PRT/exploration/status.yaml'), ...v11('work/PRT/codegen/status.yaml') });
+  const p = path.join(root, 'work/PRT/exploration/status.yaml');
+  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('procedure_version: proc-v011\n', 'procedure_version: proc-v011\nenvironment: vm01\npre_stage: { state: skipped, run_id: PRE-20261002-101500-ab12 }\n'));
+  const sv = findings(lint(root, '--flow', 'F-001', '--stage', '10'), 'status_yaml_valid');
+  assertHas(sv, /context_updates\.scenario_source がありません/);
+  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('  flow_seq: first\n', '  flow_seq: first\n  scenario_source: from_memory\n'));
+  assertHas(findings(lint(root, '--flow', 'F-001', '--stage', '10'), 'status_yaml_valid'), /scenario_source の値 from_memory は manual_usecase \/ legacy_script \/ spec_new_feature \/ none/);
+  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('scenario_source: from_memory', 'scenario_source: legacy_script'));
+  const sv3 = findings(lint(root, '--flow', 'F-001', '--stage', '10'), 'status_yaml_valid');
+  assert.ok(!sv3.some((m) => /scenario_source/.test(m)), sv3.join('\n'));
+  // proc-v010 以前のフローでは求めない(基準のリポジトリは proc-v005)
+  assert.ok(!findings(lint(makeRepo(), '--flow', 'F-001', '--stage', '10'), 'status_yaml_valid').some((m) => /scenario_source/.test(m)));
+});
+
 const ENV_SHARED = JSON.stringify({ default: 'vm01', environments: { vm01: { attributes: {
   'pms.url': { kind: 'endpoint', value: 'https://pms-test-01.example.local/pms' },
   'pms.user': { kind: 'account', value: 'e2e-user01' },

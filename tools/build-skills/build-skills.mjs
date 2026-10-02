@@ -48,6 +48,10 @@ const src = {
 const templatesDir = path.join(ROOT, refs.templates_dir);
 const templateFiles = fs.readdirSync(templatesDir).filter((f) => /^\d\d_.+\.md$/.test(f)).sort();
 
+// シナリオ策定方式の方式ファイル(00 ■シナリオ策定方式)。vocab.scenario_source と1対1
+const METHOD_SLOTS = ['入力資料', '候補の抽出手順', '根拠の書き方', '代表値と範囲外の扱い', '方式固有の禁止事項', '方式固有のDoD', '方式固有のKB・DISC'];
+const methods = loadMethods();
+
 const versionMatch = src.vocab.match(/^\s{2}procedure_version:\s*(proc-v\d{3})\b/m);
 if (!versionMatch) fail(`${refs.vocab} の meta.procedure_version(proc-v<3桁>)が見つかりません`);
 const VERSION = versionMatch[1];
@@ -61,6 +65,7 @@ collectBlocks(src.vocab, 'yaml', refs.vocab, sourceBlocks);
 collectBlocks(src.pipeline, 'dot', refs.pipeline, sourceBlocks);
 collectBlocks(src.stages, 'md', refs.stages, sourceBlocks);
 for (const f of templateFiles) collectBlocks(readText(path.join(templatesDir, f)), 'md', f, sourceBlocks);
+for (const m of methods) collectBlocks(m.text, 'md', m.rel, sourceBlocks);
 
 // ── 生成(メモリ上) ─────────────────────────────────────
 const targets = config.targets.filter((t) => !opt.target || t.id === opt.target);
@@ -193,9 +198,21 @@ function buildWorkSkill(target, sk) {
     tplFiles.push({ num, file: `references/templates/${f}` });
   }
 
+  // 方式ファイル(作業10のみ。全方式を同梱し、実行時は flow.md が指す1つだけを開く)
+  const methodFiles = [];
+  if (sk.include_methods) {
+    if (!methods.length) errors.push(`${sk.name}: include_methods が指定されていますが、方式ファイルがありません(${refs.methods_dir ?? 'shared_references.methods_dir 未設定'})`);
+    for (const m of methods) {
+      checkMentions({ text: m.text }, decl, `${sk.section}(方式ファイル ${m.rel})`);
+      const file = `references/methods/${m.id}.md`;
+      put(`${dir}/${file}`, m.text);
+      methodFiles.push({ id: m.id, title: m.title, file, isDefault: m.isDefault });
+    }
+  }
+
   // SKILL.md
   const source = `${refs.stages} §${sk.section}`;
-  const header = workSkillHeader({ dir, sk, appendixFiles, tplFiles });
+  const header = workSkillHeader({ dir, sk, appendixFiles, tplFiles, methodFiles });
   const skillMd =
     frontmatter(target, { name: sk.name, description: sk.description, invocation: sk.invocation, source }) +
     generatedNotice(source) +
@@ -213,7 +230,7 @@ function buildWorkSkill(target, sk) {
   sizeReport.push(sizeLine(dir));
 }
 
-function workSkillHeader({ dir, sk, appendixFiles, tplFiles }) {
+function workSkillHeader({ dir, sk, appendixFiles, tplFiles, methodFiles = [] }) {
   const L = [];
   L.push(`# 作業${sk.section} ${sk.title}(手順版 ${VERSION})`);
   L.push('');
@@ -226,6 +243,9 @@ function workSkillHeader({ dir, sk, appendixFiles, tplFiles }) {
   L.push('3. 作業場所の `kb/00_索引.md` を読む(KB は索引のみ。全読みしない。00 ■知見ベース)');
   L.push('4. 対象フローがあれば、作業場所の `work/_flows/F-<番号>/flow.md` を読み、現在地と手順版を確かめる');
   L.push('5. 付録と記入用テンプレートは、本文で参照されたときに下の表のファイルを開く');
+  if (methodFiles.length) {
+    L.push('6. **方式ファイルは、flow.md の `scenario_source` が指す1つだけを開く**(通常フローのパートA・B。00 ■シナリオ策定方式)。他の方式ファイルは読まない。再探索フロー(`none`)・パートP・lint の指摘の修正では開かない');
+  }
   L.push('');
   L.push('## 本文の呼び名と、このskillのファイル');
   L.push('');
@@ -235,6 +255,7 @@ function workSkillHeader({ dir, sk, appendixFiles, tplFiles }) {
   L.push(`| \`vocab.yaml\`・\`vocab.〇〇\` | \`${dir}/references/vocab.yaml\` |`);
   for (const a of appendixFiles) L.push(`| 付録${a.letter}(${a.title}) | \`${dir}/${a.file}\` |`);
   for (const t of tplFiles) L.push(`| テンプレート${t.num} | \`${dir}/${t.file}\`(書式の原本。記入先は本文が示す \`work/\` 配下) |`);
+  for (const m of methodFiles) L.push(`| 方式ファイル \`${m.id}\`(${m.title}${m.isDefault ? '。既定の方式' : ''}) | \`${dir}/${m.file}\`(flow.md の \`scenario_source\` が \`${m.id}\` のときだけ開く) |`);
   L.push('| `pipeline.dot`・`stages.md` の他の節・上にない付録 | この skill には含まれない。**読まない**(他の作業の関心を混ぜないため。00 ■AIへの渡し方) |');
   L.push('| 上にない記入用テンプレート | 書式が必要なら、作業場所の記入済みの台帳(`work/_common/` 配下)の既存の行に合わせる |');
   L.push('');
@@ -271,6 +292,61 @@ function generatedNotice(source) {
 
 function versionFile(source) {
   return `procedure_version: ${VERSION}\ngenerated_from: ${source}\ngenerator: tools/build-skills/build-skills.mjs\n`;
+}
+
+// ════════════════════════════════════════════════════════
+// 方式ファイルの読み込みと検査
+// ════════════════════════════════════════════════════════
+
+function loadMethods() {
+  if (!refs.methods_dir) return [];
+  const dirAbs = path.join(ROOT, refs.methods_dir);
+  if (!fs.existsSync(dirAbs)) { errors.push(`${refs.methods_dir} がありません`); return []; }
+  const files = fs.readdirSync(dirAbs).filter((f) => f.endsWith('.md')).sort();
+  const vocabIds = vocabKeys('scenario_source');
+  const defaultId = (vocabBlock('default').match(/^\s{2}scenario_source:\s*([a-z][a-z0-9_]*)/m) ?? [])[1] ?? null;
+  const out = [];
+  for (const f of files) {
+    const rel = path.posix.join(refs.methods_dir, f);
+    const id = f.replace(/\.md$/, '');
+    if (!/^[a-z][a-z0-9_]*$/.test(id)) { errors.push(`${rel}: 方式ファイルの名前は <方式ID>.md(英小文字・数字・_)にしてください`); continue; }
+    const text = readText(path.join(dirAbs, f));
+    const lines = text.split('\n');
+    if (lines[0] !== `# 方式: ${id}`) errors.push(`${rel}: 1行目は「# 方式: ${id}」にしてください`);
+    const title = (text.match(/^方式名: ([^/\n]+)/m) ?? [])[1]?.trim();
+    if (!title) errors.push(`${rel}: 「方式名: …」の行がありません`);
+    // 7スロットがこの順で1回ずつあること(00 ■シナリオ策定方式)
+    const heads = [];
+    let inFence = false;
+    for (const l of lines) {
+      if (/^\s*```/.test(l)) inFence = !inFence;
+      if (!inFence && /^## /.test(l)) heads.push(l.slice(3).trim());
+    }
+    const want = METHOD_SLOTS.map((name, i) => `${i + 1}. ${name}`);
+    if (heads.join('\n') !== want.join('\n')) {
+      errors.push(`${rel}: 見出しは7スロット(${want.join(' / ')})をこの順で持ってください(現在: ${heads.join(' / ') || 'なし'})`);
+    }
+    if (vocabIds.length && !vocabIds.includes(id)) errors.push(`${rel}: 方式 ${id} が ${refs.vocab} の scenario_source にありません`);
+    out.push({ id, rel, text, title: title ?? id, isDefault: id === defaultId });
+  }
+  for (const v of vocabIds) if (!out.some((m) => m.id === v)) errors.push(`${refs.vocab} の scenario_source にある ${v} の方式ファイル(${refs.methods_dir}/${v}.md)がありません`);
+  if (vocabIds.length && !vocabIds.includes(defaultId)) errors.push(`${refs.vocab} の default.scenario_source(${defaultId ?? 'なし'})が scenario_source の値ではありません`);
+  return out;
+}
+
+/** vocab.yaml の最上位のブロック(「<key>:」の行から、次の最上位の行の前まで) */
+function vocabBlock(key) {
+  const lines = src.vocab.split('\n');
+  const start = lines.findIndex((l) => l.startsWith(`${key}:`));
+  if (start < 0) return '';
+  let end = start + 1;
+  while (end < lines.length && (lines[end] === '' || /^\s|^#/.test(lines[end]))) end++;
+  return lines.slice(start + 1, end).join('\n');
+}
+
+/** vocab.yaml の最上位のマッピングのキー(2字下げの行) */
+function vocabKeys(key) {
+  return [...vocabBlock(key).matchAll(/^ {2}([A-Za-z0-9_-]+):/gm)].map((m) => m[1]);
 }
 
 // ════════════════════════════════════════════════════════

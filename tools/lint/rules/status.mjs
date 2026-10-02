@@ -3,7 +3,7 @@
 import { STAGES, flowNumber } from '../lib/repo.mjs';
 
 // 分岐に使うキーのうち、あとの手順版で追加したもの(それより前の版で始めたフローでは求めない)
-const KEY_SINCE = { health_signal: 7 };
+const KEY_SINCE = { health_signal: 7, scenario_source: 11 }; // scenario_source は作業10のシナリオ策定方式(proc-v011)
 // 作業ごとに、あとの版で分岐キーを加えたもの(作業15の escalation は proc-v008)
 const STAGE_KEY_SINCE = { '15': { escalation: 8 } };
 // 最上位の項目のうち、あとの手順版で追加したもの

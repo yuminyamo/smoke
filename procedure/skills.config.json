@@ -1,5 +1,5 @@
 {
-  "_comment": "skills の生成設定。tools/build-skills/build-skills.mjs が読む。手順の内容(何を同梱するか)は stages.md の各節の「参照付録」「参照テンプレート」の行が正で、ここには skill の名前・説明・生成先だけを書く。",
+  "_comment": "skills の生成設定。tools/build-skills/build-skills.mjs が読む。手順の内容(何を同梱するか)は stages.md の各節の「参照付録」「参照テンプレート」の行が正で、ここには skill の名前・説明・生成先だけを書く。include_methods を true にした skill には、methods_dir の全方式ファイル(シナリオ策定方式)を同梱する。",
 
   "targets": [
     {
@@ -21,13 +21,14 @@
     "vocab": "procedure/vocab.yaml",
     "pipeline": "procedure/pipeline.dot",
     "stages": "procedure/stages.md",
-    "templates_dir": "procedure/templates"
+    "templates_dir": "procedure/templates",
+    "methods_dir": "procedure/methods"
   },
 
   "router": {
     "name": "pms-regression",
     "source": "procedure/router/SKILL.md",
-    "description": "PMS(プリント管理システム)の回帰テストを作る・続きをする・進み具合を知るときの入口。「〇〇機能の回帰テストを作って」「F-003の続き」「続けて」「いまどうなってる?」「EXT-002を再探索して」などの依頼で使う。どの作業(シナリオ生成と探索/健全性の是正/コード生成 など)を行うかはこのskillが決め、作業ごとのskill(pms-10-explore 等)を使う。",
+    "description": "PMS(プリント管理システム)の回帰テストを作る・続きをする・進み具合を知るときの入口。「〇〇機能の回帰テストを作って」「既存の手順書をもとに〇〇のテストを作って」「F-003の続き」「続けて」「いまどうなってる?」「EXT-002を再探索して」などの依頼で使う。どの作業(シナリオ生成と探索/健全性の是正/コード生成 など)を行うかはこのskillが決め、作業ごとのskill(pms-10-explore 等)を使う。",
     "references": ["pipeline", "vocab"]
   },
 
@@ -50,7 +51,8 @@
       "name": "pms-10-explore",
       "section": "10",
       "title": "シナリオ生成と探索",
-      "description": "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について単機能シナリオを作り、playwright-cli で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。",
+      "include_methods": true,
+      "description": "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、playwright-cli で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。",
       "invocation": "auto"
     },
     {

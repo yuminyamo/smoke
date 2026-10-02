@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-09-28 / 版: v12(検証環境の情報: 手順版を proc-v010 に更新、environment_info・env_attr_kind・env_base_keys を追加)
+# 改訂: 2026-10-02 / 版: v13(シナリオ策定方式の分離: 手順版を proc-v011 に更新、scenario_source・default.scenario_source・コンテキストキー scenario_source・手順箇所 MT を追加)
+#       2026-09-28 / 版: v12(検証環境の情報: 手順版を proc-v010 に更新、environment_info・env_attr_kind・env_base_keys を追加)
 #       2026-09-28 / 版: v11(ゴールデンイメージの定義の拡張: 手順版を proc-v009 に更新、golden_image を追加、包括原則4と S-CLEAN-ENV を復元範囲で書き直した(包括原則4は保護ブロック。人間の指示による改訂))
 #       2026-09-28 / 版: v10(作業15の環境の変更と開始前シナリオ: 手順版を proc-v008 に更新、health_outcome に env_changed、pre_stage_state・pre_stage_on_failure を追加)
 #       2026-09-28 / 版: v9(健全性の是正: 手順版を proc-v007 に更新、health_signal_kind・health_outcome・inquiry_answer_kind・default.inquiry_limit・フロー状態 in-progress(15)・コンテキストキー health_signal を追加)
@@ -27,8 +28,8 @@
 
 meta:
   step: 1                       # 本語彙が対象とするステップ
-  revision: "2026-09-28"
-  procedure_version: proc-v010  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  revision: "2026-10-02"
+  procedure_version: proc-v011  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -82,6 +83,11 @@ progress_state:                 # 進捗軸(状態カタログ。作業30)
 flow_kind:                      # フローの種別(フロー台帳・flow.md・context_key 共通)
   new: 通常フロー。人間の領域指示について作業10 → 20 を1巡する
   reexplore: 再探索フロー。人間が整備した外部操作 skill を使い、その操作が無くて blocked になったシナリオを探索し直す
+
+scenario_source:                # シナリオ策定方式(00 ■シナリオ策定方式)。値ごとに procedure/methods/<値>.md を1つ持つ(生成スクリプトが照合する)。フロー台帳・flow.md・scenarios.md・context_key 共通
+  manual_usecase: マニュアル・仕様書から、利用者が行う基本的な作業(基本ユースケース)を抽出する。既定の方式
+  legacy_script: 人間が作成した既存のテストスクリプトから、利用者の一連の作業と確認観点を抽出する。スクリプトは参考情報であり正解の根拠ではない
+  spec_new_feature: 新しく実装した機能の仕様書から、追加された基本動作を抽出する。対象の機能が検証環境に配備済みであることが前提
 
 flow_status:                    # フローの状態(フロー台帳・flow.md 共通)
   open: flow.md 作成済・作業未着手
@@ -375,6 +381,7 @@ procedure_location:             # 手順箇所の書式。ファイル名では�
   VO: "VO/<キー> — 統制語彙(vocab.yaml)のキー。例 VO/default.timeout_sec"
   PD: "PD/<ノードID> — パイプライン構造(pipeline.dot)のノード・辺。例 PD/cod"
   TP: "TP/<番号> — 記入用テンプレート。例 TP/91"
+  MT: "MT/<方式ID>/<スロット> — シナリオ策定方式の方式ファイル(methods/)。例 MT/legacy_script/2"
 
 imp_tier:                       # 改訂の区分(00 ■手順改訂の統制)
   A: 自律適用 — 作業40が試行版として適用してよい(自律適用の解禁後)
@@ -430,6 +437,7 @@ default:
   investigation_limit: 3        # 同一目的の調査回数の上限
   inquiry_limit: 3              # 作業15の問い合わせの回数の上限(1シナリオ・1フローあたり。初回を含む)
   scenarios_per_feature: "1〜2(3本以上になる機能は範囲を見直す)"
+  scenario_source: manual_usecase  # 依頼文に方式の手がかりがないときのシナリオ策定方式(00 ■シナリオ策定方式)
   kb_file_lines: 200
   improvement_interval_flows: 3    # 作業40を起動する間隔(前回の作業40から完了したフローの数)
   signal_recurrence_threshold: 2   # 同一手順箇所の未処理シグナルがこの件数に達したら作業40を起動する
@@ -445,6 +453,7 @@ context_key:
   flow_id: "F-<3桁連番>"
   flow_kind: [new, reexplore]           # reexplore = 再探索フロー(作業10がパートRで動く)
   flow_seq: [first, subsequent]         # first = F-001(機能一覧の確定を伴う)
+  scenario_source: [manual_usecase, legacy_script, spec_new_feature, none]   # 作業10のシナリオ策定方式(flow.md の写し。値の意味は scenario_source)。none = 再探索フロー(シナリオを作らない)。辺の条件には使わず、作業10の中で手順を切り替える
   improvement_due: [yes, no]            # 作業40(手順改善)を起動するか。lint が判定する(未実装の間は人間の指示)
   kb_requested: [yes, no]               # 人間が知見蓄積(01)を指示したか
   nd_needed: [yes, no]                  # 非決定値カタログの初期作成/増分実施が必要か

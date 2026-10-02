@@ -2,12 +2,12 @@
 name: pms-20-codegen
 description: "PMS回帰テスト作成の作業20(回帰テストコード生成)。通常は入口skill pms-regression から使う。作業10の探索記録と status.yaml から、実行時にAIを使わない Playwright の回帰テストを生成し、実行確認と突合表の更新を行う。"
 metadata:
-  procedure_version: proc-v010
+  procedure_version: proc-v011
   generated_from: "procedure/stages.md §20"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v010 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v011 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業20 回帰テストコード生成(手順版 proc-v010)
+# 作業20 回帰テストコード生成(手順版 proc-v011)
 
 この skill は、手順書の正本の `stages.md` §20 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -38,7 +38,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v010` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v011` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 

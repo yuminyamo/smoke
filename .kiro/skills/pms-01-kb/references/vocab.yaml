@@ -1,10 +1,10 @@
 # 統制語彙 — 単一ソース
 #
 # 本ファイルが統制語彙の正本である。00_common.md / stages.md / pipeline.dot /
-# 各記入用テンプレート(90/91/92/93/94/95)は、値の定義をここから参照し、再掲しない。
+# 各記入用テンプレート(90/91/92/93/94/95/96)は、値の定義をここから参照し、再掲しない。
 # 値を増減するときは必ずここを先に変更する。
 #
-# 記入用テンプレート(90/91/92/93/94)は人間が使う都合で表を持っているが、
+# 記入用テンプレート(90/91/92/93/94/96)は人間が使う都合で表を持っているが、
 # そちらは本ファイルの写しである。食い違ったら本ファイルを正とする(lint: vocab_sync)。
 #
 # 手順の改訂の区分(00 ■手順改訂の統制):
@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-02 / 版: v13(シナリオ策定方式の分離: 手順版を proc-v011 に更新、scenario_source・default.scenario_source・コンテキストキー scenario_source・手順箇所 MT を追加)
+# 改訂: 2026-10-03 / 版: v14(ステップ1の状態の追加: 手順版を proc-v012 に更新、state_demand_status・id_format.state_demand を追加、initial_state_set の注記を基本の状態と追加の状態に分けた)
+#       2026-10-02 / 版: v13(シナリオ策定方式の分離: 手順版を proc-v011 に更新、scenario_source・default.scenario_source・コンテキストキー scenario_source・手順箇所 MT を追加)
 #       2026-09-28 / 版: v12(検証環境の情報: 手順版を proc-v010 に更新、environment_info・env_attr_kind・env_base_keys を追加)
 #       2026-09-28 / 版: v11(ゴールデンイメージの定義の拡張: 手順版を proc-v009 に更新、golden_image を追加、包括原則4と S-CLEAN-ENV を復元範囲で書き直した(包括原則4は保護ブロック。人間の指示による改訂))
 #       2026-09-28 / 版: v10(作業15の環境の変更と開始前シナリオ: 手順版を proc-v008 に更新、health_outcome に env_changed、pre_stage_state・pre_stage_on_failure を追加)
@@ -28,8 +29,8 @@
 
 meta:
   step: 1                       # 本語彙が対象とするステップ
-  revision: "2026-10-02"
-  procedure_version: proc-v011  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  revision: "2026-10-03"
+  procedure_version: proc-v012  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -293,11 +294,17 @@ strength:                       # 検証強度。下位に落とす前に必ず�
     impl: toBeVisible() / NOT NULL の確認のみ
 
 # ── 状態(前提条件) ──────────────────────────────────────
-initial_state_set:              # ステップ1で使用できる状態。AIが勝手に追加しない
+initial_state_set:              # ステップ1の基本の状態。AIが勝手に追加しない。ステップ1で使える状態(初期状態セット)は、この表と、状態需要リストで人間が採用した状態を合わせたもの(00 ■状態(前提条件)の扱い)
   S-ADMIN-LOGIN: 全権限を持つ管理者でログイン済
   S-USER-LOGIN: 一般権限のユーザーでログイン済
   S-DEVICE-REGISTERED: テスト用デバイスが1台以上登録済
   S-CLEAN-ENV: ゴールデンイメージの復元(VM の復元と開始前シナリオの復元エントリ)の直後の状態
+
+state_demand_status:            # 状態需要リスト(テンプレート96)の行の状態。初期状態セットへの追加の提案と採否
+  提案: AI が、初期状態セットにない前提状態の需要を記録し、状態として追加することを提案した(人間の採否待ち。フローは止めない)
+  採用: 人間が採用した。以後のフローで requires に使える(初期状態セットに含まれる)。fixture は未整備
+  整備済: AI が実操作で fixture と established check を整備した(fixture の所在を記入)。初期状態セットに含まれる
+  不採用: 人間が採用しないと判断した(理由を備考に書く)。要求元の申し送りは元の理由コードのまま残る
 
 setup_classification:
   provided: 既存資産を流用
@@ -418,6 +425,7 @@ id_format:
   discrepancy: "DISC-<機能コード>-<3桁連番>"  # 横断は DISC-COM-<連番>
   nondeterministic: "ND-UI-<3桁連番> / ND-DB-<3桁連番> / ND-Q-<3桁連番>"
   state: "S-<対象>-<状態>"
+  state_demand: "SD-<3桁連番>"             # 状態需要リストの需要ID
   gotcha: "GOT-<4桁連番>"
   open_question: "Q-<3桁連番>"
   test_data: "AT-<シナリオID>-<実行識別子>"

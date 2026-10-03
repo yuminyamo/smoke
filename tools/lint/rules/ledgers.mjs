@@ -1,5 +1,5 @@
 // ledgers.mjs — 台帳・KB との突き合わせ
-//   reason_code_enum / ext_demand_linked / operation_registered
+//   reason_code_enum / ext_demand_linked / operation_registered / requires_in_state_set
 
 import { idsIn, sectionLines } from '../lib/markdown.mjs';
 
@@ -130,4 +130,70 @@ export function operation_registered(repo) {
     }
   }
   return { findings, notes };
+}
+
+// ════════════════════════════════════════════════════════
+// requires_in_state_set
+// ════════════════════════════════════════════════════════
+const IN_STATE_SET = ['採用', '整備済'];
+
+export function requires_in_state_set(repo) {
+  const findings = [];
+  const notes = [];
+  const add = (file, message) => findings.push({ file, message });
+  const clean = (v) => String(v ?? '').replace(/`/g, '').trim();
+
+  const base = Object.keys(repo.vocab.initial_state_set ?? {});
+  const statuses = Object.keys(repo.vocab.state_demand_status ?? {});
+  const d = repo.stateDemandRows;
+  if (!d.exists) notes.push(`${d.rel} がありません(初期状態セットは vocab.initial_state_set だけ)`);
+
+  const demandIds = new Set();
+  const stateRow = new Map(); // 状態ID → { id, status }
+  for (const row of d.rows) {
+    const where = `${d.rel}:${row.line}`;
+    const id = clean(row.obj['需要ID']);
+    const st = clean(row.obj['状態ID']);
+    const status = clean(row.obj['状態']);
+    if (!/^SD-\d{3}$/.test(id)) add(where, `需要ID「${id || '空欄'}」が書式(SD-<3桁>)に合いません`);
+    else if (demandIds.has(id)) add(where, `需要ID ${id} が重複しています(一度採番したIDは1行だけ)`);
+    else demandIds.add(id);
+    if (!statuses.includes(status)) add(where, `${id} の状態「${status || '空欄'}」が vocab.state_demand_status にありません`);
+    if (!st) continue;
+    if (base.includes(st)) add(where, `${id} の状態ID ${st} は基本の状態(vocab.initial_state_set)にあります(提案しない)`);
+    if (stateRow.has(st)) add(where, `${id} の状態ID ${st} が ${stateRow.get(st).id} と重複しています(同じ状態は要求元に追記する)`);
+    else stateRow.set(st, { id, status });
+    if (status === '整備済' && isBlankCell(row.obj['fixture'])) add(where, `${id} は 整備済 なのに fixture の所在がありません`);
+  }
+  const allowed = new Set([...base, ...[...stateRow].filter(([, v]) => IN_STATE_SET.includes(v.status)).map(([k]) => k)]);
+
+  const defs = repo.scenarioDefs;
+  const seen = new Set();
+  for (const r of repo.latestRecords()) {
+    if (!r.id || seen.has(r.id)) continue;
+    seen.add(r.id);
+    const def = defs.get(r.id);
+    if (!def) continue; // 定義の欠落は requires_covered が指摘する
+    for (const st of def.requires) {
+      if (allowed.has(st)) continue;
+      const row = stateRow.get(st);
+      const why = row ? `状態需要リストの ${row.id} が ${row.status || '状態なし'} です(採用 / 整備済 になるまで requires に使わない)` : '基本の状態にも状態需要リストの採用済みの行にもありません';
+      add(`${def.file}:${def.line}`, `${r.id} の requires の ${st} が初期状態セットにありません — ${why}`);
+    }
+  }
+
+  const h = repo.handoffRows;
+  for (const row of h.rows) {
+    if (!handoffInScope(repo, row)) continue;
+    for (const id of idsIn(row.obj['想定手段'], /SD-\d{3}/g)) {
+      if (!demandIds.has(id)) add(`${h.rel}:${row.line}`, `${row.obj['ID']} が参照する ${id} が状態需要リストにありません`);
+    }
+  }
+  notes.push(`初期状態セット: 基本 ${base.length} 件 + 採用済み ${allowed.size - base.length} 件`);
+  return { findings, notes };
+}
+
+function isBlankCell(v) {
+  const t = String(v ?? '').replace(/`/g, '').trim();
+  return t === '' || t === '-' || t === '—';
 }

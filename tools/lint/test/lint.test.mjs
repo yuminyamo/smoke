@@ -448,6 +448,56 @@ test('ext_demand_linked: 申し送りの需要IDなし・存在しない需要ID
   assertHas(el, /HO-PRT-002 の理由コードが「操作手段なし」ではありません/);
 });
 
+const STATE_DEMAND = (rows) => `# 状態需要リスト
+
+## 台帳
+
+| 需要ID | 状態ID | 定義(業務語) | 分類 | 状態 | 要求元 | 構築の見込み | established check の案 | 判断日(人間) | fixture | 起票日 | 備考 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+${rows}
+| SD-099 |  |  |  | 提案 |  |  |  |  |  |  |  |
+
+## 記入例
+
+| 需要ID | 状態ID | 定義(業務語) | 分類 | 状態 | 要求元 | 構築の見込み | established check の案 | 判断日(人間) | fixture | 起票日 | 備考 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| SD-001 | S-EXAMPLE | 例 | DATA | 採用 | HO-XXX-001 |  |  |  |  | 2026-10-01 |  |
+`;
+
+test('requires_in_state_set: 基本の状態だけなら通る。提案のままの状態を requires に使うと ERROR、採用・整備済なら通る', () => {
+  assert.deepEqual(findings(lint(makeRepo()), 'requires_in_state_set'), []);
+  const scen = edit('work/PRT/scenarios.md', '- **requires**: S-ADMIN-LOGIN\n', '- **requires**: S-ADMIN-LOGIN, S-JOBLOG-COLLECTED\n');
+  const row = (status, fixture = '') => `| SD-001 | S-JOBLOG-COLLECTED | ジョブログが1件以上収集済 | DATA | ${status} | HO-PRT-002 | 管理画面で収集 | 一覧に自データの行 | 2026-10-03 | ${fixture} | 2026-10-03 |  |`;
+  const none = findings(lint(makeRepo({ ...scen })), 'requires_in_state_set');
+  assertHas(none, /SC-PRT-03 の requires の S-JOBLOG-COLLECTED が初期状態セットにありません — 基本の状態にも/);
+  const proposed = findings(lint(makeRepo({ ...scen, 'work/_common/state-demand.md': STATE_DEMAND(row('提案')) })), 'requires_in_state_set');
+  assertHas(proposed, /S-JOBLOG-COLLECTED が初期状態セットにありません — 状態需要リストの SD-001 が 提案 です/);
+  assert.deepEqual(findings(lint(makeRepo({ ...scen, 'work/_common/state-demand.md': STATE_DEMAND(row('採用')) })), 'requires_in_state_set'), []);
+  assert.deepEqual(findings(lint(makeRepo({ ...scen, 'work/_common/state-demand.md': STATE_DEMAND(row('整備済', 'fixtures/joblog.ts#jobLogCollected')) })), 'requires_in_state_set'), []);
+});
+
+test('requires_in_state_set: 需要IDの重複・状態IDの重複・語彙外の状態・整備済の fixture なし・申し送りが参照する需要IDがない', () => {
+  const rows = [
+    '| SD-001 | S-JOBLOG-COLLECTED | 収集済 | DATA | 整備済 | HO-PRT-002 |  |  |  |  | 2026-10-03 |  |',
+    '| SD-001 | S-QUOTA-SET | 上限設定済 | CONFIG | 承認 | HO-PRT-002 |  |  |  |  | 2026-10-03 |  |',
+    '| SD-002 | S-JOBLOG-COLLECTED | 収集済(重複) | DATA | 提案 | HO-PRT-002 |  |  |  |  | 2026-10-03 |  |',
+    '| SD-003 | S-USER-LOGIN | 一般ユーザーでログイン済 | AUTH | 提案 | HO-PRT-002 |  |  |  |  | 2026-10-03 |  |',
+  ].join('\n');
+  const root = makeRepo({
+    'work/_common/state-demand.md': STATE_DEMAND(rows),
+    ...edit('work/_common/handoff-register.md', '| PROH-001 | F-001 / 作業10 / SC-PRT-03-S3 |', '| PROH-001, SD-009 | F-001 / 作業10 / SC-PRT-03-S3 |'),
+  });
+  const f = findings(lint(root), 'requires_in_state_set');
+  assertHas(f, /SD-001 は 整備済 なのに fixture の所在がありません/);
+  assertHas(f, /需要ID SD-001 が重複しています/);
+  assertHas(f, /の状態「承認」が vocab\.state_demand_status にありません/);
+  assertHas(f, /SD-002 の状態ID S-JOBLOG-COLLECTED が SD-001 と重複しています/);
+  assertHas(f, /SD-003 の状態ID S-USER-LOGIN は基本の状態/);
+  assertHas(f, /HO-PRT-002 が参照する SD-009 が状態需要リストにありません/);
+  // 台帳の節だけを見る(記入例・空行は数えない)
+  assert.ok(!f.some((m) => /SD-099|S-EXAMPLE/.test(m)), f.join('\n'));
+});
+
 test('operation_registered: 索引にない操作・適合の節がない・禁止の行に該当', () => {
   const root = makeRepo({ ...edit('kb/external-ops/00_操作索引.md', 'OP-CLI-001', 'OP-CLI-002') });
   assertHas(findings(lint(root), 'operation_registered'), /OP-CLI-001 が KB T05 の操作索引に登録されていません/);

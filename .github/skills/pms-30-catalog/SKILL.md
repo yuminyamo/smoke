@@ -2,12 +2,12 @@
 name: pms-30-catalog
 description: "PMS回帰テスト作成の作業30(状態カタログ案生成)。管理者が指示したときだけ使う(複数フロー完了後)。累積した探索記録から前提状態のカタログ案を作る。フェーズ2の完了時に必ず停止する。"
 metadata:
-  procedure_version: proc-v011
+  procedure_version: proc-v012
   generated_from: "procedure/stages.md §30"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §30 / 手順版: proc-v011 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §30 / 手順版: proc-v012 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業30 状態カタログ案生成(手順版 proc-v011)
+# 作業30 状態カタログ案生成(手順版 proc-v012)
 
 この skill は、手順書の正本の `stages.md` §30 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -30,12 +30,13 @@ metadata:
 | 付録A(exploration-log.yaml) | `.github/skills/pms-30-catalog/references/appendix-A.md` |
 | 付録B(setup-log.yaml) | `.github/skills/pms-30-catalog/references/appendix-B.md` |
 | テンプレート94 | `.github/skills/pms-30-catalog/references/templates/94_手順改善台帳_記入用.md`(書式の原本。記入先は本文が示す `work/` 配下) |
+| テンプレート96 | `.github/skills/pms-30-catalog/references/templates/96_状態需要リスト_記入用.md`(書式の原本。記入先は本文が示す `work/` 配下) |
 | `pipeline.dot`・`stages.md` の他の節・上にない付録 | この skill には含まれない。**読まない**(他の作業の関心を混ぜないため。00 ■AIへの渡し方) |
 | 上にない記入用テンプレート | 書式が必要なら、作業場所の記入済みの台帳(`work/_common/` 配下)の既存の行に合わせる |
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v011` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v012` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -61,7 +62,7 @@ metadata:
 # §30 状態カタログ案生成
 
 ノードID: `cat` / クラス: `.text`
-参照付録: G, E, A, B / 参照テンプレート: 94
+参照付録: G, E, A, B / 参照テンプレート: 94, 96
 
 ## 1. 役割
 
@@ -92,6 +93,7 @@ metadata:
 | **2** | `setup-log` | 既に整備済みのセットアップと established check |
 | **2b** | `kb` | 状態がどの操作で成立し、どこで確認できるか(T01 / T02 / T03 / T07) |
 | **3** | `handoff-register` | `初期状態外`・`状態未整備` で落とされた対象 = **需要のある未整備状態** |
+| **3b** | `state-demand` | 状態需要リスト(`work/_common/state-demand.md`)。`整備済` は fixture のある状態、`採用` は人間が採用した未整備の状態、`提案` / `不採用` は需要の記録 |
 | 4 | ソースコード | ロール定義、ステータス enum、DB制約、表示分岐条件 |
 | 5 | 仕様書 | 状態の業務的意味、遷移ルール、権限とロールの対応 |
 | 6 | マニュアル | 状態の作り方、運用上の前提 |
@@ -133,6 +135,7 @@ metadata:
 3. **`carried_data`** → 持ち回られたデータは、後続ステップにとっての前提状態を示している
 4. **`blocked` になったステップの理由** → 作れなかった状態が明示されている
 5. **申し送り台帳の `初期状態外`・`状態未整備`** → 需要が確定している未整備状態。前者は `未整備`、後者は `未整備(実操作不可)` に対応する見込み
+6. **状態需要リストの行** → ステップ1で追加された状態。`整備済` は setup-log・fixture から転記して `整備済`、`採用` は `未整備`。**状態IDは状態需要リストのものをそのまま使う**(requires・fixture から参照されているため)。`不採用` は人間の判断の記録として catalog-log.yaml に残す
 
 **探索記録から起こした状態には、成立確認方法と構築の骨子が既に実績として存在する。推測で書き直さず、記録から転記すること。**
 

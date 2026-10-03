@@ -283,6 +283,17 @@ export class Repo {
     });
   }
 
+  /** 状態需要リスト(## 台帳 の表)の記入済みの行 */
+  get stateDemandRows() {
+    return this.memo('statedemand', () => {
+      const rel = 'work/_common/state-demand.md';
+      if (!this.exists(rel)) return { rel, exists: false, rows: [] };
+      const t = tableInSection(this.read(rel), '台帳', '需要ID');
+      const rows = (t?.rows ?? []).filter((r) => !isBlank(r.obj['状態ID']) || !isBlank(r.obj['定義(業務語)']));
+      return { rel, exists: true, rows };
+    });
+  }
+
   /** 禁止操作リスト(## 禁止操作表)の操作欄が記入された行 */
   get prohibitedRows() {
     return this.memo('prohibited', () => {

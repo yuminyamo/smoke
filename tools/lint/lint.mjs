@@ -30,6 +30,7 @@
 //   health_recorded            健全性シグナルのあるステップを passed にしていない、health_fix の記録、作業10・15の status.yaml との一致
 //   ext_demand_linked          操作手段なし の申し送り・blocked のステップが、外部操作需要リストの需要IDを参照している
 //   operation_registered       使った operation_id が KB T05 に登録済みで、禁止操作リストの 禁止/要許可 に該当しない
+//   requires_in_state_set      requires の全状態が初期状態セット(基本の状態 + 状態需要リストの 採用・整備済)にある。SD-ID の参照・重複
 //   skills_in_sync             tools/build-skills/build-skills.mjs --check を呼ぶ
 //   prohibition_recheck        作業20の前は tools/checks/prohibited-ops.mjs --compare を呼ぶ。作業20のあとは prohibition_check: ok を確かめる
 //   env_restored               skill restore-golden-image 同梱の Test-EnvRestoreMarker.ps1 を呼ぶ(PowerShell が必要)
@@ -42,13 +43,13 @@ import { fileURLToPath } from 'node:url';
 import { Repo, LintSetupError, STAGES } from './lib/repo.mjs';
 import { status_yaml_valid, procedure_version_present } from './rules/status.mjs';
 import { requires_covered, blocked_recorded, verdict_enum, no_temp_locator, health_recorded } from './rules/exploration.mjs';
-import { reason_code_enum, ext_demand_linked, operation_registered } from './rules/ledgers.mjs';
+import { reason_code_enum, ext_demand_linked, operation_registered, requires_in_state_set } from './rules/ledgers.mjs';
 import { skills_in_sync, prohibition_recheck, env_restored } from './rules/delegated.mjs';
 import { env_value_leak, env_value_hardcoded } from './rules/environment.mjs';
 
 const IMPLEMENTED = {
   status_yaml_valid, procedure_version_present, verdict_enum, reason_code_enum, no_temp_locator,
-  requires_covered, blocked_recorded, health_recorded, ext_demand_linked, operation_registered,
+  requires_covered, blocked_recorded, health_recorded, ext_demand_linked, operation_registered, requires_in_state_set,
   skills_in_sync, prohibition_recheck, env_restored, env_value_leak, env_value_hardcoded,
 };
 // 既存のスクリプトを呼ぶ規則(--list の表示用)

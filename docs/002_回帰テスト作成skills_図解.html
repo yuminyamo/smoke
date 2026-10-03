@@ -1,0 +1,1558 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PMS回帰テスト skills 図解</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F2F4F5; --surface:#FFFFFF; --ink:#17202A; --muted:#5B6672; --line:#D5DBE0; --code-bg:#E7EBEE;
+  --ai:#2C5C8F; --ai-soft:#E1EAF4;
+  --human:#9A5B0E; --human-soft:#FAECD8;
+  --stop:#B0362F; --stop-soft:#F8E1DE;
+  --store:#2D6E52; --store-soft:#DDEFE6;
+  --tool:#5B6672; --tool-soft:#E9ECEF;
+  --font-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --font-display:"Zen Kaku Gothic New","Noto Sans JP","Hiragino Sans",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F141A; --surface:#171F28; --ink:#E3E8ED; --muted:#98A4B1; --line:#2A3541; --code-bg:#212B36;
+    --ai:#84AEDB; --ai-soft:#1B2B3C;
+    --human:#E0A55A; --human-soft:#3A2914;
+    --stop:#EE8A80; --stop-soft:#3B1D1A;
+    --store:#7CC6A2; --store-soft:#16302A;
+    --tool:#98A4B1; --tool-soft:#222B35;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F141A; --surface:#171F28; --ink:#E3E8ED; --muted:#98A4B1; --line:#2A3541; --code-bg:#212B36;
+  --ai:#84AEDB; --ai-soft:#1B2B3C;
+  --human:#E0A55A; --human-soft:#3A2914;
+  --stop:#EE8A80; --stop-soft:#3B1D1A;
+  --store:#7CC6A2; --store-soft:#16302A;
+  --tool:#98A4B1; --tool-soft:#222B35;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.85;padding-inline:20px;padding-block:0 80px}
+.wrap{max-width:1040px;margin:0 auto}
+a{color:var(--ai);text-underline-offset:3px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+header{padding-block:52px 32px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,5vw,40px);line-height:1.3;text-wrap:balance;margin:10px 0 16px}
+h2{font-family:var(--font-display);font-weight:700;font-size:24px;line-height:1.4;text-wrap:balance;margin:0 0 14px}
+h3{font-family:var(--font-display);font-weight:700;font-size:17px;line-height:1.5;margin:30px 0 10px}
+p{margin:0 0 14px;max-width:44em}
+.lead{font-size:16px;max-width:42em}
+.sub{color:var(--muted);font-size:14px}
+code{font-family:var(--font-mono);font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:3px}
+section{padding-block:44px;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+ul.plain{margin:0 0 14px;padding-left:1.2em;max-width:46em}
+ul.plain li{margin-bottom:6px}
+
+/* key facts */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:26px}
+.facts div{background:var(--surface);padding:12px 14px}
+.facts dt{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.facts dd{margin:2px 0 0;font-weight:500;font-size:14px;line-height:1.6}
+
+nav.toc{margin-top:22px;display:flex;flex-wrap:wrap;gap:6px 8px;font-size:13px}
+nav.toc a{display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-decoration:none;color:var(--ink)}
+nav.toc a:hover{border-color:var(--ai);color:var(--ai)}
+
+/* figures */
+figure{margin:22px 0 10px}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;overflow-x:auto}
+.fig svg{display:block;width:100%;height:auto}
+.fig.wide svg{min-width:900px}
+.fig.mid svg{min-width:720px}
+figcaption{font-size:13px;color:var(--muted);margin-top:8px;max-width:52em}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:12.5px;margin-top:10px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:16px;height:12px;border-radius:3px;border:1.5px solid;display:inline-block}
+.sw.ai{background:var(--ai-soft);border-color:var(--ai)}
+.sw.opt{background:var(--surface);border-color:var(--ai);border-style:dashed}
+.sw.human{background:var(--human-soft);border-color:var(--human)}
+.sw.stop{background:var(--stop-soft);border-color:var(--stop)}
+.sw.tool{background:var(--tool-soft);border-color:var(--tool)}
+.sw.store{background:var(--store-soft);border-color:var(--store)}
+.sw.store-new{background:var(--store);border-color:var(--store)}
+
+/* svg styling via page tokens */
+.dg{color:var(--ink);font-family:var(--font-body)}
+.dg text{fill:currentColor;font-size:12px}
+.dg .b{font-weight:700}
+.dg .m{fill:var(--muted)}
+.dg .mono{font-family:var(--font-mono)}
+.dg .s105{font-size:10.5px}
+.dg .s11{font-size:11px}
+.dg .s125{font-size:12.5px}
+.dg .s13{font-size:13px}
+.dg .s15{font-size:15px}
+.dg .t-ai{fill:var(--ai)}
+.dg .t-stop{fill:var(--stop)}
+.dg .t-human{fill:var(--human)}
+.dg .t-store{fill:var(--store)}
+.dg .t-inv{fill:var(--bg)}
+.dg .n-ai{fill:var(--ai-soft);stroke:var(--ai);stroke-width:1.5}
+.dg .n-main{fill:var(--ai-soft);stroke:var(--ai);stroke-width:2.5}
+.dg .n-opt{fill:var(--surface);stroke:var(--ai);stroke-width:1.5;stroke-dasharray:5 4}
+.dg .n-human{fill:var(--human-soft);stroke:var(--human);stroke-width:1.5}
+.dg .n-human-d{fill:var(--human-soft);stroke:var(--human);stroke-width:1.5;stroke-dasharray:5 4}
+.dg .n-stop{fill:var(--stop-soft);stroke:var(--stop);stroke-width:1.5}
+.dg .n-tool{fill:var(--tool-soft);stroke:var(--tool);stroke-width:1.5}
+.dg .n-store{fill:var(--store-soft);stroke:var(--store);stroke-width:1.5}
+.dg .n-plain{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.dg .n-file{fill:var(--bg);stroke:var(--line);stroke-width:1}
+.dg .n-done{fill:var(--ink);stroke:none}
+.dg .n-chip-ai{fill:var(--ai);stroke:none}
+.dg .n-chip-human{fill:var(--human);stroke:none}
+.dg .n-chip-store{fill:var(--store);stroke:none}
+.dg .lane{fill:var(--bg);stroke:none}
+.dg .brick-new{fill:var(--store);stroke:none}
+.dg .brick-old{fill:var(--store-soft);stroke:var(--store);stroke-width:1;stroke-opacity:.55}
+.dg .ln{stroke:currentColor;stroke-width:1.5;fill:none}
+.dg .ln-d{stroke:currentColor;stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+.dg .ln-stop{stroke:var(--stop);stroke-width:1.5;fill:none}
+.dg .ln-m{stroke:var(--muted);stroke-width:1.5;fill:none;stroke-dasharray:4 4}
+.dg .mk{fill:currentColor}
+.dg .mk-stop{fill:var(--stop)}
+.dg .mk-m{fill:var(--muted)}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface);margin:16px 0}
+#artifacts th:nth-child(2){min-width:110px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.65}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.04em;color:var(--muted);font-weight:500;background:var(--bg);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+tr.grp td{background:var(--bg);font-weight:700;font-size:12.5px;color:var(--muted);letter-spacing:.04em;padding-block:6px}
+.who{display:inline-block;font-family:var(--font-mono);font-size:11.5px;padding:0 6px;border-radius:3px;border:1px solid var(--ai);color:var(--ai);margin:0 3px 3px 0;white-space:nowrap}
+.who.h{border-color:var(--human);color:var(--human)}
+.who.t{border-color:var(--tool);color:var(--tool)}
+.tag-stop{color:var(--stop);font-weight:700}
+
+/* filter chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 0}
+.chips button{font:inherit;font-size:13px;padding:3px 12px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--ai);border-color:var(--ai);color:var(--surface)}
+.chips .lab{font-size:12.5px;color:var(--muted);align-self:center;margin-right:4px}
+
+/* cards */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.card h4{font-family:var(--font-display);font-size:15px;margin:0 0 6px;line-height:1.5}
+.card p,.card li{font-size:13.5px;line-height:1.75}
+.card p:last-child{margin-bottom:0}
+.card ul{margin:0;padding-left:1.1em}
+.card.human{border-top:3px solid var(--human)}
+.card.ai{border-top:3px solid var(--ai)}
+.card .k{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);display:block;margin-bottom:2px}
+
+/* chat sessions */
+.chat{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:16px}
+.sess{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;font-size:13.5px;line-height:1.7}
+.sess.cond{border-style:dashed}
+.sess .hd{font-size:12px;color:var(--muted);margin-bottom:8px;font-family:var(--font-mono)}
+.say{background:var(--human-soft);border-radius:6px;padding:6px 10px;margin-bottom:8px;font-family:var(--font-mono);font-size:12.5px}
+.do{padding-left:10px;border-left:2px solid var(--ai);margin-bottom:8px}
+.end{color:var(--stop);font-weight:700;font-size:12.5px}
+.end.ok{color:var(--store)}
+
+/* steps */
+ol.steps{list-style:none;counter-reset:s;margin:0;padding:0}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 12px 34px;font-size:13.5px;line-height:1.7}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;background:var(--ai-soft);color:var(--ai);font-family:var(--font-mono);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+ol.steps li b{font-weight:700}
+
+/* tree */
+pre.tree{font-family:var(--font-mono);font-size:12.5px;line-height:1.75;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:16px 0}
+pre.tree .c{color:var(--muted)}
+pre.tree .bd{display:inline-block;font-size:10.5px;padding:0 5px;border-radius:3px;border:1px solid var(--ai);color:var(--ai);line-height:1.5;vertical-align:1px}
+pre.tree .bd.h{border-color:var(--human);color:var(--human)}
+pre.tree .bd.t{border-color:var(--tool);color:var(--tool)}
+pre.code{font-family:var(--font-mono);font-size:12.5px;line-height:1.7;background:var(--code-bg);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:12px 0}
+pre.code .c{color:var(--muted)}
+
+dl.gloss{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:0;margin:16px 0;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+dl.gloss dt,dl.gloss dd{margin:0;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.7}
+dl.gloss dt{font-weight:700;background:var(--bg)}
+dl.gloss dt:last-of-type,dl.gloss dd:last-of-type{border-bottom:0}
+@media (max-width:560px){
+  dl.gloss{grid-template-columns:1fr}
+  dl.gloss dt{border-bottom:0;padding-bottom:2px}
+}
+.more{font-size:12.5px;white-space:nowrap;font-weight:500}
+.subsec{padding-top:34px;margin-top:34px;border-top:1px dashed var(--line);scroll-margin-top:16px}
+.subsec:first-of-type{margin-top:22px}
+.subsec h3{font-size:20px;margin-top:0}
+h4.h4{font-family:var(--font-display);font-size:15px;margin:24px 0 10px}
+.vs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:16px 0}
+.card.yes{border-top:3px solid var(--store)}
+.card.no{border-top:3px solid var(--stop)}
+.card li{margin-bottom:4px}
+.grid2 > pre.code{margin:0}
+footer{padding-top:30px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">.kiro/skills · 手順版 proc-v011 · 2026-10-02</div>
+  <h1>PMS 回帰テスト作成 skills の全体像</h1>
+  <p class="lead">AIに「〇〇機能の回帰テストを作って」と頼むと、シナリオ作成 → 実画面での探索 → 実行時にAIを使わない Playwright 回帰テストの生成までを、手順書どおりに進める skills 一式です。この資料では、何を入力にして、どの順に作業し、何をどこに残し、それがフローを重ねるごとにどう蓄積していくかを図で説明します。</p>
+  <dl class="facts">
+    <div><dt>使う人が呼ぶのは</dt><dd><code>/pms-regression</code> だけ</dd></div>
+    <div><dt>1回の依頼(1フロー)</dt><dd>1〜2機能。1機能あたりシナリオ1〜2本</dd></div>
+    <div><dt>1本のシナリオ</dt><dd>正常系・代表1値・3〜6ステップ</dd></div>
+    <div><dt>必ず止まるところ</dt><dd>探索(作業10)が終わったとき</dd></div>
+    <div><dt>回帰テストの実行時</dt><dd>AIを使わない。毎回同じに動く</dd></div>
+  </dl>
+  <nav class="toc" aria-label="目次">
+    <a href="#vision">全体構想と位置付け</a>
+    <a href="#skills">skills の構成</a>
+    <a href="#inputs">入力情報</a>
+    <a href="#flow">作業の流れ</a>
+    <a href="#outputs">成果物と格納先</a>
+    <a href="#accumulate">蓄積の仕組み</a>
+    <a href="#human">人が判断する場面</a>
+    <a href="#rules">品質を守る約束ごと</a>
+    <a href="#deep">補足説明</a>
+    <a href="#glossary">用語集</a>
+    <a href="#start">使い始めるとき</a>
+  </nav>
+</header>
+
+<!-- ============================================================ -->
+<section id="vision">
+  <h2>全体構想と、今の skills の位置付け</h2>
+  <p>構想のねらいは、機能追加・不具合修正・OSや連携ソフトのバージョンアップのたびに発生するE2Eテストの工数を減らし、不具合を早く見つけ、社内の品質点検の基盤にすることです。AIがテスト項目の策定・探索的実行・回帰テストコード生成を担い、人はレビューとガバナンスに回る形(自律テスト成熟度モデルの <b>Level 3</b>)を目指しています。</p>
+  <p>全機能・全観点を一度に自動化せず、<b>3つのステップで網の目を細かくしていきます</b>。今の skills が作るのは、そのうちステップ1の「単機能シナリオ」です。</p>
+
+  <figure>
+    <div class="fig mid">
+      <svg class="dg" viewBox="0 0 860 300" role="img" aria-label="3ステップのロードマップ。今の skills はステップ1の単機能シナリオを作る。ステップ1で扱わなかった対象は申し送り台帳を通じてステップ2・3の投資計画になる。">
+        <defs>
+          <marker id="f1-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+          <marker id="f1-ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-m"/></marker>
+        </defs>
+        <!-- step 1 -->
+        <rect x="10" y="10" width="270" height="170" rx="6" class="n-ai"/>
+        <text x="26" y="36" class="b s15">ステップ1</text>
+        <rect x="226" y="20" width="44" height="20" rx="10" class="n-chip-ai"/>
+        <text x="248" y="34" text-anchor="middle" class="s11 b t-inv">現在</text>
+        <text x="26" y="58" class="s125">シナリオ型(E2E)</text>
+        <text x="26" y="76" class="s11 m">全機能の基本動作を保証 / 網の目: 粗い</text>
+        <rect x="26" y="92" width="120" height="50" rx="5" class="n-main"/>
+        <text x="86" y="113" text-anchor="middle" class="b s13">単機能シナリオ</text>
+        <text x="86" y="131" text-anchor="middle" class="s105 m">3〜6ステップ</text>
+        <rect x="164" y="92" width="100" height="50" rx="5" class="n-plain"/>
+        <text x="214" y="113" text-anchor="middle" class="b s125">連結シナリオ</text>
+        <text x="214" y="131" text-anchor="middle" class="s105 m">機能をまたぐ</text>
+        <line x1="146" y1="117" x2="162" y2="117" class="ln" marker-end="url(#f1-ah)"/>
+        <text x="86" y="162" text-anchor="middle" class="s11 b t-ai">今の skills の対象</text>
+        <text x="214" y="162" text-anchor="middle" class="s105 m">部品を再利用して次に</text>
+        <!-- step 2 -->
+        <rect x="295" y="10" width="270" height="170" rx="6" class="n-plain"/>
+        <text x="311" y="36" class="b s15">ステップ2</text>
+        <text x="311" y="58" class="s125">単発型+シナリオのバリエーション</text>
+        <text x="311" y="76" class="s11 m">E2Eの充実 / 網の目: 中</text>
+        <rect x="311" y="92" width="238" height="50" rx="5" class="n-file"/>
+        <text x="430" y="113" text-anchor="middle" class="s125">状態カタログ(作業30)を語彙に</text>
+        <text x="430" y="131" text-anchor="middle" class="s105 m">異常系・値違い・DB投入セットアップ</text>
+        <!-- step 3 -->
+        <rect x="580" y="10" width="270" height="170" rx="6" class="n-plain"/>
+        <text x="596" y="36" class="b s15">ステップ3</text>
+        <text x="596" y="58" class="s125">E2E以外の手段</text>
+        <text x="596" y="76" class="s11 m">機能特性に応じた検証 / 網の目: 細かい</text>
+        <rect x="596" y="92" width="238" height="50" rx="5" class="n-file"/>
+        <text x="715" y="113" text-anchor="middle" class="s125">HTTP層・DB層・メタモルフィック</text>
+        <text x="715" y="131" text-anchor="middle" class="s105 m">異常注入・PDL解析の回帰など</text>
+        <!-- handoff -->
+        <path d="M145 180 V200 H715" class="ln-m"/>
+        <line x1="430" y1="200" x2="430" y2="184" class="ln-m" marker-end="url(#f1-ahm)"/>
+        <line x1="715" y1="200" x2="715" y2="184" class="ln-m" marker-end="url(#f1-ahm)"/>
+        <text x="160" y="218" class="s11 m">申し送り台帳(理由コード別の集計)が、次のステップの投資計画になる</text>
+        <!-- phases -->
+        <rect x="10" y="232" width="270" height="60" rx="6" class="n-ai"/>
+        <text x="26" y="256" class="b s125">フェーズ1 · Level 3 の確立</text>
+        <text x="26" y="276" class="s11 m">人が起点でフローを反復(今ここ)</text>
+        <rect x="295" y="232" width="270" height="60" rx="6" class="n-plain"/>
+        <text x="311" y="256" class="b s125">フェーズ2 · Level 3 の定着</text>
+        <text x="311" y="276" class="s11 m">CI常設・lint の保護機構・状態カタログ活用</text>
+        <rect x="580" y="232" width="270" height="60" rx="6" class="n-plain"/>
+        <text x="596" y="256" class="b s125">フェーズ3 · Level 4 の要素</text>
+        <text x="596" y="276" class="s11 m">差分検知で自動起動・self-healing(人が承認)</text>
+      </svg>
+    </div>
+    <figcaption>上段がテストの網の目(ステップ)、下段が自律度のロードマップ(フェーズ)。今の skills はステップ1・フェーズ1にあたり、人が対象を指示してフローを1本ずつ回します。</figcaption>
+  </figure>
+
+  <ul class="plain">
+    <li><b>ステップ1の範囲は固定です。</b>シナリオ型・正常系のみ・各パラメータは代表1値・1機能内で完結(3〜6ステップ)。依頼に「異常系も」とあっても範囲は広げず、AIは確認のために止まります。</li>
+    <li><b>扱わないものは捨てません。</b>異常系・値違い・機能をまたぐ連鎖・実操作で作れない前提状態・手段(skill)のない外部操作などは、9語の理由コード付きで申し送り台帳に記録されます。理由コード別の件数が、そのままステップ2・3で何に投資すべきかを示します。</li>
+    <li><b>正解は「今の製品の実際の動き」です。</b>マニュアル・仕様書は手順を考えるための材料で、実挙動と食い違えば実挙動で進め、食い違いを不整合レポート(DISC)に残します。作った回帰テストは「基準バージョンから挙動が変わっていないこと」を機械的に確かめるものになります。</li>
+  </ul>
+
+  <h3>構想の要素と、今の skills での実現</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>構想の要素</th><th>今の skills での実現</th><th>状態</th></tr></thead>
+      <tbody>
+        <tr><td>シナリオの生成と、実画面での探索的実行</td><td><code>pms-10-explore</code>(作業10)</td><td>使える</td></tr>
+        <tr><td>実行時にAIを使わない決定的な回帰テスト</td><td><code>pms-20-codegen</code>(作業20)</td><td>使える</td></tr>
+        <tr><td>正常に終わらなかった操作の原因調査とやり直し</td><td><code>pms-15-health</code>(作業15)+ 問い合わせ skill</td><td>問い合わせ skill は任意で配置</td></tr>
+        <tr><td>知見ベース(KB)による調査の一度きり化</td><td><code>pms-01-kb</code>(作業01)+ 全作業が参照・更新</td><td>使える</td></tr>
+        <tr><td>非決定値カタログ(値ごとの検証強度)</td><td><code>pms-02-nd</code>(作業02)</td><td>使える</td></tr>
+        <tr><td>検証環境の自動復元</td><td><code>restore-golden-image</code> + Playwright の globalSetup</td><td>使える</td></tr>
+        <tr><td>状態カタログ(ステップ2の準備)</td><td><code>pms-30-catalog</code>(作業30)</td><td>複数フロー後に指示で実行</td></tr>
+        <tr><td>手順そのものの自己改善</td><td><code>pms-40-improve</code>(作業40。別セッション)</td><td>改訂は当面すべて人が採否</td></tr>
+        <tr><td>CI常設・差分検知・self-healing・AIによる失敗分析</td><td>—</td><td>未着手(フェーズ2・3)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="skills">
+  <h2>skills の構成</h2>
+  <p><code>.kiro/skills/</code> には9つの skill があります。8つは手順書の正本 <code>procedure/</code> から生成スクリプトで作られたもので、残りの <code>restore-golden-image</code> は人が整備した外部操作 skill です。利用者が直接呼ぶのは入口の <code>pms-regression</code> だけで、どの作業の skill を使うかは入口が決めます。</p>
+
+  <figure>
+    <div class="fig mid">
+      <svg class="dg" viewBox="0 0 860 300" role="img" aria-label="procedure/ の正本から build-skills.mjs が8つの skill を生成する。restore-golden-image は人が整備した外部操作 skill で生成の対象外。">
+        <defs>
+          <marker id="f2-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <rect x="10" y="10" width="260" height="282" rx="6" class="n-plain"/>
+        <text x="24" y="34" class="b s13 mono">procedure/</text>
+        <text x="108" y="34" class="s11 m">手順書の正本</text>
+        <text x="24" y="52" class="s11 m">人と作業40だけが編集する</text>
+        <g>
+          <rect x="24" y="66" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="83" class="mono s11">00_common.md</text><text x="248" y="83" text-anchor="end" class="s11 m">全作業共通の既定</text>
+          <rect x="24" y="98" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="115" class="mono s11">vocab.yaml</text><text x="248" y="115" text-anchor="end" class="s11 m">統制語彙・手順版</text>
+          <rect x="24" y="130" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="147" class="mono s11">pipeline.dot</text><text x="248" y="147" text-anchor="end" class="s11 m">順序・分岐・停止点</text>
+          <rect x="24" y="162" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="179" class="mono s11">stages.md</text><text x="248" y="179" text-anchor="end" class="s11 m">各作業の手順と付録</text>
+          <rect x="24" y="194" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="211" class="mono s11">methods/</text><text x="248" y="211" text-anchor="end" class="s11 m">シナリオ策定方式 ×3</text>
+          <rect x="24" y="226" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="243" class="mono s11">templates/</text><text x="248" y="243" text-anchor="end" class="s11 m">台帳の書式 90〜95</text>
+          <rect x="24" y="258" width="232" height="26" rx="3" class="n-file"/>
+          <text x="32" y="275" class="mono s11">router/SKILL.md</text><text x="248" y="275" text-anchor="end" class="s11 m">入口の原稿</text>
+        </g>
+        <line x1="274" y1="150" x2="374" y2="150" class="ln" marker-end="url(#f2-ah)"/>
+        <text x="325" y="140" text-anchor="middle" class="s125 b">生成</text>
+        <text x="325" y="168" text-anchor="middle" class="s105 mono m">build-skills.mjs</text>
+
+        <rect x="380" y="10" width="470" height="282" rx="6" class="n-plain"/>
+        <text x="394" y="34" class="b s13 mono">.kiro/skills/</text>
+        <text x="394" y="52" class="s11 m">Copilot 用の .github/skills/ にも同じものを生成。直接編集しない</text>
+        <rect x="394" y="66" width="220" height="34" rx="4" class="n-main"/>
+        <text x="404" y="80" class="mono s11 b">pms-regression</text><text x="404" y="94" class="s105">入口・次の作業を決める</text>
+        <rect x="618" y="66" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="628" y="80" class="mono s11 b">pms-10-explore</text><text x="628" y="94" class="s105">10 シナリオ生成と探索</text>
+        <rect x="394" y="106" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="404" y="120" class="mono s11 b">pms-01-kb</text><text x="404" y="134" class="s105">01 知見蓄積</text>
+        <rect x="618" y="106" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="628" y="120" class="mono s11 b">pms-15-health</text><text x="628" y="134" class="s105">15 健全性の是正</text>
+        <rect x="394" y="146" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="404" y="160" class="mono s11 b">pms-02-nd</text><text x="404" y="174" class="s105">02 非決定値カタログ</text>
+        <rect x="618" y="146" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="628" y="160" class="mono s11 b">pms-20-codegen</text><text x="628" y="174" class="s105">20 回帰テストコード生成</text>
+        <rect x="394" y="186" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="404" y="200" class="mono s11 b">pms-30-catalog</text><text x="404" y="214" class="s105">30 状態カタログ案</text>
+        <rect x="618" y="186" width="220" height="34" rx="4" class="n-ai"/>
+        <text x="628" y="200" class="mono s11 b">pms-40-improve</text><text x="628" y="214" class="s105">40 手順改善(別セッション)</text>
+        <rect x="394" y="232" width="444" height="46" rx="4" class="n-human-d"/>
+        <text x="404" y="251" class="mono s11 b">restore-golden-image</text>
+        <text x="404" y="269" class="s105">人が整備した外部操作 skill。生成の対象外。PMSサーバVMを基準状態へ戻す</text>
+      </svg>
+    </div>
+    <figcaption><code>stages.md</code> の §10 が <code>pms-10-explore</code> の本文になる、というように作業ごとの節がそれぞれの skill になります。<code>00_common.md</code> と <code>vocab.yaml</code> は全 skill に同梱されます。</figcaption>
+  </figure>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th>skill</th><th>何をするか</th><th>いつ使われるか</th><th>終わったら</th></tr></thead>
+      <tbody>
+        <tr><td><code>pms-regression</code></td><td>入口。依頼文とフローの記録(flow.md・status.yaml)を <code>pipeline.dot</code> の条件に当てはめ、次の作業の skill を使う。自分では作業しない</td><td>利用者が <code>/pms-regression …</code> で起動</td><td>—</td></tr>
+        <tr><td><code>pms-01-kb</code></td><td>後段の作業に要る知見を逆算して調べ、KB に記録する。分からなかったことも記録する</td><td>管理者が調査を指示したとき / 作業10が知見不足になったとき</td><td>次へ進む</td></tr>
+        <tr><td><code>pms-02-nd</code></td><td>同じ操作を3回続けて実行し、画面・DBの値ごとに検証の強さを観測で決める <a class="more" href="#nd-detail">→ 補足</a></td><td>カタログがないとき(初回)/ 作業10が追加を求めたとき</td><td>次へ進む</td></tr>
+        <tr><td><code>pms-10-explore</code></td><td>シナリオを作り、playwright-cli で実画面を探索して、コード化できる記録を残す</td><td>フローの本線①</td><td class="tag-stop">必ず停止</td></tr>
+        <tr><td><code>pms-15-health</code></td><td>動いたが正常に終わっていない操作を、問い合わせ skill に聞いてやり直す <a class="more" href="#health-detail">→ 補足</a></td><td>作業10で健全性シグナルが出たときだけ</td><td class="tag-stop">停止</td></tr>
+        <tr><td><code>pms-20-codegen</code></td><td>探索記録だけから Playwright の回帰テストを生成し、実行確認と突合を行う</td><td>フローの本線②</td><td>フロー完了</td></tr>
+        <tr><td><code>pms-30-catalog</code></td><td>累積した探索記録から前提状態のカタログ案を作る(ステップ2の準備)</td><td>管理者の指示時(複数フロー後)</td><td class="tag-stop">データ変更の前に停止</td></tr>
+        <tr><td><code>pms-40-improve</code></td><td>手順改善シグナルを集め、手順書を差分で改訂し、効果を判定する</td><td>管理者が別のセッションで起動</td><td>止まらない</td></tr>
+        <tr><td><code>restore-golden-image</code></td><td>PMSサーバVMをゴールデンイメージへ戻し、ログインできるまで待つ(操作ID <code>OP-VM-001</code>)</td><td>作業10・20の開始時に1回</td><td>失敗時は停止</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>1つの作業 skill の中身</h3>
+  <p>作業ごとの skill には「その作業に必要なものだけ」が入っています。作業10を行うAIに作業20のコード規約を読ませない、というように関心を分けるためです。</p>
+<pre class="tree">.kiro/skills/pms-10-explore/
+├── SKILL.md            <span class="c">stages.md §10 の本文+起動時に読むものの指示(自動生成)</span>
+├── VERSION             <span class="c">procedure_version: proc-v011</span>
+└── references/
+    ├── 00_common.md    <span class="c">全作業共通の既定(原則・規約・報告書の骨格・lint 規則)</span>
+    ├── vocab.yaml      <span class="c">統制語彙(判定値・理由コード・ID書式・既定値)</span>
+    ├── appendix-A/B/C/E.md   <span class="c">この作業が使う付録だけ(探索記録・セットアップ記録・シナリオ・KB の書式)</span>
+    ├── templates/91〜94_…   <span class="c">記入用テンプレート(台帳の書式の原本)</span>
+    └── methods/        <span class="c">シナリオ策定方式(作業10だけ。flow.md が指す1つだけを読む)</span></pre>
+  <p class="sub">KB の索引(<code>kb/00_索引.md</code>)と flow.md は作業場所のデータなので同梱されず、skill の起動時に読み込まれます。</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="inputs">
+  <h2>入力情報</h2>
+  <p>入力は「人が用意するもの」と「過去のフローの蓄積から読むもの」に分かれます。人が毎回用意するのは依頼文だけで、それ以外は一度用意すれば以後のフローで使い回されます。</p>
+
+  <div class="grid2">
+    <div class="card human">
+      <h4>人が用意するもの</h4>
+      <ul>
+        <li><b>依頼文</b>: 対象領域(1〜2機能)と、シナリオを何から作るかの手がかり。flow.md に原文のまま転記されます</li>
+        <li><b>文献</b>: 利用者マニュアル・仕様書・既存のテストスクリプト(所在を依頼文に書くか、KB の文書ポインタ T11 に登録)</li>
+        <li><b>検証環境</b>: Hyper-V 上の PMS サーバ VM とそのゴールデンイメージ(<code>config/golden-restore.json</code>)</li>
+        <li><b>環境情報</b>: PMS の URL・アカウント・DB・複合機の IP など。共有分は <code>config/environments.json</code>、パスワードは各自の <code>environments.local.json</code>。足りなければAIがまとめて聞き、保存して次から聞きません</li>
+        <li><b>禁止操作リスト</b>: <code>work/_common/prohibited-operations.md</code>。AIが実行してはならない操作。未記入でも始められます(包括原則だけが働く)</li>
+        <li><b>外部操作 skill</b>(印刷指示・機器操作など)と<b>問い合わせ skill</b>: 人が段階的に整備。なければAIは記録だけ残して先へ進みます。作り方は<a class="more" href="#extop-detail">→ 補足</a></li>
+        <li><b>開始前シナリオの設定</b>(任意): <code>config/pre-stage-scenarios.json</code>。VM の復元では戻らない機器設定などを作業前に戻す</li>
+      </ul>
+    </div>
+    <div class="card ai">
+      <h4>蓄積から読むもの</h4>
+      <ul>
+        <li><b>KB の索引</b> <code>kb/00_索引.md</code>: 開始時はこれだけを読み、必要なファイルだけを開きます(全読み禁止)</li>
+        <li><b>既存のテスト部品</b> <code>tests/</code>: 前提状態は既存 fixture の実行が第一選択。同じ操作を探索し直さない</li>
+        <li><b>過去フローの記録</b>: scenarios.md・探索記録・セットアップ記録(確立済みの操作列・ロケータ・待機の実測値)</li>
+        <li><b>非決定値カタログ</b>と各台帳(申し送り・外部操作需要・DISC)</li>
+        <li><b>前の作業の status.yaml</b>: 後段の作業は報告書を読み解かず、ここから入力を機械的に取ります(例: 作業20のコード化対象は作業10の <code>codeable_items</code>)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>シナリオ策定方式(シナリオを何から作るか)</h3>
+  <p>入口 skill が依頼文の書き方から方式を1つ選び、最初に1行で伝えます。方式で変わるのは「シナリオ候補をどの資料からどう拾うか」だけで、成果物の置き場所・書式・それ以降の作業は同じです。1フローの途中で方式は変えません。方式を増やす手順は <a class="more" href="#method-extend">→ 補足</a></p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>方式</th><th>依頼の言い方の例</th><th>主な入力</th><th>前提条件</th><th>シナリオの根拠の書き方</th></tr></thead>
+      <tbody>
+        <tr><td><code>manual_usecase</code><br><span class="sub">既定</span></td><td>「印刷実行機能の回帰テストを作って」</td><td>マニュアル・仕様書</td><td>なし</td><td><code>利用者マニュアル4-2</code></td></tr>
+        <tr><td><code>legacy_script</code></td><td>「既存の手順書 X をもとに作って」</td><td>既存テストスクリプト</td><td>スクリプトの所在が分かる</td><td><code>既存テスト:印刷_回帰テスト手順書.xlsx#印刷!No.3</code></td></tr>
+        <tr><td><code>spec_new_feature</code></td><td>「新機能〇〇の仕様書からテストを作って」</td><td>新機能の仕様書</td><td>新機能が検証環境に配備済み</td><td><code>機能仕様書 一括印刷 v1.0 3.2</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="sub">どの方式でも、文書にもスクリプトにも記載がないステップの根拠は <code>推測(仕様未記載)</code> または <code>画面観察</code> と明記され、レビューで見分けられます。既存スクリプトの操作手順や期待結果は書き写さず、実画面で確かめます。</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="flow">
+  <h2>作業の流れ</h2>
+
+  <h3>使う人から見た流れ</h3>
+  <p>1フローは2〜3回のチャットに分かれます。作業10と作業20の間では必ず止まり、作業20は新しいチャットで行うことを勧めています(探索の経緯を持ち込まず、記録だけからコードを作るため)。</p>
+  <div class="chat">
+    <div class="sess">
+      <div class="hd">チャット 1</div>
+      <div class="say">/pms-regression 印刷実行機能の回帰テストを作って</div>
+      <div class="do">方式を伝え、フロー番号 F-003 を採番。必要なら作業01・02を先に行い、作業10でシナリオ作成と画面での確認</div>
+      <div class="end">停止:「新しいチャットで『F-003 の続き』と伝えてください」</div>
+    </div>
+    <div class="sess cond">
+      <div class="hd">チャット 2(必要なときだけ)</div>
+      <div class="say">/pms-regression F-003 の続き</div>
+      <div class="do">ジョブがエラーなど、動いたが正常に終わっていない操作があったときだけ作業15。問い合わせて操作をやり直す</div>
+      <div class="end">停止:「解消 1件、解消せず 1件。次はコード生成です」</div>
+    </div>
+    <div class="sess">
+      <div class="hd">チャット 3</div>
+      <div class="say">/pms-regression F-003 の続き</div>
+      <div class="do">関所(禁止操作リストの照合と lint)を通り、作業20で回帰テストを生成・実行確認</div>
+      <div class="end ok">完了:「回帰テストを 4件追加しました。フローは完了です」</div>
+    </div>
+  </div>
+
+  <h3>パイプライン全体</h3>
+  <p>実行順序・分岐・停止点はすべて <code>pipeline.dot</code> に定義されています。各作業は終わると status.yaml に結果を列挙値で書き、入口 skill がその値を辺の条件に当てはめて次の作業を決めます。</p>
+  <figure>
+    <div class="fig wide">
+      <svg class="dg" viewBox="0 0 1040 400" role="img" aria-label="パイプライン全体。依頼から入口を経て、前段の作業01・02、作業10、停止、関所、条件付きの作業15、作業20、lint、フロー完了へ進む。要許可操作とDB不変条件違反では人の判断で止まる。記録に不足があれば作業20から作業10へ差し戻す。">
+        <defs>
+          <marker id="f3-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+          <marker id="f3-ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-stop"/></marker>
+        </defs>
+        <!-- human stops -->
+        <polygon points="575,24 725,24 740,54 725,84 575,84 560,54" class="n-stop"/>
+        <text x="650" y="50" text-anchor="middle" class="b t-stop">要許可操作の許可</text>
+        <text x="650" y="70" text-anchor="middle" class="s105">許可して再開 / 申し送り</text>
+        <polygon points="775,24 925,24 940,54 925,84 775,84 760,54" class="n-stop"/>
+        <text x="850" y="50" text-anchor="middle" class="b t-stop">DB不変条件違反の判断</text>
+        <text x="850" y="70" text-anchor="middle" class="s105">起票して続行 / 中断</text>
+        <path d="M440 132 V108 H850 V88" class="ln-stop" marker-end="url(#f3-ahs)"/>
+        <line x1="650" y1="108" x2="650" y2="88" class="ln-stop" marker-end="url(#f3-ahs)"/>
+        <text x="448" y="102" class="s105 t-stop">必要・検出したら停止</text>
+
+        <!-- request & entry -->
+        <rect x="10" y="132" width="90" height="76" rx="6" class="n-human"/>
+        <text x="55" y="164" text-anchor="middle" class="b s13">依頼</text>
+        <text x="55" y="184" text-anchor="middle" class="s11 m">対象と作り方</text>
+        <line x1="100" y1="170" x2="123" y2="170" class="ln" marker-end="url(#f3-ah)"/>
+        <rect x="125" y="132" width="120" height="76" rx="6" class="n-main"/>
+        <text x="185" y="158" text-anchor="middle" class="b s13">入口</text>
+        <text x="185" y="178" text-anchor="middle" class="mono s105">pms-regression</text>
+        <text x="185" y="196" text-anchor="middle" class="s105 m">次の作業を決める</text>
+
+        <!-- prework -->
+        <rect x="200" y="28" width="130" height="52" rx="6" class="n-opt"/>
+        <text x="265" y="50" text-anchor="middle" class="b s125">01 知見蓄積</text>
+        <text x="265" y="68" text-anchor="middle" class="s105 m">指示・知見不足時</text>
+        <rect x="345" y="28" width="130" height="52" rx="6" class="n-opt"/>
+        <text x="410" y="50" text-anchor="middle" class="b s125">02 非決定値カタログ</text>
+        <text x="410" y="68" text-anchor="middle" class="s105 m">カタログがなければ</text>
+        <path d="M185 132 V54 H198" class="ln-d" marker-end="url(#f3-ah)"/>
+        <line x1="330" y1="54" x2="343" y2="54" class="ln-d" marker-end="url(#f3-ah)"/>
+        <line x1="410" y1="80" x2="410" y2="130" class="ln-d" marker-end="url(#f3-ah)"/>
+        <line x1="245" y1="170" x2="298" y2="170" class="ln" marker-end="url(#f3-ah)"/>
+
+        <!-- 10 -->
+        <rect x="300" y="132" width="160" height="76" rx="6" class="n-main"/>
+        <text x="380" y="156" text-anchor="middle" class="b s13">10 シナリオ生成と探索</text>
+        <text x="380" y="176" text-anchor="middle" class="mono s105">pms-10-explore</text>
+        <text x="380" y="196" text-anchor="middle" class="s105 m">開始時に環境を復元</text>
+        <line x1="460" y1="170" x2="518" y2="170" class="ln" marker-end="url(#f3-ah)"/>
+        <rect x="468" y="154" width="38" height="32" rx="4" class="n-stop"/>
+        <text x="487" y="175" text-anchor="middle" class="b s11 t-stop">停止</text>
+
+        <!-- gate -->
+        <rect x="520" y="138" width="90" height="64" rx="6" class="n-tool"/>
+        <text x="565" y="164" text-anchor="middle" class="b s125">関所</text>
+        <text x="565" y="184" text-anchor="middle" class="s11">照合+lint</text>
+        <line x1="610" y1="170" x2="698" y2="170" class="ln" marker-end="url(#f3-ah)"/>
+        <text x="654" y="160" text-anchor="middle" class="s105 m">シグナルなし</text>
+
+        <!-- 15 -->
+        <line x1="565" y1="202" x2="565" y2="268" class="ln-d" marker-end="url(#f3-ah)"/>
+        <text x="572" y="240" class="s105 m">シグナルあり</text>
+        <rect x="540" y="270" width="160" height="64" rx="6" class="n-opt"/>
+        <text x="620" y="296" text-anchor="middle" class="b s13">15 健全性の是正</text>
+        <text x="620" y="316" text-anchor="middle" class="mono s105">pms-15-health</text>
+        <path d="M700 302 H780 V210" class="ln-d" marker-end="url(#f3-ah)"/>
+        <rect x="722" y="286" width="38" height="32" rx="4" class="n-stop"/>
+        <text x="741" y="307" text-anchor="middle" class="b s11 t-stop">停止</text>
+        <text x="706" y="338" class="s105 m">次の「続き」で関所へ</text>
+
+        <!-- 20 -->
+        <rect x="700" y="132" width="160" height="76" rx="6" class="n-main"/>
+        <text x="780" y="156" text-anchor="middle" class="b s13">20 回帰テストコード生成</text>
+        <text x="780" y="176" text-anchor="middle" class="mono s105">pms-20-codegen</text>
+        <text x="780" y="196" text-anchor="middle" class="s105 m">開始時に環境を復元</text>
+        <line x1="860" y1="170" x2="878" y2="170" class="ln" marker-end="url(#f3-ah)"/>
+        <rect x="880" y="146" width="56" height="48" rx="6" class="n-tool"/>
+        <text x="908" y="175" text-anchor="middle" class="b mono s11">lint</text>
+        <line x1="936" y1="170" x2="954" y2="170" class="ln" marker-end="url(#f3-ah)"/>
+        <rect x="956" y="146" width="76" height="48" rx="24" class="n-done"/>
+        <text x="994" y="175" text-anchor="middle" class="b t-inv">フロー完了</text>
+
+        <!-- 30 -->
+        <line x1="994" y1="194" x2="994" y2="268" class="ln-d" marker-end="url(#f3-ah)"/>
+        <rect x="900" y="270" width="132" height="52" rx="6" class="n-opt"/>
+        <text x="966" y="292" text-anchor="middle" class="b">30 状態カタログ案</text>
+        <text x="966" y="310" text-anchor="middle" class="s105 m">指示があれば</text>
+
+        <!-- rework -->
+        <path d="M840 208 V372 H380 V212" class="ln" marker-end="url(#f3-ah)"/>
+        <text x="610" y="390" text-anchor="middle" class="s105 m">コード化に必要な記録が足りなければ作業10へ差し戻し</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw ai"></i>AIの作業(本線)</span>
+      <span><i class="sw opt"></i>条件付きの作業</span>
+      <span><i class="sw human"></i>人の入力</span>
+      <span><i class="sw stop"></i>停止点・人の判断</span>
+      <span><i class="sw tool"></i>機械チェック(スクリプトの終了コードで決まる)</span>
+    </div>
+    <figcaption>DB不変条件違反 <a class="more" href="#inv-detail">→ 補足</a> と健全性シグナル <a class="more" href="#health-detail">→ 補足</a> の詳しい意味は補足説明にあります。作業15も、環境の変更に許可が要るときは「要許可操作の許可」で止まります。作業40(手順改善)はフローの外側で別セッションとして動くため、この図には含めていません。</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card">
+      <h4>関所(作業15・20の前)</h4>
+      <p><code>prohibited-ops.mjs --compare</code> で、作業10のあとに禁止操作リストが書き換えられていないかを照合します(変わっていれば作業10のパートPで保留ステップを判定し直す)。続けて <code>lint.mjs --stage 10</code> で記録が決まりを満たすかを検査し、ERROR があれば作業10へ差し戻します。</p>
+    </div>
+    <div class="card">
+      <h4>判断は終了コードだけで</h4>
+      <p>照合と lint の結果は、スクリプトの終了コード(0 / 1 / 2 / 3)だけで決まります。AIが「関係のない変更だ」「軽微だ」と判断して省くことはできません。差し戻しは同じ関所で1回までで、それでも直らなければ人に伝えて止まります。</p>
+    </div>
+    <div class="card">
+      <h4>工程0(作業10・20の開始時)</h4>
+      <p>最初の操作の前に、VM をゴールデンイメージへ復元してログインできるまで待ち、設定があれば開始前シナリオで機器なども戻します。作業15・途中再開・作業の終了時には復元しません(作ったデータと記録が食い違うため)。</p>
+    </div>
+  </div>
+
+  <h3>作業ごとの中身</h3>
+  <div class="grid2">
+    <div class="card ai">
+      <h4>作業10 シナリオ生成と探索</h4>
+      <ol class="steps">
+        <li><b>環境情報の確認</b> — <code>env.mjs require</code>。足りなければまとめて聞く</li>
+        <li><b>工程0</b> — 環境を復元 → 開始前シナリオ → 禁止操作リストの版(digest)を取得</li>
+        <li><b>パートA</b> — flow.md を作り依頼文を原文で転記。方式の前提を確認。初回(F-001)だけ機能一覧と機能コードを確定。既存資産を棚卸し</li>
+        <li><b>パートB</b> — シナリオを作る。<b>操作手順は書かず</b>、検証意図・判定基準・根拠・検証手段・前提状態だけを書く。範囲外は申し送り台帳へ</li>
+        <li><b>パートC</b> — 前提状態を fixture で整備(established check 付き)→ playwright-cli で操作手順を自分で編み出す → 成功直後に安定ロケータを解決 → 画面とDBで判定 → 健全性シグナルとDB不変条件を確認。前提状態の仕組みは<a class="more" href="#fixture-detail">→ 補足</a></li>
+        <li><b>記録と完了</b> — 報告書と status.yaml を出し、lint で ERROR 0件を確かめて停止</li>
+      </ol>
+    </div>
+    <div class="card ai">
+      <h4>作業20 回帰テストコード生成</h4>
+      <ol class="steps">
+        <li><b>開始前の検査</b> — 禁止操作リストの照合と、作業10(・15)の記録の lint。どちらも0のときだけ始める</li>
+        <li><b>工程0</b> — 環境情報の確認 → 環境を復元 → 開始前シナリオ</li>
+        <li><b>コード化の前の確認</b> — 前提状態ごとに fixture があるか、使う外部操作 skill に実行体があるか</li>
+        <li><b>コード生成</b> — 探索記録の操作列とアサーションのヒントを忠実にコード化。1シナリオ=1 <code>test()</code>、1ステップ=1 <code>test.step()</code></li>
+        <li><b>ID突合</b> — シナリオIDがコード全体でちょうど1回、対象の全IDと全ステップがあるかを機械的に確かめ、突合表を更新</li>
+        <li><b>実行確認</b> — 復元直後の1回目を <code>clean_run</code> として記録 → 復元せず3回連続で実行して flaky を特定 → 実行時間を計測</li>
+        <li><b>記録と完了</b> — 報告書と status.yaml → lint → フロー完了(記録不足なら作業10へ差し戻し)</li>
+      </ol>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card"><h4>作業15 健全性の是正</h4><p>期待結果は満たしたが自分のジョブがエラーになっている、といったシナリオについて、読み取りだけで自己診断 → 問い合わせ skill に再現手順と解決してほしいことを渡す(1シナリオ3回まで)→ 回答の操作で最初のステップからやり直します。環境の変更で直ったものは回帰テストで再現できないためコード化せず、人に判断を任せます。 <a class="more" href="#health-detail">→ 補足</a></p></div>
+    <div class="card"><h4>作業01 知見蓄積</h4><p>調査対象を指示されると、後段の各作業が何を必要とするかを逆算して調査項目を自分で立てます。文献は本文を写さず「どの文書のどこに書いてあるか」だけを記録し、DB定義と実データ、実画面も調べて KB に書きます。</p></div>
+    <div class="card"><h4>作業02 非決定値カタログ</h4><p>同じ入力で同じ操作を、環境を戻さず3回続けて実行し、毎回変わる値を見つけます。変わる値は「関係式 → パターン一致 → 存在のみ」の順に強い検証を検討し、金額・枚数などが揺れたら強度を下げる前に報告します。 <a class="more" href="#nd-detail">→ 補足</a></p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="outputs">
+  <h2>出力成果物と格納先</h2>
+  <p>成果物は「フローの管理」「機能ごとの記録」「回帰テストの資産」「フロー横断の知見と台帳」に分かれます。AIが作る成果物には、冒頭にレビューヘッダ(<code>review_status: unreviewed</code>)が付きます。値を書き換えるのは人だけです。</p>
+
+<pre class="tree">work/
+├── _flows/
+│   ├── 00_フロー台帳.md      <span class="bd">10</span> <span class="c">全フローを1行ずつ</span>
+│   └── F-003/flow.md             <span class="bd">10</span> <span class="c">依頼文の原文・方式・手順版・タスクのチェック・メモ(再開点)</span>
+├── PRT/                          <span class="c">機能コードごとに1つ(例: PRT)</span>
+│   ├── scenarios.md              <span class="bd">10</span> <span class="c">シナリオ(検証意図と判定基準)</span>
+│   ├── exploration/              <span class="bd">10</span> <span class="c">探索記録・セットアップ記録・証跡・報告書・status.yaml</span>
+│   └── health/                   <span class="bd">15</span> <span class="c">問い合わせ記録・報告書・status.yaml</span>
+├── _common/                      <span class="c">フロー横断で累積する台帳</span>  <span class="bd">01</span> <span class="bd">02</span> <span class="bd">10</span> <span class="bd">15</span> <span class="bd">20</span> <span class="bd h">人</span>
+├── _catalog/                     <span class="bd">30</span> <span class="c">状態カタログ案</span>
+└── _improve/                     <span class="bd">40</span> <span class="c">指標の推移・改訂の記録</span>
+tests/
+├── pages/ flows/ external/ fixtures/ helpers/   <span class="bd">10</span> <span class="c">ページオブジェクト・シナリオ部品・外部操作ラッパ・前提状態</span>
+├── readiness/server-ready.setup.ts              <span class="bd">10</span> <span class="c">起動確認テスト(ログインできたら起動完了)</span>
+└── specs/PRT/                                   <span class="bd">20</span> <span class="c">回帰テスト本体</span>
+traceability/PRT-matrix.md                       <span class="bd">20</span> <span class="c">シナリオID ⇔ テストコードの突合表</span>
+kb/                                              <span class="bd">01</span> <span class="c">+ 全作業が更新。知見ベース(T01〜T11)</span>
+logs/discovery-log_YYYYMMDD.md                   <span class="bd">全作業</span> <span class="c">KB になく自分で調べたこと</span>
+config/environments.json / .local.json           <span class="bd t">env.mjs</span> <span class="c">検証環境の情報</span></pre>
+
+  <h3>成果物一覧</h3>
+  <div class="chips" role="group" aria-label="作る作業で絞り込む">
+    <span class="lab">作る作業で絞り込む:</span>
+    <button type="button" id="flt-all" data-f="all" aria-pressed="true">すべて</button>
+    <button type="button" id="flt-01" data-f="01" aria-pressed="false">01</button>
+    <button type="button" id="flt-02" data-f="02" aria-pressed="false">02</button>
+    <button type="button" id="flt-10" data-f="10" aria-pressed="false">10</button>
+    <button type="button" id="flt-15" data-f="15" aria-pressed="false">15</button>
+    <button type="button" id="flt-20" data-f="20" aria-pressed="false">20</button>
+    <button type="button" id="flt-30" data-f="30" aria-pressed="false">30</button>
+    <button type="button" id="flt-40" data-f="40" aria-pressed="false">40</button>
+    <button type="button" id="flt-h" data-f="h" aria-pressed="false">人・ツール</button>
+  </div>
+  <div class="tbl">
+    <table id="artifacts">
+      <thead><tr><th>成果物</th><th>作る作業</th><th>格納先</th><th>中身</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">フローの管理</td></tr>
+        <tr data-by="10 15 20"><td>フロー台帳</td><td><span class="who">10</span><span class="who">15</span><span class="who">20</span></td><td><code>work/_flows/00_フロー台帳.md</code></td><td>全フローを1行ずつ(ID・対象・方式・手順版・状態)</td></tr>
+        <tr data-by="10 15 20"><td>フロー記録</td><td><span class="who">10</span><span class="who">15</span><span class="who">20</span></td><td><code>work/_flows/F-&lt;番号&gt;/flow.md</code></td><td>依頼文の原文、方式、開始時の手順版、タスクのチェック、メモ欄(restore_id・再開点・人の判断)。別のセッションのAIがこれだけで引き継げる</td></tr>
+
+        <tr class="grp"><td colspan="4">機能ごとの記録</td></tr>
+        <tr data-by="10"><td>シナリオ</td><td><span class="who">10</span></td><td><code>work/&lt;機能コード&gt;/scenarios.md</code></td><td>シナリオごとの検証意図・判定基準・根拠・検証手段・前提状態・策定方式(付録C)。追記のみで、既存行は変えない</td></tr>
+        <tr data-by="10 15"><td>探索記録</td><td><span class="who">10</span><span class="who">15</span></td><td><code>work/&lt;機能コード&gt;/exploration/exploration-log.yaml</code></td><td>成功した最短の操作列・安定ロケータ・判定・アサーションのヒント・待機の実測秒・作成データの実値・blocked の理由と再開ステップ(付録A)。作業20の主入力</td></tr>
+        <tr data-by="10"><td>セットアップ記録</td><td><span class="who">10</span></td><td><code>…/exploration/setup-log.yaml</code></td><td>前提状態の作り方と、成立を機械的に確かめる established check(付録B) <a class="more" href="#fixture-detail">→ 補足</a></td></tr>
+        <tr data-by="10"><td>証跡</td><td><span class="who">10</span></td><td><code>…/exploration/evidence/</code></td><td>failed・human-check のスクリーンショット(必須)</td></tr>
+        <tr data-by="10"><td>報告書・status.yaml</td><td><span class="who">10</span></td><td><code>…/exploration/report.md</code>・<code>status.yaml</code></td><td>人向けの報告(要約・判定一覧・DISC・優先レビュー推奨)と、次の作業への機械可読な受け渡し</td></tr>
+        <tr data-by="15"><td>問い合わせ記録</td><td><span class="who">15</span></td><td><code>work/&lt;機能コード&gt;/health/inquiries/&lt;シナリオID&gt;-&lt;回&gt;.md</code></td><td>問い合わせの入力と回答の全文、回答の区分、行った操作と結果</td></tr>
+        <tr data-by="15"><td>報告書・status.yaml</td><td><span class="who">15</span></td><td><code>work/&lt;機能コード&gt;/health/</code></td><td>シナリオごとの是正結果(解消・環境の変更で解消・未解消)と追加のコード化対象</td></tr>
+        <tr data-by="20"><td>報告書・status.yaml</td><td><span class="who">20</span></td><td>当該フローの作業ディレクトリ</td><td>突合表・実行結果(clean_run と最終)・実行時間・flaky・逸脱・コード化できなかったもの・as-is 判断待ち</td></tr>
+
+        <tr class="grp"><td colspan="4">回帰テストの資産</td></tr>
+        <tr data-by="20"><td>回帰テストコード</td><td><span class="who">20</span></td><td><code>tests/specs/&lt;機能コード&gt;/</code></td><td>Playwright のテスト。シナリオIDのタグと、生成元の注釈(フローIDと手順版)付き。実行のしかたは<a class="more" href="#run-commands">→ 補足</a></td></tr>
+        <tr data-by="20"><td>突合表</td><td><span class="who">20</span></td><td><code>traceability/&lt;機能コード&gt;-matrix.md</code></td><td>シナリオID ⇔ テストファイル・テスト名。コード化しなかったシナリオも理由付きで全行残す。累積更新</td></tr>
+        <tr data-by="10"><td>ページオブジェクト・シナリオ部品</td><td><span class="who">10</span></td><td><code>tests/pages/</code>・<code>tests/flows/</code></td><td>1画面の要素と最小操作 / 業務的に意味のある操作のまとまり。2つ以上のシナリオで同じ操作列が出たら部品化</td></tr>
+        <tr data-by="10"><td>fixture</td><td><span class="who">10</span></td><td><code>tests/fixtures/</code></td><td>前提状態(管理者ログイン済など)を作り、established check で確かめる <a class="more" href="#fixture-detail">→ 補足</a></td></tr>
+        <tr data-by="10"><td>外部操作ラッパ</td><td><span class="who">10</span></td><td><code>tests/external/</code></td><td>KB T05 の操作IDと1対1。skill に同梱された実行体を呼ぶだけ</td></tr>
+        <tr data-by="10"><td>起動確認テスト</td><td><span class="who">10</span></td><td><code>tests/readiness/server-ready.setup.ts</code></td><td>ログインの部品で Web UI にログインできるまで待つ。ログイン fixture を初めて整備したフローで作る</td></tr>
+
+        <tr class="grp"><td colspan="4">フロー横断の知見と台帳</td></tr>
+        <tr data-by="01 02 10 15 20"><td>知見ベース(KB)</td><td><span class="who">01</span><span class="who">全作業</span></td><td><code>kb/</code>(入口は <code>kb/00_索引.md</code>)</td><td>画面・遷移・DB・外部操作(T05 = 確立済み操作の台帳)・待機の実測・ロール・用語・環境・落とし穴・文書ポインタ(T01〜T11)</td></tr>
+        <tr data-by="01 02 10 15 20"><td>発見ログ</td><td><span class="who">全作業</span></td><td><code>logs/discovery-log_YYYYMMDD.md</code></td><td>KB になく自分で調べたこと。再発見率を出し、次の作業01の対象選びに使う</td></tr>
+        <tr data-by="02"><td>非決定値カタログ</td><td><span class="who">02</span></td><td><code>work/_common/nondeterministic-catalog.md</code></td><td>値ごとの検証強度(完全一致 / 関係式 / パターン一致 / 存在のみ)と観測の根拠 <a class="more" href="#nd-detail">→ 補足</a></td></tr>
+        <tr data-by="10 15"><td>申し送り台帳</td><td><span class="who">10</span><span class="who">15</span></td><td><code>work/_common/handoff-register.md</code></td><td>ステップ1で扱わなかった対象。9語の理由コード(同一経路・異常系・操作手段なし・禁止操作 など)付き</td></tr>
+        <tr data-by="01 02 10 20"><td>外部操作需要リスト</td><td><span class="who">01</span><span class="who">02</span><span class="who">10</span><span class="who">20</span></td><td><code>work/_common/external-op-demand.md</code></td><td>skill がなくて実行できなかった外部操作。1操作1行で、どのシナリオを止めているかを累積。優先度と整備記録は人が書く</td></tr>
+        <tr data-by="01 10 15"><td>不整合レポート(DISC)</td><td><span class="who">01</span><span class="who">10</span><span class="who">15</span></td><td><code>work/_common/discrepancies.md</code></td><td>文書と実挙動の食い違い。どちらが正しいかは人が判断する</td></tr>
+        <tr data-by="10"><td>testid 追加依頼</td><td><span class="who">10</span></td><td><code>work/_common/testid-requests.md</code></td><td>安定ロケータが取れない要素への <code>data-testid</code> 追加依頼</td></tr>
+        <tr data-by="01 02 10 15 20 40"><td>手順改善台帳</td><td><span class="who">全作業</span><span class="who">40</span></td><td><code>work/_common/procedure-improvement.md</code></td><td>手順の迷い・矛盾・逸脱のシグナル(全作業が記録)と、作業40の改訂案・採否</td></tr>
+        <tr data-by="h"><td>禁止操作リスト</td><td><span class="who h">人</span></td><td><code>work/_common/prohibited-operations.md</code></td><td>実行してはならない操作(禁止 / 要許可 / 条件付き許可)</td></tr>
+        <tr data-by="h"><td>復元・開始前シナリオの実行記録</td><td><span class="who t">ツール</span></td><td><code>work/_common/env-restore-log.jsonl</code>・<code>pre-stage-log.jsonl</code></td><td>実行体が追記。lint が status.yaml の記載と突き合わせる</td></tr>
+        <tr data-by="h"><td>検証環境の情報</td><td><span class="who t">env.mjs</span><span class="who h">人</span></td><td><code>config/environments.json</code>・<code>.local.json</code></td><td>接続先・アカウント。秘密情報は各自の local 側にだけ置き、記録には <code>&lt;env:キー&gt;</code> と書く</td></tr>
+        <tr data-by="30"><td>状態カタログ案</td><td><span class="who">30</span></td><td><code>work/_catalog/</code></td><td>実際に観測された前提状態の一覧(AUTH・DATA・ENTITY・CONFIG・ENV)と確度。ステップ2の語彙</td></tr>
+        <tr data-by="40"><td>手順改善の記録</td><td><span class="who">40</span></td><td><code>work/_improve/</code></td><td><code>metrics.md</code>(フロー×手順版の指標の推移)と、改訂ごとの報告書・差分</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>status.yaml が次の作業を決める</h3>
+  <p>報告書は人のため、status.yaml は次の作業のためのものです。分岐に使う値は統制語彙で決まった列挙値だけで、入口 skill はこれを <code>pipeline.dot</code> の条件に当てはめます。</p>
+<pre class="code"><span class="c"># work/PRT/exploration/status.yaml(作業10。抜粋)</span>
+stage: "10"
+flow_id: F-003
+procedure_version: proc-v011
+env_restore: { restore_id: RST-20261002-101500-a1b2, purpose: work10, readiness: auto }
+context_updates:
+  escalation: none            <span class="c"># permission_required なら「要許可操作の許可」で停止</span>
+  invariant_violation: none   <span class="c"># found なら「DB不変条件違反の判断」で停止</span>
+  health_signal: found        <span class="c"># found なら作業15へ、none なら作業20へ</span>
+  codeable_items: [SC-PRT-01, SC-PRT-02]   <span class="c"># 作業20がコード化する対象(passed のみ)</span>
+  health_signal_items: [SC-PRT-03]         <span class="c"># 作業15の対象</span>
+  blocked_by_prohibition: []               <span class="c"># 作業20の前の照合に使う</span></pre>
+</section>
+
+<!-- ============================================================ -->
+<section id="accumulate">
+  <h2>成果物の蓄積の仕組み</h2>
+  <p>1フローで全機能を網羅しようとはせず、<b>フローを繰り返して回帰テストセットを育てます</b>。回帰テストは毎回増えていく一方で、前提状態の fixture・シナリオ部品・KB・非決定値カタログは次のフローで流用されるため、フローを重ねるほど新しく作る量が減り、1フローあたりのコストが下がっていきます。</p>
+
+  <figure>
+    <div class="fig mid">
+      <svg class="dg" viewBox="0 0 810 278" role="img" aria-label="フローごとの資産の蓄積のイメージ。回帰テストは毎フロー同じだけ増える。テスト部品とKBは前のフローからの流用が増え、新しく作る量が減っていく。">
+        <defs>
+          <marker id="f7-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <rect x="190" y="14" width="140" height="48" rx="6" class="n-ai"/>
+        <text x="260" y="34" text-anchor="middle" class="mono b s125">F-001</text>
+        <text x="260" y="52" text-anchor="middle" class="s105 m">初回・機能一覧を確定</text>
+        <rect x="345" y="14" width="140" height="48" rx="6" class="n-ai"/>
+        <text x="415" y="34" text-anchor="middle" class="mono b s125">F-002</text>
+        <text x="415" y="52" text-anchor="middle" class="s105 m">次の1〜2機能</text>
+        <rect x="500" y="14" width="140" height="48" rx="6" class="n-ai"/>
+        <text x="570" y="34" text-anchor="middle" class="mono b s125">F-003</text>
+        <text x="570" y="52" text-anchor="middle" class="s105 m">再探索フローも同じ</text>
+        <rect x="655" y="14" width="140" height="48" rx="6" class="n-ai"/>
+        <text x="725" y="34" text-anchor="middle" class="mono b s125">F-004 …</text>
+        <text x="725" y="52" text-anchor="middle" class="s105 m">フローを重ねる</text>
+        <line x1="330" y1="38" x2="343" y2="38" class="ln" marker-end="url(#f7-ah)"/>
+        <line x1="485" y1="38" x2="498" y2="38" class="ln" marker-end="url(#f7-ah)"/>
+        <line x1="640" y1="38" x2="653" y2="38" class="ln" marker-end="url(#f7-ah)"/>
+        <!-- lane labels -->
+        <text x="14" y="111" class="b">回帰テスト</text>
+        <text x="14" y="147" class="b">テスト部品・fixture</text>
+        <text x="14" y="183" class="b">KB(知見)</text>
+        <text x="14" y="219" class="b">非決定値カタログ</text>
+        <text x="14" y="255" class="b">台帳類</text>
+        <!-- lane backgrounds -->
+        <rect x="186" y="92" width="613" height="28" rx="4" class="lane"/>
+        <rect x="186" y="128" width="613" height="28" rx="4" class="lane"/>
+        <rect x="186" y="164" width="613" height="28" rx="4" class="lane"/>
+        <rect x="186" y="200" width="613" height="28" rx="4" class="lane"/>
+        <rect x="186" y="236" width="613" height="28" rx="4" class="lane"/>
+        <!-- bricks -->
+        <rect x="198" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="213" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="353" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="368" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="383" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="398" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="508" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="523" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="538" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="553" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="568" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="583" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="663" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="678" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="693" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="708" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="723" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="738" y="96" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="753" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="768" y="96" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="198" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="213" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="228" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="243" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="353" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="368" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="383" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="398" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="413" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="428" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="508" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="523" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="538" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="553" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="568" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="583" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="598" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="663" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="678" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="693" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="708" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="723" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="738" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="753" y="132" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="768" y="132" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="198" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="213" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="228" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="353" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="368" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="383" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="398" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="413" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="508" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="523" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="538" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="553" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="568" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="583" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="598" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="663" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="678" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="693" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="708" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="723" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="738" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="753" y="168" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="768" y="168" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="198" y="204" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="213" y="204" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="228" y="204" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="243" y="204" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="353" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="368" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="383" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="398" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="413" y="204" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="508" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="523" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="538" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="553" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="568" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="663" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="678" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="693" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="708" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="723" y="204" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="738" y="204" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="198" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="213" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="353" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="368" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="383" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="398" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="508" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="523" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="538" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="553" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="568" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="583" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="663" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="678" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="693" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="708" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="723" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="738" y="240" width="12" height="20" rx="2" class="brick-old"/>
+        <rect x="753" y="240" width="12" height="20" rx="2" class="brick-new"/>
+        <rect x="768" y="240" width="12" height="20" rx="2" class="brick-new"/>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw store-new"></i>そのフローで新しく作ったもの</span>
+      <span><i class="sw store"></i>前のフローから引き継いで流用したもの</span>
+    </div>
+    <figcaption>数は説明用のイメージです。実際の流用の実績は各報告書の「資産流用の実績」、再調査の多さは作業10の status.yaml の <code>rediscovery_rate</code>(再発見率)で測ります。</figcaption>
+  </figure>
+
+  <h3>蓄積を成り立たせる決まり</h3>
+  <div class="grid3">
+    <div class="card"><h4>追記が原則</h4><p>scenarios.md・突合表・非決定値カタログ・台帳は既存の行を変えずに追記します。KB を訂正するときも旧記述を消さず、取り消し理由と日付を残します。</p></div>
+    <div class="card"><h4>IDは全体で一意</h4><p>シナリオIDとテストのタグは全フロー通算で一意にし、作業20が機械的に突合します。機能コードは初回フローで確定し、ディレクトリ名になるため後から変えません。</p></div>
+    <div class="card"><h4>流用が第一選択</h4><p>前提状態は既存 fixture の実行、外部操作は KB T05 の確立済み操作を使います。同じ操作列が2つ以上のシナリオに出たら部品にします(フローをまたいで数える)。</p></div>
+    <div class="card"><h4>KB は索引から</h4><p>開始時は <code>kb/00_索引.md</code> だけを読み、必要なファイルだけ開きます。新しく分かったことはその場で KB に反映し、KB を見ずに調べ直したことは発見ログで見えるようにします。</p></div>
+    <div class="card"><h4>黙って落とさない</h4><p>扱わない対象は申し送り台帳へ、コード化しなかったシナリオは突合表へ理由付きで残します。blocked になったシナリオも、前提状態の整備と途中までの記録を残します(後で解けたときに探し直さないため)。</p></div>
+    <div class="card"><h4>引き継ぎは記録だけで</h4><p>作業の間の受け渡しは status.yaml と flow.md で行います。別のセッション・別の担当者のAIでも、記録だけを読めば続きから進められます。</p></div>
+  </div>
+
+  <h3>止まったシナリオが、あとで回帰テストになる経路</h3>
+  <p>外部操作(印刷指示・機器パネル操作など)の skill は段階的にしか整備できません。skill がない操作は、その場で需要として積み上げておき、整備されたら再探索フローで同じシナリオに戻ります。需要の発生(AI)と skill の整備(人)は切り離されています。</p>
+  <figure>
+    <div class="fig mid">
+      <svg class="dg" viewBox="0 0 860 140" role="img" aria-label="外部操作の需要から回帰テストまで。作業10で skill がなく blocked、需要リストに未整備で記録、人が skill を整備して整備済、再探索フローで操作を確立して確立済、作業20で回帰テストに追加。">
+        <defs>
+          <marker id="f8-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        </defs>
+        <text x="14" y="26" class="s105 t-ai b">AI · 作業10</text>
+        <rect x="10" y="36" width="150" height="90" rx="6" class="n-ai"/>
+        <text x="85" y="60" text-anchor="middle" class="b s125">skill がない</text>
+        <text x="85" y="82" text-anchor="middle" class="s105">外部操作が必要な</text>
+        <text x="85" y="100" text-anchor="middle" class="s105">ステップ以降を blocked</text>
+        <text x="186" y="26" class="s105 t-ai b">AI · 記録</text>
+        <rect x="182" y="36" width="150" height="90" rx="6" class="n-store"/>
+        <text x="257" y="60" text-anchor="middle" class="b s125">需要リストに記録</text>
+        <rect x="229" y="72" width="56" height="18" rx="9" class="n-chip-store"/>
+        <text x="257" y="85" text-anchor="middle" class="s105 b t-inv">未整備</text>
+        <text x="257" y="110" text-anchor="middle" class="s105">申し送り台帳にも</text>
+        <text x="358" y="26" class="s105 t-human b">人</text>
+        <rect x="354" y="36" width="150" height="90" rx="6" class="n-human"/>
+        <text x="429" y="60" text-anchor="middle" class="b s125">skill を整備</text>
+        <rect x="401" y="72" width="56" height="18" rx="9" class="n-chip-human"/>
+        <text x="429" y="85" text-anchor="middle" class="s105 b t-inv">整備済</text>
+        <text x="429" y="110" text-anchor="middle" class="s105">優先度は人が決める</text>
+        <text x="530" y="26" class="s105 t-ai b">AI · 再探索フロー</text>
+        <rect x="526" y="36" width="150" height="90" rx="6" class="n-ai"/>
+        <text x="601" y="60" text-anchor="middle" class="b s125">操作を確立</text>
+        <rect x="573" y="72" width="56" height="18" rx="9" class="n-chip-ai"/>
+        <text x="601" y="85" text-anchor="middle" class="s105 b t-inv">確立済</text>
+        <text x="601" y="110" text-anchor="middle" class="s105">KB T05 に登録</text>
+        <text x="702" y="26" class="s105 t-ai b">AI · 作業20</text>
+        <rect x="698" y="36" width="150" height="90" rx="6" class="n-ai"/>
+        <text x="773" y="60" text-anchor="middle" class="b s125">回帰テストに追加</text>
+        <text x="773" y="84" text-anchor="middle" class="s105">突合表の行を更新</text>
+        <text x="773" y="104" text-anchor="middle" class="s105">ラッパ経由で呼ぶ</text>
+        <line x1="160" y1="81" x2="180" y2="81" class="ln" marker-end="url(#f8-ah)"/>
+        <line x1="332" y1="81" x2="352" y2="81" class="ln" marker-end="url(#f8-ah)"/>
+        <line x1="504" y1="81" x2="524" y2="81" class="ln" marker-end="url(#f8-ah)"/>
+        <line x1="676" y1="81" x2="696" y2="81" class="ln" marker-end="url(#f8-ah)"/>
+      </svg>
+    </div>
+    <figcaption>skill の作り方と、AIに渡すまでの手順は <a class="more" href="#extop-detail">→ 補足</a>。同じ考え方で、禁止操作リストの都合で保留したステップはリストが書き換えられたあとに作業10のパートPで判定し直され、failed・human-check の項目は人が「今の動きを正解とする(as-is)」と判断したあとの作業20で拾われます。</figcaption>
+  </figure>
+
+  <h3>手順そのものも実行から良くなる</h3>
+  <p>KB が「対象システムについての事実」を蓄積する仕組みだとすれば、手順改善は「テストの作り方」を蓄積する仕組みです。実行中のAIは手順書を書き換えず、気づきをシグナルとして記録するだけにとどめます。</p>
+  <figure>
+    <div class="fig mid">
+      <svg class="dg" viewBox="0 0 860 148" role="img" aria-label="手順改善の流れ。各作業が手順改善シグナルを記録し、作業40が別セッションで集約して差分の改訂案を作り、区分に応じて適用し、正本を改訂して skills を再生成する。改訂は次のフローから効く。">
+        <defs>
+          <marker id="f9-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+          <marker id="f9-ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-m"/></marker>
+        </defs>
+        <rect x="10" y="20" width="150" height="80" rx="6" class="n-ai"/>
+        <text x="85" y="44" text-anchor="middle" class="b s125">各作業のAI</text>
+        <text x="85" y="66" text-anchor="middle" class="s105">迷い・矛盾・逸脱を</text>
+        <text x="85" y="84" text-anchor="middle" class="s105">その場で記録</text>
+        <rect x="182" y="20" width="150" height="80" rx="6" class="n-store"/>
+        <text x="257" y="44" text-anchor="middle" class="b s125">手順改善台帳</text>
+        <text x="257" y="66" text-anchor="middle" class="s105 mono">SIG-nnnn</text>
+        <text x="257" y="84" text-anchor="middle" class="s105">lint・人の指摘も起票</text>
+        <rect x="354" y="20" width="150" height="80" rx="6" class="n-ai"/>
+        <text x="429" y="44" text-anchor="middle" class="b s125">作業40 手順改善</text>
+        <text x="429" y="66" text-anchor="middle" class="s105">別セッションで集約し</text>
+        <text x="429" y="84" text-anchor="middle" class="s105">差分の改訂案を作る</text>
+        <rect x="526" y="20" width="150" height="80" rx="6" class="n-human"/>
+        <text x="601" y="44" text-anchor="middle" class="b s125">区分で扱いを分ける</text>
+        <text x="601" y="66" text-anchor="middle" class="s105">A 自律 / B 人が採否</text>
+        <text x="601" y="84" text-anchor="middle" class="s105">C 保護ブロックは不可侵</text>
+        <rect x="698" y="20" width="150" height="80" rx="6" class="n-tool"/>
+        <text x="773" y="44" text-anchor="middle" class="b s125">正本を改訂・版を上げる</text>
+        <text x="773" y="66" text-anchor="middle" class="s105">build-skills で再生成</text>
+        <text x="773" y="84" text-anchor="middle" class="s105">コミットとタグ</text>
+        <line x1="160" y1="60" x2="180" y2="60" class="ln" marker-end="url(#f9-ah)"/>
+        <line x1="332" y1="60" x2="352" y2="60" class="ln" marker-end="url(#f9-ah)"/>
+        <line x1="504" y1="60" x2="524" y2="60" class="ln" marker-end="url(#f9-ah)"/>
+        <line x1="676" y1="60" x2="696" y2="60" class="ln" marker-end="url(#f9-ah)"/>
+        <path d="M773 100 V120 H85 V104" class="ln-m" marker-end="url(#f9-ahm)"/>
+        <text x="429" y="138" text-anchor="middle" class="s105 m">改訂は次のフローの開始時から効く(実行中のフローには配備しない)</text>
+      </svg>
+    </div>
+    <figcaption>検証を緩めて摩擦を減らす「改善」を防ぐため、実挙動を正解とする原則・期待結果の書き換え禁止・禁止操作などは保護ブロックとして固定され、効果の判定には効率とは別に検出力の指標を使います。区分Aの自律適用は lint の保護機構が実装されるまで解禁せず、当面はすべての改訂を人が採否します。</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ -->
+<section id="human">
+  <h2>人が判断する場面</h2>
+  <p>人のレビューは後段の作業を止めるゲートにはしていません(非ブロッキング)。止まるのは、行為の許可や環境の前提など、人でなければ決められない場面だけです。止まったときは、AIが「何が起きたか・誰が何をすれば進むか」を1〜3行で伝えます。判断した人と内容を添えて「F-xxx の続き」と伝えると、flow.md に記録されて再開します。</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>場面</th><th>何が起きているか</th><th>誰が何をすれば進むか</th></tr></thead>
+      <tbody>
+        <tr><td>作業10・15の完了</td><td>決まった停止点。報告書と status.yaml が出ている</td><td>利用者が新しいチャットで「続き」と伝える</td></tr>
+        <tr><td class="tag-stop">要許可操作</td><td>禁止操作リストの「要許可」、または包括原則(物理資源の大量消費・復旧困難・環境の外への影響・復元で戻らない変更)に当たる操作が必要</td><td>管理者が許可するか、今回は見送って申し送りに回すかを決める</td></tr>
+        <tr><td class="tag-stop">DB不変条件の違反</td><td>どのシナリオのあとでも成り立つべき条件(1ジョブ1課金など)が崩れた。製品不具合の可能性</td><td>管理者が「起票して続行」か「中断」を決める <a class="more" href="#inv-detail">→ 補足</a></td></tr>
+        <tr><td class="tag-stop">状態カタログのデータ変更</td><td>作業30がフェーズ2で停止。確認にデータを変える操作が要る</td><td>管理者が範囲を許可する(許可しなければフェーズ2までで終了)</td></tr>
+        <tr><td>復元後のログイン確認</td><td>初期でログインの部品がまだなく、起動完了を自動で判定できない</td><td>管理者が PMS にログインできることを確かめる</td></tr>
+        <tr><td>開始前シナリオの失敗・方式の前提条件</td><td>作業を始めていない(例: 新機能が検証環境に配備されていない)</td><td>管理者が環境や設定を直す。直したら工程0の復元からやり直す</td></tr>
+        <tr><td>環境情報が足りない</td><td>URL・アカウント・機器の IP などが未登録</td><td>利用者が値を答える(保存されるので次からは聞かれない)</td></tr>
+        <tr><td>lint 止まり・手順書と skills の食い違い</td><td>差し戻しても記録の ERROR が直らない / skills が正本と一致しない</td><td>管理者が確認する / skills を再生成する</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>止まらずに進むもの</b>もあります。as-is 判断待ちの項目、外部操作の準備待ちで保留したシナリオ、手順改善の採否待ちは、完了報告に件数が添えられるだけで、フローは残りの項目で進みます。各報告書の末尾には、AIが「人が優先して見るべき上位5件程度」を理由付きで挙げる<b>優先レビュー推奨リスト</b>があり、限られたレビュー時間の使いどころを示します。</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="rules">
+  <h2>品質を守る約束ごと</h2>
+  <p>生成されたテストを信頼できるものにするため、すべての作業に共通の決まり(<code>00_common.md</code>)があります。成果物を読むときの前提として知っておくと理解が早くなります。</p>
+  <div class="grid3">
+    <div class="card"><span class="k">オラクル</span><h4>実挙動が正解</h4><p>文書と実挙動が食い違えば実挙動で続け、DISC に記録します。どちらが正しいかをAIは判断しません。</p></div>
+    <div class="card"><span class="k">期待結果</span><h4>期待結果は書き換えない</h4><p>探索で変えてよいのは検証手段だけです。おかしいと思えば human-check にして根拠を報告します。</p></div>
+    <div class="card"><span class="k">実行時</span><h4>回帰実行にAIを使わない</h4><p>生成コードは決定的に動きます。外部操作もラッパ経由で skill の実行体を呼ぶだけです。</p></div>
+    <div class="card"><span class="k">検証手段</span><h4>画面とDBの二重確認</h4><p>原則は「両方」。DB だけで確かめた箇所には理由を1文添え、ステップ3の見直しの入口にします。 <a class="more" href="#db-detail">→ 補足</a></p></div>
+    <div class="card"><span class="k">待機</span><h4>固定待機は使わない</h4><p>「目的の状態が成立した」をポーリングで待ちます。タイムアウト値の根拠は探索時の実測値です。</p></div>
+    <div class="card"><span class="k">非決定値</span><h4>強度は観測で決める</h4><p>テストが不安定でも、テスト側で検証を勝手に緩めません。カタログの見直し提案として人に上げます。 <a class="more" href="#nd-detail">→ 補足</a></p></div>
+    <div class="card"><span class="k">再実行耐性</span><h4>自分のデータだけを見る</h4><p>作成データは実行ごとに一意にし、環境全体の件数では判定しません。復元はスイート開始前の1回だけです。</p></div>
+    <div class="card"><span class="k">DB不変条件</span><h4>どのシナリオも整合性テストになる</h4><p>各テストの後に自データの範囲で、スイートの最後にDB全体で、常に成り立つべき条件を検査します。 <a class="more" href="#inv-detail">→ 補足</a></p></div>
+    <div class="card"><span class="k">外部操作</span><h4>手段は skill だけ</h4><p>AIは skill を作らず改変もしません。禁止操作リストと包括原則に従い、迷ったら実行しません。DB は SELECT のみです。 <a class="more" href="#extop-detail">→ 補足</a></p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="deep">
+  <h2>補足説明</h2>
+  <p>概要だけでは分かりにくい仕組みを補足します。仕組みごとに「それがある場合とない場合で何が変わるか」を並べています。</p>
+  <nav class="toc" aria-label="補足説明の目次">
+    <a href="#nd-detail">非決定値カタログ</a>
+    <a href="#inv-detail">DB不変条件違反</a>
+    <a href="#health-detail">健全性の是正</a>
+    <a href="#extop-detail">外部操作 skill の作り方</a>
+    <a href="#db-detail">DBでも判定する理由</a>
+    <a href="#method-extend">シナリオ策定方式の拡張</a>
+    <a href="#fixture-detail">fixture・セットアップ記録・established check</a>
+    <a href="#run-commands">回帰テストの実行コマンド</a>
+  </nav>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="nd-detail">
+    <h3>非決定値カタログとは</h3>
+    <p>回帰テストは「前回と同じ結果になるか」を比べます。ところが画面やDBには、ジョブID・作成日時のように<b>実行するたびに変わる値</b>が混ざっています。非決定値カタログは、値ごとに「どこまで厳密に比べるか(検証強度)」を決めた一覧です。強度は推測ではなく、<b>同じ入力で同じ操作を3回繰り返した観測</b>で決めます。作業02が <code>work/_common/nondeterministic-catalog.md</code> に作り、作業10の判定と作業20のコードはこれに従います。</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>強度(強い順)</th><th>意味</th><th>値の例</th><th>テストコードでの書き方</th></tr></thead>
+        <tbody>
+          <tr><td>完全一致</td><td>毎回同じ値になる</td><td>同じ入力で印刷したときの課金明細の金額(3回とも 120 円)</td><td><code>toBe(120)</code> / <code>toHaveText('120')</code></td></tr>
+          <tr><td>関係式</td><td>値は変わるが、他の値との関係は常に成り立つ</td><td>明細の総和 = 表示合計 / テスト開始時刻 ≤ 作成日時</td><td>関連する値を取って関係を検証する</td></tr>
+          <tr><td>パターン一致</td><td>値は変わるが、書式は決まっている</td><td>ジョブID <code>JOB-00001042</code> → <code>^JOB-\d{8}$</code></td><td><code>toHaveText(/^JOB-\d{8}$/)</code></td></tr>
+          <tr><td>存在のみ</td><td>内容は問わず、あることだけ確かめる</td><td>DBの自動採番(IDENTITY)列</td><td><code>toBeVisible()</code> / NOT NULL の確認</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>強度は上から順に検討し、関係式やパターンが書ける値を「存在のみ」に落とすことはできません。金額・枚数・ユーザー名・権限・設定値のような業務的に重要な値が揺れたら、強度を下げる前に報告します(本来一致すべき値が一致しないのは、不具合の可能性があるため)。</p>
+    <div class="vs">
+      <div class="card yes"><h4>カタログがある場合</h4><ul>
+        <li>変わる値は書式や関係で、変わらない値は完全一致で比べるので、毎回安定して通りながら金額・枚数の誤りは検出できる</li>
+        <li>強度の判断が根拠(観測値)付きで1か所にまとまり、テストごとにAIが判断しない</li>
+        <li>テストが不安定でもテスト側では緩めず、カタログ見直しの提案として人に上がる。誰がなぜ緩めたかが残る</li>
+      </ul></div>
+      <div class="card no"><h4>カタログがない場合</h4><ul>
+        <li>初回の値をそのまま完全一致で固めると、2回目の実行からジョブIDや日時の違いで失敗する(flaky)</li>
+        <li>逆に揺れそうな値を全部「存在のみ」にすると、金額が0円になってもテストは通る。<b>緑のまま不具合を見逃す</b></li>
+        <li>強度がテストごと・担当AIごとにばらつき、緩めた理由が残らない</li>
+      </ul></div>
+    </div>
+    <p class="sub">観測は回帰実行と同じ条件で行います。環境を戻さずに3回続けて実行し、日をまたがず、同じ入力を与えます。毎回環境を戻すと、戻した直後にしか成り立たない値(件数・連番)を「毎回同じ」と誤って判定し、回帰実行の2回目以降で壊れるためです。</p>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="inv-detail">
+    <h3>DB不変条件違反とは</h3>
+    <p>DB不変条件は、<b>どのシナリオを実行したあとでも常に成り立つべきデータの条件</b>です。シナリオごとの期待結果とは別に、すべてのシナリオのあとで機械的に検査します。不変条件違反とは、この条件が崩れたことを指し、製品の不具合の可能性があります。</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>ID</th><th>条件</th><th>状態</th></tr></thead>
+        <tbody>
+          <tr><td><code>INV-001</code></td><td>完了したジョブ1件に対し、課金レコードがちょうど1件対応する</td><td>課金スキーマ確認待ちで未実装</td></tr>
+          <tr><td><code>INV-002</code></td><td>課金明細の合計額が請求総額と一致する</td><td>課金スキーマ確認待ちで未実装</td></tr>
+          <tr><td><code>INV-003</code></td><td>参照先を失った孤児レコードが存在しない</td><td>使える</td></tr>
+          <tr><td><code>INV-004</code></td><td>金額・枚数に負の値が存在しない</td><td>使える</td></tr>
+          <tr><td><code>INV-005</code></td><td>主要テーブルの必須列に想定外の NULL が存在しない</td><td>使える</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure>
+      <div class="fig mid">
+        <svg class="dg" viewBox="0 0 860 176" role="img" aria-label="DB不変条件の2段構えの検査。各テストの直後は自分が作ったデータだけを検査し、全テストの完了後に1回だけDB全体を検査する。">
+          <defs>
+            <marker id="f10-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-m"/></marker>
+          </defs>
+          <text x="10" y="69" class="mono s11 m">worker 1</text>
+          <text x="10" y="129" class="mono s11 m">worker 2</text>
+          <rect x="80" y="44" width="170" height="40" rx="5" class="n-ai"/>
+          <text x="165" y="69" text-anchor="middle">テストA 本体</text>
+          <rect x="252" y="44" width="100" height="40" rx="5" class="n-tool"/>
+          <text x="302" y="61" text-anchor="middle" class="b s11">INV 検査</text>
+          <text x="302" y="76" text-anchor="middle" class="s105">自データだけ</text>
+          <rect x="360" y="44" width="140" height="40" rx="5" class="n-ai"/>
+          <text x="430" y="69" text-anchor="middle">テストC 本体</text>
+          <rect x="502" y="44" width="100" height="40" rx="5" class="n-tool"/>
+          <text x="552" y="61" text-anchor="middle" class="b s11">INV 検査</text>
+          <text x="552" y="76" text-anchor="middle" class="s105">自データだけ</text>
+          <rect x="80" y="104" width="220" height="40" rx="5" class="n-ai"/>
+          <text x="190" y="129" text-anchor="middle">テストB 本体</text>
+          <rect x="302" y="104" width="100" height="40" rx="5" class="n-tool"/>
+          <text x="352" y="121" text-anchor="middle" class="b s11">INV 検査</text>
+          <text x="352" y="136" text-anchor="middle" class="s105">自データだけ</text>
+          <rect x="410" y="104" width="110" height="40" rx="5" class="n-ai"/>
+          <text x="465" y="129" text-anchor="middle">テストD 本体</text>
+          <rect x="522" y="104" width="100" height="40" rx="5" class="n-tool"/>
+          <text x="572" y="121" text-anchor="middle" class="b s11">INV 検査</text>
+          <text x="572" y="136" text-anchor="middle" class="s105">自データだけ</text>
+          <line x1="636" y1="38" x2="636" y2="150" class="ln-m"/>
+          <text x="636" y="30" text-anchor="middle" class="s105 m">全テスト完了</text>
+          <rect x="650" y="44" width="200" height="100" rx="6" class="n-tool"/>
+          <text x="750" y="80" text-anchor="middle" class="mono b">globalTeardown</text>
+          <text x="750" y="102" text-anchor="middle">INV 検査(DB 全体)</text>
+          <text x="750" y="122" text-anchor="middle" class="s105 m">最後に1回だけ</text>
+          <line x1="80" y1="164" x2="846" y2="164" class="ln-m" marker-end="url(#f10-ah)"/>
+          <text x="80" y="158" class="s105 m">時間</text>
+        </svg>
+      </div>
+      <figcaption>テストは並行して走るため、各テストの直後(<code>afterEach</code>)に DB 全体を見ると、隣で動いている別のテストの書きかけのデータを拾って偽の失敗になります。そこで直後は自分が作ったデータだけを、DB 全体は全テストの完了後に1回だけ検査します。</figcaption>
+    </figure>
+    <div class="vs">
+      <div class="card yes"><h4>不変条件の検査がある場合</h4><ul>
+        <li>どのシナリオも同時に整合性テストになる。印刷のシナリオが、二重課金や負の金額といった別の箇所の破損も拾う(カバレッジが掛け算で増える)</li>
+        <li>画面は「受付完了」で期待結果を満たしていても、裏で孤児レコードができていれば検出できる</li>
+        <li>違反は自動でやり直さず人の判断へ回るので、たまたま通った再実行で不具合が揉み消されない</li>
+      </ul></div>
+      <div class="card no"><h4>不変条件の検査がない場合</h4><ul>
+        <li>各シナリオの期待結果に書いた点しか見ないため、画面に出ないデータの破損は回帰テストを素通りする</li>
+        <li>探索のやり直しで違反が出なくなれば「直った」扱いになり、不具合が記録に残らないおそれがある</li>
+      </ul></div>
+    </div>
+    <p>違反が見つかると、作業10・15は status.yaml に <code>invariant_violation: found</code> を出して止まります。管理者は「不具合として起票して続行」(フローは残りの作業へ進む)か「中断」を選びます。検査は <code>SELECT</code> だけで書き、<code>tests/helpers/invariants.ts</code> に集約し、失敗メッセージに <code>INVARIANT</code> を含めてシナリオ本体の失敗と区別します。誤った条件は全シナリオに偽の失敗を撒くため、不変条件のSQLは優先レビューの対象です。</p>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="health-detail">
+    <h3>健全性の是正とは</h3>
+    <p>期待結果は満たしているのに、操作や環境が正しくないために<b>本来の正常な結果になっていない</b>ことがあります。たとえば、印刷ジョブは発行でき一覧で検索もできるが、複合機に残っていた認証設定のためにジョブが「認証エラー」になっている場合です。この兆候を<b>健全性シグナル</b>と呼び、作業10はそのステップを passed にせず human-check として記録します。作業15(健全性の是正)は、そうしたシナリオについて原因を調べ、正常な結果が得られる操作を編み出し直します。</p>
+    <p>健全性シグナルは自分のテストのデータ・操作に関するものだけを数えます(他のデータのエラーは数えません)。種類は4つです: 自データの異常状態(ジョブがエラー・保留など)/ エラー表示 / 外部操作の異常終了・警告 / 関連システム(機器の表示・ログ)のエラー。</p>
+    <ol class="steps">
+      <li><b>自己診断</b> — 記録と証跡、自データに絞った DB の SELECT、KB の落とし穴(T10)・環境(T09)を読み取りだけで確かめる。KB に解消の方法があれば、問い合わせずに試してよい</li>
+      <li><b>問い合わせ</b> — 問い合わせ skill(別の問い合わせ対応エージェント)に、再現手順・本来得たい結果(期待結果をそのまま)・解決してほしいことを渡す。1シナリオにつき3回まで。入力と回答の全文を <code>health/inquiries/</code> に保存する</li>
+      <li><b>回答の扱い</b> — 回答は情報源であって正解の根拠ではない。「操作の変更」なら最初のステップから探索し直し、「環境の変更」なら禁止操作リストに照らしてから試す。「製品不具合の見立て」は DISC に記録する</li>
+      <li><b>結果の記録</b> — 下の表の4つの結果のどれかにして、作業20へ進む(解消しないことを理由に止まらない)</li>
+    </ol>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>結果</th><th>意味</th><th>回帰テストへの扱い</th></tr></thead>
+        <tbody>
+          <tr><td><code>resolved</code></td><td>操作を変えて、シグナルが出ない操作を編み出せた</td><td>探索記録を追記し、作業20でコード化する。原因と直し方は KB に残す</td></tr>
+          <tr><td><code>env_changed</code></td><td>環境(PMS・機器の設定)を変えたらシグナルが消えた</td><td>コード化しない。環境の変更は回帰テストで再現されないため、ゴールデンイメージや開始前シナリオに取り込むかを人が判断する</td></tr>
+          <tr><td><code>unresolved</code></td><td>3回問い合わせても解消しない、または製品の修正が要りそう</td><td>human-check のまま残す。as-is 判断の前に環境の是正を検討するよう報告する</td></tr>
+          <tr><td><code>no_skill</code></td><td>問い合わせ skill がない</td><td>記録だけ残して作業20へ進む</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="vs">
+      <div class="card yes"><h4>健全性の是正がある場合</h4><ul>
+        <li>エラーになったジョブのような誤った状態を、正解として回帰テストに固めることを防げる</li>
+        <li>原因と直し方が KB に残り、次のフローで同じ環境の癖につまずかない</li>
+        <li>環境側の問題は「環境の前提に取り込むか」という具体的な判断材料として人に上がる</li>
+      </ul></div>
+      <div class="card no"><h4>健全性の是正がない場合</h4><ul>
+        <li>エラーのまま操作列がコード化され、後で環境が直された時点で回帰テストが偽の失敗を出す</li>
+        <li>人の as-is 判断に「本当は環境や操作の問題」の項目が混ざり、誤った挙動を正解として凍結するおそれがある</li>
+        <li>同じ環境の問題に毎フローでつまずき、そのたびに調べ直す</li>
+      </ul></div>
+    </div>
+    <p class="sub">作業15は環境を復元せず、作業10が残した環境をそのまま使います。止まるのは、環境の変更に許可が必要なとき(要許可操作・包括原則)だけです。期待結果・判定基準・シナリオは変えません。</p>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="extop-detail">
+    <h3>Web UI 以外の操作が必要なとき(外部操作 skill の作り方)</h3>
+    <p>複合機のパネル操作、クライアントPCからの印刷指示、ジョブログの収集、AD やメールサーバの操作など、Web UI 以外の操作(外部操作)は、<b>人が整備する外部操作 skill を介してだけ</b>行います。AIは skill を作ったり変えたりせず、skill の使い方を確立して台帳(KB T05)に登録するところまでを担います。回帰テストは実行時にAIを使わないため、skill には<b>テストコードから直接呼べる実行体</b>(CLI・スクリプト)が必要です。</p>
+
+    <h4 class="h4">拡張の手順</h4>
+    <ol class="steps">
+      <li><b>需要を見る</b> — <code>work/_common/external-op-demand.md</code> の状態「未整備」の行を見て、整備する操作を選ぶ。1つの外部操作につき1行で、どのシナリオを止めているか・Web UI や DB による代替手段の有無が書いてある</li>
+      <li><b>禁止操作リストを決める</b> — その操作の対象(実機・シミュレータ・CLIENT・AD・SMTP・PMS-OS)について、禁止 / 要許可 / 条件付き許可と、同時実行できるかを <code>prohibited-operations.md</code> に書く。行がないと包括原則で判断され、ゴールデンイメージで戻らない対象の変更は許可待ちで止まる</li>
+      <li><b>skill を作る</b> — <code>.kiro/skills/&lt;skill名&gt;/</code> に <code>SKILL.md</code> と <code>scripts/</code> の実行体を置く。Copilot でも使うなら <code>.github/skills/</code> にも同じものを置く。生成スクリプトは <code>skills.config.json</code> にある skill しか作り直さないので、外部操作 skill は消されない</li>
+      <li><b>単体で確かめる</b> — 実行体を手で起動し、終了コードと出力が下の約束どおりかを確かめる</li>
+      <li><b>整備記録を書く</b> — 需要リストの行に整備日と skill名を書き、状態を「整備済」にする</li>
+      <li><b>再探索を頼む</b> — <code>/pms-regression EXT-002 を再探索して</code>(需要IDを省くと「整備済」の全行が対象)</li>
+      <li><b>ここからはAIが行う</b> — 実行体の確認 → 使い方の確立(引数・前提・完了判定・所要時間の実測)→ KB T05 に操作ID(例 <code>OP-DEV-005</code>)で登録 → <code>tests/external/</code> にラッパを実装 → 止まっていたシナリオを最初のステップから探索し直し → 作業20でコード化</li>
+    </ol>
+
+    <h4 class="h4">実行体の約束</h4>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>項目</th><th>約束</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td>実行体の同梱</td><td>skill のフォルダに CLI・スクリプトを入れる(<b>必須</b>)</td><td>ないと「実行体なし」として回帰テストにできない</td></tr>
+          <tr><td>非対話</td><td>確認のプロンプトや画面操作なしで最後まで動く(<b>必須</b>)</td><td>テストコードから呼ぶため</td></tr>
+          <tr><td>成否</td><td>終了コード 0 が成功、0 以外が失敗(<b>必須</b>)</td><td>ラッパが成否を機械的に判定し、失敗ならテストを失敗させる</td></tr>
+          <tr><td>出力</td><td>結果は標準出力の最後の1行に JSON、途中経過は標準エラー(推奨)</td><td><code>restore-golden-image</code> と同じ形。呼び出し側が読みやすい</td></tr>
+          <tr><td>接続先</td><td>機器のホスト・IP などは引数で受け取る</td><td>値は環境ごとに変わる。ラッパが <code>envValue</code> で読んで渡す</td></tr>
+          <tr><td>秘密情報</td><td>パスワードをコマンドラインやログに出さない(推奨)</td><td>テストのログ・報告書に残さないため</td></tr>
+          <tr><td>完了の意味</td><td>「指示を受け付けた」のか「処理が完了した」のかを SKILL.md に書く</td><td>AIが完了判定と待機条件を決める材料になる</td></tr>
+          <tr><td>副作用のない確認</td><td><code>--help</code> や <code>--version</code> で起動を確かめられる</td><td>作業20がコード化の前に、実際に操作せず起動できるかを確かめる</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid2">
+      <div>
+<pre class="code"><span class="c"># 例: 複合機のジョブログ送信の skill</span>
+.kiro/skills/pms-device-joblog/
+├── SKILL.md
+└── scripts/
+    └── device-joblog.mjs   <span class="c"># .ps1 や .py でもよい</span></pre>
+<pre class="code"><span class="c">// tests/external/deviceJoblog.ts(AIが作るラッパの例)</span>
+<span class="c">// OP-DEV-005 と1対1。skill の実行体を呼ぶだけ</span>
+export function sendJobLog(device: string) {
+  const host = envValue(`mfp.${device}.host`);
+  execFileSync(process.execPath, [
+    '.kiro/skills/pms-device-joblog/scripts/device-joblog.mjs',
+    'send', '--device', host,
+  ]); <span class="c">// 0 以外なら例外になりテストが失敗する</span>
+}</pre>
+      </div>
+<pre class="code"><span class="c"># SKILL.md の例</span>
+---
+name: pms-device-joblog
+description: 複合機に保存されたジョブログを PMS へ
+  送信させる外部操作。PMS 回帰テストの探索と
+  tests/external/ のラッパから使う。
+---
+# 複合機のジョブログ送信
+
+## 実行方法
+node &lt;この skill のフォルダ&gt;/scripts/device-joblog.mjs \
+  send --device &lt;複合機のホスト&gt;
+
+## 結果
+- 終了コード 0: 複合機が送信指示を受け付けた
+  (PMS への反映は非同期。完了は DB の JobLog で確かめる)
+- 1: 送信の失敗 / 2: 引数・接続の誤り
+- 標準出力の最後の1行が JSON
+  {"success":true,"device":"…","accepted_at":"…"}
+
+## 注意
+- 使う環境情報: mfp.&lt;機器&gt;.host
+- 機器の設定は変えない(読み取りと送信指示のみ)</pre>
+    </div>
+    <p class="sub">作業15が使う<b>問い合わせ skill</b>も同じ形で作ります。再現手順と解決してほしいことを入力に受け取り、調査結果をテキストで返すコマンドを同梱します。なお、同時に実行できない機器を使うテストには <code>@serial-&lt;対象略号&gt;</code> のタグが付き、直列の project で実行されます(禁止操作リストの「同時実行の可否」で決まる)。</p>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="db-detail">
+    <h3>Web UI に加えて DB でも判定する理由</h3>
+    <p>期待結果は<b>画面での確認を主とし、できる限り DB でも裏付けます</b>(検証手段「両方」)。1つの操作で、画面の層とデータを保存する層の両方を確かめられ、追加のコストが小さいためです。画面に出ない内部処理の完了状態などは DB だけで判定し、その場合は理由を1文添えます。</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>起きている問題</th><th>画面だけで確認</th><th>画面+DB で確認</th></tr></thead>
+        <tbody>
+          <tr><td>画面は「受付完了」だが、ジョブの行が保存されていない(または2件保存された)</td><td>見逃す</td><td>検出できる</td></tr>
+          <tr><td>画面の金額は正しいが、DB の課金明細の金額が誤っている</td><td>見逃す</td><td>検出できる</td></tr>
+          <tr><td>一覧の表示が更新されるタイミングがまちまち</td><td>待ちが不安定になり flaky</td><td>DB の状態を待機条件にすると安定する</td></tr>
+          <tr><td>内部処理の完了状態が画面に出ない</td><td>判定できない</td><td>DB だけで判定できる(理由を併記)</td></tr>
+          <tr><td>画面の文言やレイアウトが変わった</td><td>期待結果を業務的な意味で書いているので影響は小さい</td><td>DB 側の確認は影響を受けない</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="vs">
+      <div class="card yes"><h4>DB での判定がある場合</h4><ul>
+        <li>画面と保存されたデータの食い違い(表示だけ正しい)を検出できる</li>
+        <li>非同期処理の完了を DB の状態で待てるので、待機が安定する</li>
+        <li>DB だけで判定した箇所に理由が残り、ステップ3で検証手段を見直すときの入口になる</li>
+      </ul></div>
+      <div class="card no"><h4>画面だけの場合</h4><ul>
+        <li>保存されたデータの誤り(二重登録・金額の誤り)は画面に出るまで見えない</li>
+        <li>画面の更新タイミングに左右されて、テストが不安定になりやすい</li>
+        <li>画面に出ない処理は「判定できない」として検証から抜けていく</li>
+      </ul></div>
+    </div>
+    <p class="sub">DB の操作は <code>SELECT</code> だけで、自分のテストが作ったデータに <code>WHERE</code> で絞ります(環境全体の件数では判定しない)。DB の列の意味は KB の T03 に蓄積されます。DB での確認は画面の確認の代わりではなく、利用者に見える画面での確認が主です。</p>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="method-extend">
+    <h3>シナリオ策定方式の拡張方法</h3>
+    <p>シナリオを作る材料を増やしたいときは、方式を1つ追加します。方式が担うのは「シナリオ候補をどの資料からどう拾うか」だけなので、作業10のパートC以降・作業15・20・成果物の書式は変える必要がありません。ここでは例として、<b>不具合の改修票から、直した機能の基本動作のシナリオを作る方式</b>(仮の名前 <code>bugfix_ticket</code>)を足す場合を示します。</p>
+    <ol class="steps">
+      <li><b>語彙に加える</b> — <code>procedure/vocab.yaml</code> の <code>scenario_source</code> に <code>bugfix_ticket</code> と説明を1行足す</li>
+      <li><b>方式ファイルを書く</b> — <code>procedure/methods/bugfix_ticket.md</code> を、下の7つの見出しで、この順に書く(番号は付け替えない)</li>
+      <li><b>入口に手がかりを足す</b> — <code>procedure/router/SKILL.md</code> の「シナリオ策定方式を決める」表に、依頼文の手がかり(例:「改修票 〇〇 から」)を加える。前提条件があれば、入口で確かめる内容も書く</li>
+      <li><b>版を上げて記録する</b> — <code>vocab.yaml</code> の <code>meta.procedure_version</code> を1つ上げ、<code>procedure/docs/000_overview.md</code> の改訂履歴に記録する</li>
+      <li><b>生成して検査する</b> — <code>node tools/build-skills/build-skills.mjs</code> のあと <code>--check</code>。語彙と方式ファイルの過不足や見出しの順が違えば、エラーになり何も書き出さない</li>
+      <li><b>コミットして配る</b> — 正本と生成物を同じコミットにし、版と同じ名前のタグを付ける。メンバーへの配布は、実行中のフローが終わってから</li>
+    </ol>
+<pre class="code"><span class="c"># procedure/methods/bugfix_ticket.md の骨組み</span>
+# 方式: bugfix_ticket
+
+方式名: 不具合の改修票起点
+
+## 1. 入力資料
+<span class="c">主たる入力・補助の資料・所在。前提条件とその確かめ方(例: 改修版が検証環境に配備済み)。初回フローで機能一覧を確定する元の資料</span>
+## 2. 候補の抽出手順
+<span class="c">資料から利用者の一連の作業を切り出し、共通契約の妥当性基準で 1機能1〜2本に絞るまで</span>
+## 3. 根拠の書き方
+<span class="c">例: 改修票:BUG-1234 / 文書に記載があれば文書名+章番号を先に</span>
+## 4. 代表値と範囲外の扱い
+<span class="c">再現条件の値違い・異常系は申し送り台帳へ</span>
+## 5. 方式固有の禁止事項
+## 6. 方式固有のDoD
+<span class="c">機械的に確かめられる形で書く</span>
+## 7. 方式固有のKB・DISC</pre>
+    <ul class="plain">
+      <li><b>共通の決まりを緩めない。</b>単機能・正常系・代表1値・操作手順を書かない・全ステップに根拠、といったパートBの共通契約は方式ファイルに再掲せず、緩めもしません</li>
+      <li>該当がない見出しも残して「なし」と書きます(空欄は仕様の穴として扱われる)</li>
+      <li>方式ファイルの改訂は、人が採否を決める区分B です。作業40が勝手に変えることはありません</li>
+      <li>1つの scenarios.md に、異なる方式で作ったシナリオが並んでも構いません(各シナリオに方式IDが記録される)</li>
+    </ul>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="fixture-detail">
+    <h3>fixture・セットアップ記録・established check の関係</h3>
+    <p>シナリオは、前提状態を <code>requires</code> に状態IDで書くだけで、作り方は書きません。前提状態の<b>作り方の記録</b>がセットアップ記録、<b>作り方のコード</b>がシナリオ部品と fixture、<b>できたことの確かめ方</b>が established check です。</p>
+    <figure>
+      <div class="fig mid">
+        <svg class="dg" viewBox="0 0 900 252" role="img" aria-label="シナリオの requires がセットアップ記録を指し、セットアップ記録の操作列がシナリオ部品に、確認条件が fixture にコード化される。fixture は部品を呼び確認を行ってテストに前提を渡す。起動確認テストも同じ部品と確認を使う。">
+          <defs>
+            <marker id="f11-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+          </defs>
+          <rect x="10" y="40" width="170" height="64" rx="6" class="n-plain"/>
+          <text x="95" y="64" text-anchor="middle" class="mono b">scenarios.md</text>
+          <text x="95" y="86" text-anchor="middle" class="mono s105">requires: S-USER-LOGIN</text>
+          <line x1="180" y1="72" x2="213" y2="72" class="ln" marker-end="url(#f11-ah)"/>
+          <rect x="215" y="24" width="215" height="96" rx="6" class="n-store"/>
+          <text x="322" y="48" text-anchor="middle" class="mono b">setup-log.yaml</text>
+          <text x="227" y="68" class="s105">state_id / steps(操作列)</text>
+          <text x="227" y="86" class="s105">established_check(確認条件)</text>
+          <text x="227" y="104" class="s105">fixture・部品の所在 / verified</text>
+          <path d="M430 50 H478" class="ln" marker-end="url(#f11-ah)"/>
+          <text x="454" y="42" text-anchor="middle" class="s105 m">コード化</text>
+          <path d="M430 100 H455 V170 H478" class="ln" marker-end="url(#f11-ah)"/>
+          <text x="461" y="128" class="s105 m">コード化</text>
+          <rect x="480" y="20" width="200" height="60" rx="6" class="n-ai"/>
+          <text x="580" y="44" text-anchor="middle" class="mono b s11">tests/flows/auth.ts</text>
+          <text x="580" y="64" text-anchor="middle" class="s105">loginAsUser(): 操作列</text>
+          <rect x="480" y="140" width="200" height="60" rx="6" class="n-main"/>
+          <text x="580" y="164" text-anchor="middle" class="mono b s11">tests/fixtures/auth.ts</text>
+          <text x="580" y="184" text-anchor="middle" class="s105">userLogin: 部品+確認</text>
+          <line x1="580" y1="140" x2="580" y2="82" class="ln" marker-end="url(#f11-ah)"/>
+          <text x="586" y="116" class="s105 m">呼ぶ</text>
+          <rect x="730" y="140" width="160" height="60" rx="6" class="n-ai"/>
+          <text x="810" y="164" text-anchor="middle" class="mono b s11">tests/specs/…</text>
+          <text x="810" y="184" text-anchor="middle" class="mono s105">test(…,{ userLogin })</text>
+          <line x1="680" y1="170" x2="728" y2="170" class="ln" marker-end="url(#f11-ah)"/>
+          <text x="705" y="132" text-anchor="middle" class="s105 m">前提を渡す</text>
+          <rect x="730" y="20" width="160" height="60" rx="6" class="n-ai"/>
+          <text x="810" y="44" text-anchor="middle" class="b">起動確認テスト</text>
+          <text x="810" y="64" text-anchor="middle" class="s105">同じ部品・同じ確認</text>
+          <line x1="730" y1="50" x2="682" y2="50" class="ln" marker-end="url(#f11-ah)"/>
+          <text x="706" y="42" text-anchor="middle" class="s105 m">呼ぶ</text>
+          <text x="10" y="238" class="s11 m">lint requires_covered — 作業10: requires の全状態が setup-log にあるか / 作業20: コード化したシナリオの requires に、established check 付きの fixture があるか</text>
+        </svg>
+      </div>
+      <figcaption>作り方の記録(setup-log)と作り方のコード(部品・fixture)は作業10が同時に作ります。作業20はこのコードを使うだけで、セットアップを新しく作りません。</figcaption>
+    </figure>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>名前</th><th>何か</th><th>誰が作るか</th><th>どこにあるか</th></tr></thead>
+        <tbody>
+          <tr><td>状態ID(requires)</td><td>シナリオが必要とする前提の名前。ステップ1では初期状態セットの4つ(<code>S-ADMIN-LOGIN</code>・<code>S-USER-LOGIN</code>・<code>S-DEVICE-REGISTERED</code>・<code>S-CLEAN-ENV</code>)だけを使う</td><td>語彙は人が決める。シナリオは参照するだけ</td><td><code>vocab.yaml</code> / <code>scenarios.md</code></td></tr>
+          <tr><td>セットアップ記録</td><td>状態ごとの操作列・確認条件・コードの所在・2回実行で確かめたか(<code>verified</code>)</td><td>作業10(フェーズA)</td><td><code>work/&lt;機能コード&gt;/exploration/setup-log.yaml</code></td></tr>
+          <tr><td>シナリオ部品</td><td>操作列そのもの。アサーションは書かない</td><td>作業10</td><td><code>tests/flows/</code></td></tr>
+          <tr><td>fixture</td><td>部品を呼び、established check で成立を確かめてから、テストに前提を渡す</td><td>作業10</td><td><code>tests/fixtures/</code></td></tr>
+          <tr><td>established check</td><td>状態が成立したことの機械的な確認。例: ナビゲーションにログアウトのリンクが表示される</td><td>作業10が記録し、fixture に実装する</td><td>setup-log と fixture の両方</td></tr>
+        </tbody>
+      </table>
+    </div>
+<pre class="code"><span class="c">// tests/fixtures/auth.ts(例)</span>
+export const test = base.extend&lt;{ userLogin: void }&gt;({
+  userLogin: async ({ page }, use) =&gt; {
+    await loginAsUser(page);                          <span class="c">// シナリオ部品 = setup-log の steps</span>
+    await expect(page.getByRole('navigation')
+      .getByRole('link', { name: 'ログアウト' })).toBeVisible();  <span class="c">// established check</span>
+    await use();
+  },
+});</pre>
+    <ul class="plain">
+      <li><b>なぜ established check が要るか。</b>テストが落ちたとき、「前提が作れなかった」のか「検証対象の機能が壊れた」のかを区別するためです。確認なしのセットアップでは、失敗の切り分けができません。また、環境がきれいなことを暗黙の前提にせず、毎回成立を確かめます</li>
+      <li><b>既存の fixture があれば流用します。</b>実行して established check が通ることを確かめるだけで、操作を探し直しません</li>
+      <li><b>2回実行して確かめます。</b>2回目が残留データで失敗するなら、後始末をするか専用のデータにします。確かめられなければ <code>verified: false</code> と書き、作業20が最初に確認します</li>
+      <li><b>blocked のシナリオでも前提状態は整備して記録します。</b>blocked が解けたときに作り方を探し直さないためです</li>
+      <li><b>作業20はセットアップを新しく作りません。</b>fixture のない前提を要するシナリオは「コード化不能」として作業10へ差し戻します</li>
+      <li><b>起動確認テストはログイン fixture と同じ部品・同じ確認条件を使います。</b>ログイン画面が変わっても、直す場所は1か所で済みます</li>
+    </ul>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <div class="subsec" id="run-commands">
+    <h3>回帰テストを直接実行するコマンド</h3>
+    <p>生成された回帰テストは通常の Playwright テストなので、AIを使わずに <code>npx playwright test</code> で実行できます。以下は、<code>golden-restore/README.md</code> の例に沿った <code>playwright.config.ts</code>(project <code>readiness</code>・<code>default</code>・<code>serial-&lt;対象&gt;</code>、globalSetup・globalTeardown)と、下のタグの決まりを前提にした例です。リポジトリのルートで実行します。機能コード <code>PRT</code>・ファイル名は例なので、実際の名前に置き換えてください。</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>タグ</th><th>付くテスト</th><th>例</th></tr></thead>
+        <tbody>
+          <tr><td><code>@&lt;シナリオID&gt;</code></td><td>全テスト。1つのシナリオIDはコード全体でちょうど1つのテストにだけ付く</td><td><code>@SC-PRT-01</code></td></tr>
+          <tr><td><code>@&lt;機能コード&gt;</code></td><td>全テスト</td><td><code>@PRT</code></td></tr>
+          <tr><td><code>@external</code></td><td>外部操作を含むテスト</td><td><code>@external</code></td></tr>
+          <tr><td><code>@serial-&lt;対象略号&gt;</code></td><td>同時に実行できない機器を使うテスト</td><td><code>@serial-DEV</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid2">
+<pre class="code"><span class="c"># ── 全部のテスト ──────────────────────</span>
+<span class="c"># 今の環境のまま(復元しない)</span>
+npx playwright test
+
+<span class="c"># 実行前にゴールデンイメージへ1回復元(定期実行・CI 向け)</span>
+<span class="c"># bash / zsh</span>
+PMS_RESTORE=1 npx playwright test
+<span class="c"># PowerShell</span>
+$env:PMS_RESTORE='1'; npx playwright test; Remove-Item Env:PMS_RESTORE
+
+<span class="c"># ── シナリオ単位 ──────────────────────</span>
+npx playwright test --grep "@SC-PRT-01"
+<span class="c"># 複数のシナリオ</span>
+npx playwright test --grep "@SC-PRT-01|@SC-PRT-03"</pre>
+<pre class="code"><span class="c"># ── グループ単位 ──────────────────────</span>
+<span class="c"># 機能単位(タグ)</span>
+npx playwright test --grep "@PRT"
+<span class="c"># 機能単位(フォルダ)/ ファイル単位</span>
+npx playwright test tests/specs/PRT/
+npx playwright test tests/specs/PRT/prt-print.spec.ts
+<span class="c"># 外部操作を含むものだけ / 含むものを除く</span>
+npx playwright test --grep "@external"
+npx playwright test --grep-invert "@external"
+<span class="c"># 組み合わせ: PRT のうち外部操作なし</span>
+npx playwright test --grep "@PRT" --grep-invert "@external"
+<span class="c"># 直列で実行する機器のテストだけ(project 名で指定)</span>
+npx playwright test --project serial-DEV</pre>
+    </div>
+<pre class="code"><span class="c"># ── その他の便利な指定 ────────────────</span>
+npx playwright test --grep "@PRT" --list          <span class="c"># 実行せずに対象の一覧だけを見る</span>
+npx playwright test --last-failed                  <span class="c"># 前回失敗したテストだけ(Playwright 1.44 以降)</span>
+PMS_ENV=vm02 npx playwright test --grep "@PRT"     <span class="c"># 別の検証環境で(PowerShell: $env:PMS_ENV='vm02'; …)</span>
+npx playwright test -c playwright.readiness.config.ts   <span class="c"># 起動確認テスト(ログインできるか)だけ</span>
+npx playwright test --grep "@SC-PRT-01" --headed   <span class="c"># 画面を表示して実行(--debug で1行ずつ、--ui で専用画面)</span>
+npx playwright show-report                         <span class="c"># 直前の実行結果のレポートを開く</span>
+
+<span class="c"># 再実行耐性の確認(作業20と同じく、復元せずに3回続けて実行)</span>
+for i in 1 2 3; do npx playwright test --grep "@PRT"; done           <span class="c"># bash / zsh</span>
+1..3 | ForEach-Object { npx playwright test --grep "@PRT" }        <span class="c"># PowerShell</span></pre>
+    <ul class="plain">
+      <li><b>最小の単位はシナリオです。</b>ステップ(<code>test.step()</code>)は1つのテストの一部なので、ステップだけを実行することはできません</li>
+      <li><code>--grep</code> は正規表現で、テスト名とタグに対して照合します。機能コードが別のコードの先頭と重なる場合(例 <code>PRT</code> と <code>PRTX</code>)は <code>"@PRT\b"</code> のように境界を付けます</li>
+      <li><code>PMS_RESTORE=1</code> を付けると、実行の前に VM の復元(数分〜十数分)が入ります。付けなければ今の環境のまま実行します。テストは復元なしの再実行に耐えるように作られているので、普段の確認やデバッグでは付けなくて構いません</li>
+      <li>絞り込んで実行しても、globalTeardown の DB 全体の不変条件検査は最後に走ります。実際に何が実行されるかは <code>--list</code> で事前に確かめられます</li>
+      <li><code>package.json</code> に <code>"test:regression": "cross-env PMS_RESTORE=1 playwright test"</code> のようなスクリプトを用意しておくと、一括実行を1語で呼べます</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="glossary">
+  <h2>用語集</h2>
+  <dl class="gloss">
+    <dt>フロー</dt><dd>実行の単位。人が指示した対象領域(1〜2機能)について、作業10 → 作業20 を1巡すること。ID は F-001 から通し番号</dd>
+    <dt>再探索フロー</dt><dd>外部操作 skill の整備後に、その操作がなくて blocked になっていたシナリオを探索し直すフロー。シナリオは作り直さない</dd>
+    <dt>シナリオ型 / 単発型</dt><dd>利用者の一連の作業をなぞる複数ステップのテスト / 1つの観点を独立に確かめるテスト。ステップ1はシナリオ型だけ</dd>
+    <dt>判定</dt><dd><code>passed</code>(満たす)・<code>failed</code>(満たさない)・<code>human-check</code>(AIが正否を断定できない)・<code>blocked</code>(実行できない)の4つ。コード化するのは passed だけ</dd>
+    <dt>健全性シグナル</dt><dd>期待結果は満たしたが、自分のデータや操作に正常でない兆候が出ていること(例: ジョブが認証エラー)。出たステップは passed にせず作業15で是正する <a class="more" href="#health-detail">→ 補足</a></dd>
+    <dt>ゴールデンイメージ・復元範囲</dt><dd>検証環境を戻す先の基準状態。VM の復元と、開始前シナリオの復元エントリが戻す対象を合わせたものが復元範囲</dd>
+    <dt>工程0・開始前シナリオ</dt><dd>作業10・20の最初に行う環境の復元と、そのあとに実行する設定済みの回帰テスト(機器の設定を戻すなど)</dd>
+    <dt>established check</dt><dd>前提状態が成立したことの機械的な確認(例: ログイン済ならヘッダーにログアウトリンクがある)。セットアップの失敗と機能の不具合を切り分けるために必須 <a class="more" href="#fixture-detail">→ 補足</a></dd>
+    <dt>外部操作・KB T05</dt><dd>Web UI 以外の操作(印刷指示・機器操作など)。skill を使って確立した操作は操作ID を付けて KB T05 に登録してから使う</dd>
+    <dt>申し送り台帳・理由コード</dt><dd>ステップ1で扱わなかった対象の記録。理由は9語の統制語彙だけを使い、AIは語彙を増やさない</dd>
+    <dt>DISC</dt><dd>不整合レポート。文書・既存テスト・KB と実挙動の食い違いを、両方の出典付きで記録したもの</dd>
+    <dt>パートP</dt><dd>禁止操作リストが書き換えられたあと、作業10が「禁止操作」で保留したステップを判定し直す手順</dd>
+    <dt>status.yaml</dt><dd>作業ごとに出す機械可読な段階間契約。分岐に使う値と、次の作業の入力(コード化対象など)を持つ</dd>
+    <dt>lint・関所</dt><dd>記録が手順書の決まり(完了条件 DoD)を満たすかを検査するスクリプト。作業が自分で実行し、入口 skill も作業の間で実行する</dd>
+    <dt>手順版</dt><dd>手順書一式の版(現在 <code>proc-v011</code>)。git のタグと一致し、1フローは開始時の1つの版で実行する。生成したテストにも記録される</dd>
+  </dl>
+</section>
+
+<!-- ============================================================ -->
+<section id="start">
+  <h2>使い始めるとき</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>覚える言い方は3つ</h4>
+<pre class="code">/pms-regression 印刷実行機能の回帰テストを作って
+/pms-regression F-003 の続き
+/pms-regression いまどうなってる?</pre>
+      <p>始める前に <code>git pull</code> で他のメンバーの変更を取り込みます(フロー番号の重なりを避けるため)。探索は環境にデータを書き込むので、検証環境は1人1台を勧めます。</p>
+      <p>できあがった回帰テストを自分で実行するコマンドは <a class="more" href="#run-commands">→ 補足</a></p>
+    </div>
+    <div class="card">
+      <h4>してはいけないこと</h4>
+      <ul>
+        <li><code>.kiro/skills/pms-*</code> を直接編集しない。正本 <code>procedure/</code> を直して <code>node tools/build-skills/build-skills.mjs</code> で再生成する(pre-commit フックが食い違いを止める)</li>
+        <li>作業10のあと、同じチャットのまま作業20を頼まない</li>
+        <li>パスワードなどの値を flow.md や報告書に書かない。環境情報は <code>node tools/env/env.mjs set</code> で保存する</li>
+        <li>レビューヘッダの <code>review_status</code> は人が書き換える。AIに書き換えさせない</li>
+      </ul>
+    </div>
+  </div>
+  <h3>もっと詳しく知りたいとき</h3>
+  <ul class="plain">
+    <li><code>docs/skills版_利用説明書.md</code> — 使い方(第1部)と、導入・改訂・止まったときの対応(第2部)</li>
+    <li><code>docs/001_手順書一式の解説_初見メンバ向け.md</code> — 手順書の各ファイルと考え方の解説</li>
+    <li><code>docs/e2eテスト自動化構想 説明資料.md</code> — 構想全体と将来のロードマップ</li>
+    <li><code>procedure/pipeline.dot</code> — 分岐と停止点の正本(<code>dot -Tsvg</code> で図にできる)</li>
+    <li><code>procedure/00_common.md</code> — 全作業に共通の規約。ディレクトリ構成と lint 規則の一覧もここ</li>
+  </ul>
+</section>
+
+<footer>
+  この資料は説明用です。規約の正本は <code>procedure/</code> の手順書で、食い違いがあれば手順書を正とします。手順版 proc-v011(2026-10-02)時点の内容です。
+</footer>
+
+</div>
+<script>
+(function(){
+  var chips = document.querySelectorAll('.chips button');
+  var rows = document.querySelectorAll('#artifacts tbody tr');
+  function apply(f){
+    var grp = null, shown = 0;
+    function closeGroup(){ if (grp) grp.hidden = (shown === 0); }
+    rows.forEach(function(tr){
+      if (tr.classList.contains('grp')) { closeGroup(); grp = tr; shown = 0; return; }
+      var by = (tr.getAttribute('data-by') || '').split(' ');
+      var on = (f === 'all') || by.indexOf(f) !== -1;
+      tr.hidden = !on;
+      if (on) shown++;
+    });
+    closeGroup();
+  }
+  chips.forEach(function(b){
+    b.addEventListener('click', function(){
+      chips.forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      apply(b.getAttribute('data-f'));
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -27,7 +27,7 @@
 //   no_temp_locator            探索記録・セットアップ記録の locator に snapshot の一時IDがない
 //   requires_covered           作業10: requires の全状態が setup-log にある / 作業20: コード化したシナリオの requires に fixture がある
 //   blocked_recorded           blocked_by(理由・参照・resume_from)、blocked の手前のステップの記録、blocked_by_prohibition との一致
-//   health_recorded            健全性シグナルのあるステップを passed にしていない、health_fix の記録、作業10・15の status.yaml との一致
+//   health_recorded            健全性シグナルのあるステップを passed にしていない、health_fix の記録、作業10・15の status.yaml との一致、健全性シグナルのステップの時刻(proc-v014 以降)
 //   ext_demand_linked          操作手段なし の申し送り・blocked のステップが、外部操作需要リストの需要IDを参照している
 //   operation_registered       使った operation_id が KB T05 に登録済みで、禁止操作リストの 禁止/要許可 に該当しない
 //   requires_in_state_set      requires の全状態が初期状態セット(基本の状態 + 状態需要リストの 採用・整備済)にある。SD-ID の参照・重複

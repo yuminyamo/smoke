@@ -2,12 +2,12 @@
 name: pms-10-explore
 description: "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、playwright-cli で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。"
 metadata:
-  procedure_version: proc-v013
+  procedure_version: proc-v014
   generated_from: "procedure/stages.md §10"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v013 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v014 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業10 シナリオ生成と探索(手順版 proc-v013)
+# 作業10 シナリオ生成と探索(手順版 proc-v014)
 
 この skill は、手順書の正本の `stages.md` §10 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -43,7 +43,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v013` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v014` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -309,12 +309,12 @@ metadata:
 
 - 値の比較は `nd-catalog` の強度に従う。**未登録の値は推測で強度を決めず、追加候補として記録する**
 - `failed` / `human-check` は証跡必須。`passed` も結果画面1枚を推奨
-- **健全性シグナル**(00 ■健全性シグナルと問い合わせ)を、ステップごとに期待結果とは別に確かめる。期待結果を満たしていても、自データのジョブがエラーになっている等のシグナルが出たら、**そのステップを `passed` にせず `human-check` とし、`health_signal`(付録A)と証跡を記録する。** 探索中に自分で解消できればそれでよい。解消できなければ、その操作をいったん採用して探索を続けてよい(是正は作業15が行う。本作業では問い合わせない)
+- **健全性シグナル**(00 ■健全性シグナルと問い合わせ)を、ステップごとに期待結果とは別に確かめる。期待結果を満たしていても、自データのジョブがエラーになっている等のシグナルが出たら、**そのステップを `passed` にせず `human-check` とし、`health_signal`(付録A。観測した時刻 `observed_at` を含む)と証跡を記録する。** 探索中に自分で解消できればそれでよい。解消できなければ、その操作をいったん採用して探索を続けてよい(是正は作業15が行う。本作業では問い合わせない)
 - `操作手段なし` で `blocked` にしたステップには、需要IDと申し送りIDを記録する(付録A)
 
 **DB不変条件** — シナリオ末尾で00の2段構えに従い実行する。探索セッションの終わりに全体検査を1回。違反はシナリオ判定と**独立に**報告し、`context.invariant_violation=found` を status.yaml に出力する。
 
-**記録** — exploration-log.yaml(付録A)に追記、不整合は DISC 採番、気づきはその場で申し送り台帳へ(発生元にフローIDを含める)。手順について迷った・矛盾を見つけた・手順と違う方法で実施した場合は、その場で手順改善シグナルを記録する(00 ■手順改善シグナル)。
+**記録** — exploration-log.yaml(付録A)に追記、各ステップの開始・終了時刻(`started_at`・`ended_at`。`vocab.timestamp_format`)をその場で記録する(作業15がサーバーのログを集める時間範囲に使う)、不整合は DISC 採番、気づきはその場で申し送り台帳へ(発生元にフローIDを含める)。手順について迷った・矛盾を見つけた・手順と違う方法で実施した場合は、その場で手順改善シグナルを記録する(00 ■手順改善シグナル)。
 
 ### 完了前の lint(全パート共通)
 
@@ -426,6 +426,7 @@ metadata:
 - [ ] `blocked` のシナリオの探索で確立した操作を、fixture・シナリオ部品・KB のいずれかに反映し、反映先を報告書の固有セクション1に書いた(なければ「なし」)
 - [ ] `failed` / `human-check` の全件に `evidence` パスがある
 - [ ] 健全性シグナルが出た全ステップに `health_signal`(種類は `vocab.health_signal_kind`)があり、判定が `passed` でない(lint `health_recorded`)
+- [ ] 探索した全ステップに `started_at`・`ended_at` があり、健全性シグナルには `observed_at` がある(`vocab.timestamp_format`。健全性シグナルのあるステップは lint `health_recorded`)
 - [ ] status.yaml の `health_signal` と `health_signal_items` が、探索記録(シナリオごとの最新の記録)の `health_signal` と一致する(lint `health_recorded`)
 - [ ] `verification: 両方` の全ステップに `verified_by.screen` と `verified_by.db` の双方がある
 - [ ] 非同期待機を行った全ステップに `wait.measured_seconds` と `wait.timeout_used` がある

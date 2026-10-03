@@ -8,7 +8,10 @@
 //   node tools/pre-stage/run-scenarios.mjs --restore-scope              復元範囲(ゴールデンイメージの復元で戻る対象)を JSON で出す
 //
 // 設定ファイル(既定 config/pre-stage-scenarios.json)の hooks.<hook> に書いたエントリを上から順に実行する。
-// 1つのエントリには1つ以上のシナリオID を書け、書いた順に Playwright の回帰テスト(@<シナリオID> のタグ)を実行する。
+// エントリは2種類(vocab.pre_stage_entry_kind)で、1つのエントリにはどちらか一方だけを書く。
+//   シナリオのエントリ: scenarios に1つ以上のシナリオID を書き、書いた順に Playwright の回帰テスト(@<シナリオID> のタグ)を実行する。
+//   外部操作のエントリ: op(KB T05 の操作ID)と run(実行体の呼び出し。文字列の配列)を書き、run をそのまま実行する。
+//     終了コード0を成功とし、標準出力が JSON なら結果の output に残す(例: 時刻合わせの前後のずれ)。
 // 設定ファイルがない、hook がない、hook が空のときは何もしない(state: skipped)。
 //
 // 復元エントリ: エントリに restores(戻す対象の配列)を書くと、そのエントリはゴールデンイメージの復元の一部になる
@@ -58,6 +61,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(opt.root ?? path.join(scriptDir, '..', '..'));
 const CONFIG = path.resolve(ROOT, opt.config ?? path.join('config', 'pre-stage-scenarios.json'));
 const SCENARIO_ID = /^SC-[A-Z0-9]+-\d{2,}$/;
+const OPERATION_ID = /^OP-[A-Z0-9]+-\d{3}$/;
 
 // ── 設定 ─────────────────────────────────────────────
 let config = null;
@@ -75,7 +79,7 @@ if (opt.list) {
   if (!config) { console.log(`設定ファイルがありません(${rel(CONFIG)})。開始前シナリオは実行されません`); process.exit(0); }
   for (const [name, entries] of Object.entries(config.hooks ?? {})) {
     console.log(`${name}:${entries.length ? '' : ' (空)'}`);
-    for (const e of entries) console.log(`  - ${e.name}: ${e.scenarios.join(', ')}(失敗したら ${e.on_failure ?? 'stop'})${e.restores ? ` [復元: ${e.restores.join(', ')}]` : ''}`);
+    for (const e of entries) console.log(`  - ${e.name}: ${e.op ? `外部操作 ${e.op}(${e.run.join(' ')})` : e.scenarios.join(', ')}(失敗したら ${e.on_failure ?? 'stop'})${e.restores ? ` [復元: ${e.restores.join(', ')}]` : ''}`);
   }
   process.exit(0);
 }
@@ -95,6 +99,17 @@ let state = 'passed';
 outer:
 for (const e of entries) {
   const onFailure = e.on_failure ?? 'stop';
+  if (e.op) {
+    const r = runOperation(e);
+    results.push({ name: e.name, op: e.op, result: r.result, duration_sec: r.duration, message: r.message ?? null, ...(r.output !== undefined ? { output: r.output } : {}), ...(e.restores ? { restores: e.restores } : {}) });
+    process.stderr.write(`[pre-stage] ${opt.hook} / ${e.name} / ${e.op}: ${r.result}${r.message ? ` — ${r.message}` : ''}\n`);
+    if (r.result !== 'passed') {
+      if (onFailure === 'continue') { if (state === 'passed') state = 'warning'; continue; }
+      state = 'failed';
+      break;
+    }
+    continue;
+  }
   for (const id of e.scenarios) {
     const r = runScenario(id, e);
     results.push({ name: e.name, scenario: id, result: r.result, duration_sec: r.duration, message: r.message ?? null, ...(e.restores ? { restores: e.restores } : {}) });
@@ -135,6 +150,23 @@ function runScenario(id, entry) {
   return { result: 'passed', duration };
 }
 
+function runOperation(entry) {
+  const env = { ...process.env };
+  delete env.PMS_RESTORE;
+  const started = Date.now();
+  const r = spawnSync(entry.run[0], entry.run.slice(1), {
+    cwd: ROOT, env, encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
+    shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const duration = Math.round((Date.now() - started) / 100) / 10;
+  if (r.error) return { result: 'failed', duration, message: r.error.code === 'ETIMEDOUT' ? `時間切れ(${timeoutMs / 1000} 秒)` : `起動できません: ${r.error.message}` };
+  let output;
+  const text = String(r.stdout ?? '').trim();
+  if (text) { try { output = JSON.parse(text); } catch { output = undefined; } }
+  if (r.status !== 0) return { result: 'failed', duration, output, message: `実行体が失敗しました(終了コード ${r.status})。${lastLine(r.stderr)}` };
+  return { result: 'passed', duration, output };
+}
+
 function collectSpecs(suites) {
   const out = [];
   const walk = (s) => { for (const sp of s.specs ?? []) out.push(sp); for (const c of s.suites ?? []) walk(c); };
@@ -158,8 +190,15 @@ function validate(c) {
       const where = `hooks.${name}[${i}]`;
       if (!e || typeof e !== 'object') fail(`${where} はオブジェクトにしてください`);
       if (!e.name) fail(`${where} に name(目的。例: 機器のゴールデンイメージ復元)がありません`);
-      if (!Array.isArray(e.scenarios) || e.scenarios.length === 0) fail(`${where} に scenarios(シナリオIDの配列)がありません`);
-      for (const id of e.scenarios) if (!SCENARIO_ID.test(String(id))) fail(`${where} のシナリオID ${id} が書式(SC-<機能コード>-<連番>)に合いません`);
+      const isOp = e.op != null || e.run != null;
+      if (isOp && e.scenarios != null) fail(`${where} に scenarios と op・run の両方があります(1つのエントリはシナリオか外部操作のどちらか一方)`);
+      if (isOp) {
+        if (!OPERATION_ID.test(String(e.op ?? ''))) fail(`${where} の op(KB T05 の操作ID)がない、または書式(OP-<対象略号>-<3桁>)に合いません`);
+        if (!Array.isArray(e.run) || e.run.length === 0 || !e.run.every((x) => typeof x === 'string' && x)) fail(`${where} の run は、実行体の呼び出し(文字列の配列)にしてください(例: ["pwsh", "-File", "Sync-Clock.ps1"])`);
+      } else {
+        if (!Array.isArray(e.scenarios) || e.scenarios.length === 0) fail(`${where} に scenarios(シナリオIDの配列)、または op と run(外部操作)がありません`);
+        for (const id of e.scenarios) if (!SCENARIO_ID.test(String(id))) fail(`${where} のシナリオID ${id} が書式(SC-<機能コード>-<連番>)に合いません`);
+      }
       if (e.on_failure != null && !['stop', 'continue'].includes(e.on_failure)) fail(`${where} の on_failure は stop / continue のいずれかにしてください`);
       if (e.restores != null) {
         if (!Array.isArray(e.restores) || e.restores.length === 0 || !e.restores.every((x) => typeof x === 'string' && x.trim())) fail(`${where} の restores は、戻す対象(文字列)の配列にしてください(例: ["実機:MFP-A の設定"])`);
@@ -169,14 +208,15 @@ function validate(c) {
   }
 }
 
-// 復元範囲: VM の復元で戻る対象(固定)+ hooks.work10 と hooks.work20 の両方の復元エントリが restores に書いた対象
+// 復元範囲: VM の復元で戻る対象(固定)+ hooks.work10 と hooks.work20 の両方の復元エントリ(シナリオ・外部操作)が restores に書いた対象
 function restoreScope(c) {
   const VM = ['VM:PMSサーバ(OS・IIS・サービス・DB・VM 上のシミュレータを含む)'];
-  const of = (hook) => new Map((c?.hooks?.[hook] ?? []).filter((e) => e.restores).flatMap((e) => e.restores.map((t) => [t.trim(), e.scenarios])));
+  const of = (hook) => new Map((c?.hooks?.[hook] ?? []).filter((e) => e.restores).flatMap((e) => e.restores.map((t) => [t.trim(), e])));
+  const by = (e, hook) => (e.op ? { [`op_${hook}`]: e.op } : { [`scenarios_${hook}`]: e.scenarios });
   const w10 = of('work10');
   const w20 = of('work20');
   const targets = [...new Set([...w10.keys(), ...w20.keys()])].sort();
-  const scenarios = targets.filter((t) => w10.has(t) && w20.has(t)).map((t) => ({ target: t, scenarios_work10: w10.get(t), scenarios_work20: w20.get(t) }));
+  const scenarios = targets.filter((t) => w10.has(t) && w20.has(t)).map((t) => ({ target: t, ...by(w10.get(t), 'work10'), ...by(w20.get(t), 'work20') }));
   const partial = targets.filter((t) => !(w10.has(t) && w20.has(t))).map((t) => ({ target: t, only_in: w10.has(t) ? 'work10' : 'work20' }));
   return { config: c ? rel(CONFIG) : null, vm: VM, scenarios, partial };
 }

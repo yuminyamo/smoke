@@ -17,6 +17,8 @@ scenarios:
     steps:
       - step_id: SC-PRT-01-S1
         verdict: passed
+        started_at: 2026-09-03T13:50:12+09:00   # ステップの開始・終了時刻(vocab.timestamp_format)。作業15がログを集める時間範囲に使う
+        ended_at: 2026-09-03T13:50:31+09:00
         actions:
           - action: goto
             detail: /print/new
@@ -55,12 +57,15 @@ scenarios:
     steps:
       - step_id: SC-PRT-05-S2
         verdict: human-check      # 健全性シグナルが出たステップは passed にしない
+        started_at: 2026-09-03T14:05:40+09:00
+        ended_at: 2026-09-03T14:06:58+09:00
         actions:
           - action: external
             operation_id: OP-CLI-001
         health_signal:            # 00 ■健全性シグナルと問い合わせ
           kind: 自データの異常状態 # vocab.health_signal_kind
           detail: ジョブは受け付けられ一覧で検索できるが、PrintJob.Status = 'Error'、エラーコード AUTH-401(認証エラー)
+          observed_at: 2026-09-03T14:06:55+09:00   # 健全性シグナルを観測した時刻(待機のあとに観測したときは、その時刻)
         verification: 両方
         assertion_hint: |
           DB: SELECT Status FROM PrintJob WHERE JobId = <carried_data.job_id>(現状 'Error')
@@ -74,6 +79,7 @@ scenarios:
       cause: 複合機に認証設定が残っており、登録外のユーザー名の印刷ジョブが認証エラーになっていた
       change: 印刷指示のユーザー名を、複合機に登録済みのテスト用ユーザーに変えた
       record: health/inquiries/SC-PRT-05-1.md
+      log_ids: [PMS-E-2041]     # 回答が原因の根拠として挙げ、添付したログのログIDの一覧で確認したログID(KB T12 に記録したもの。なければ省略)
     steps:
       - step_id: SC-PRT-05-S2
         verdict: passed
@@ -131,5 +137,6 @@ scenarios:
 - **`blocked` のシナリオでも `requires_setup` を書き、blocked のステップより前のステップを判定付きで記録する**(lint `requires_covered` / `blocked_recorded`)
 - `blocked` の最初のステップの `blocked_by` には、理由・参照・`resume_from` を書く。`操作手段なし` は需要IDと申し送りID(lint `ext_demand_linked`)、`禁止操作` は禁止ID(または包括原則の番号)と申し送りIDを書く。後続のステップは `{ reason: 前ステップが blocked }` でよい
 - 再探索フローの記録は、当該シナリオの記録に新しい `flow_id` と `reexplore_of: <旧フローID>` を付けて追記する。パートPの記録は `recheck_of: <前回の prohibited_ops.digest>` を付けて追記する。いずれも旧記録は削除しない
-- 健全性シグナルが出たステップには `health_signal`(種類 `kind` は `vocab.health_signal_kind`、要点 `detail`)を書き、判定を `passed` にしない(lint `health_recorded`)
-- 作業15で解消した記録は、同じ `flow_id` と `health_fix`(問い合わせの回数・原因・変えた操作・問い合わせの記録のパス)を付けて追記する。作業10の記録は削除しない。`health_fix` の付いた記録のどのステップにも `health_signal` があってはならない
+- 健全性シグナルが出たステップには `health_signal`(種類 `kind` は `vocab.health_signal_kind`、要点 `detail`、観測した時刻 `observed_at`)を書き、判定を `passed` にしない(lint `health_recorded`)
+- 探索したステップには `started_at`・`ended_at`(`vocab.timestamp_format`。AI実行マシンの時計)を書く。ステップの最初の操作の直前と、判定に使った観測の直後の時刻とする(待機を含む)。`blocked` で実行しなかったステップには書かない。作業15がサーバーのログを集める時間範囲に使う(00 ■健全性シグナルと問い合わせ ログの添付)。健全性シグナルのあるステップの `started_at` と `observed_at` は lint `health_recorded` が検査する(proc-v014 以降のフロー)
+- 作業15で解消した記録は、同じ `flow_id` と `health_fix`(問い合わせの回数・原因・変えた操作・問い合わせの記録のパス・確認済みのログID)を付けて追記する。作業10の記録は削除しない。`health_fix` の付いた記録のどのステップにも `health_signal` があってはならない

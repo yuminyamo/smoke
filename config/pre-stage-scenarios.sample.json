@@ -1,12 +1,14 @@
 {
-  "_comment": "開始前シナリオの設定例(00_common.md ■回帰実行の環境前提 開始前シナリオ)。使うときは config/pre-stage-scenarios.json にコピーして書き換える。このファイル(.sample.json)は読まれない。hooks.work10 は作業10の工程0、hooks.work20 は作業20の工程0で、ゴールデンイメージの復元と起動完了の確認のあとに実行される。hook がない・空のときは何もしない。scenarios には回帰テストになったシナリオID(テストの @<シナリオID> タグ)を書いた順に並べる。on_failure: stop(既定。失敗したら作業を始めない)/ continue(記録だけ残して続ける)。restores(戻す対象の配列)を書いたエントリは復元エントリになり、ゴールデンイメージの復元の一部になる(on_failure は stop にする)。work10 と work20 の両方に同じ対象の復元エントリがあるときだけ、その対象は復元範囲に入る(node tools/pre-stage/run-scenarios.mjs --restore-scope で確かめる)。command を省くと npx playwright test を使う",
+  "_comment": "開始前シナリオの設定例(00_common.md ■回帰実行の環境前提 開始前シナリオ)。使うときは config/pre-stage-scenarios.json にコピーして書き換える。このファイル(.sample.json)は読まれない。hooks.work10 は作業10の工程0、hooks.work20 は作業20の工程0で、ゴールデンイメージの復元と起動完了の確認のあとに実行される。hook がない・空のときは何もしない。エントリはシナリオか外部操作のどちらか一方(vocab.pre_stage_entry_kind)。シナリオのエントリは scenarios に回帰テストになったシナリオID(テストの @<シナリオID> タグ)を書いた順に並べる。外部操作のエントリは op に KB T05 の操作ID、run に実行体の呼び出し(文字列の配列)を書き、終了コード0を成功とする(標準出力の JSON は記録の output に残る)。時刻合わせは外部操作のエントリとして両方の hook の先頭に置く(00_common.md ■回帰実行の環境前提 時刻合わせ)。on_failure: stop(既定。失敗したら作業を始めない)/ continue(記録だけ残して続ける)。restores(戻す対象の配列)を書いたエントリは復元エントリになり、ゴールデンイメージの復元の一部になる(on_failure は stop にする)。work10 と work20 の両方に同じ対象の復元エントリがあるときだけ、その対象は復元範囲に入る(node tools/pre-stage/run-scenarios.mjs --restore-scope で確かめる)。command を省くと npx playwright test を使う",
   "timeout_sec": 1800,
   "hooks": {
     "work10": [
-      { "name": "機器のゴールデンイメージ復元", "scenarios": ["SC-DEV-05"], "on_failure": "stop", "restores": ["実機:MFP-A の設定(認証設定を含む)"] }
+      {"name": "検証環境の時刻合わせ", "op": "OP-ENV-001", "run": ["pwsh", "-NoProfile", "-File", "C:/pms-skills/sync-clock/Sync-TestClock.ps1", "-Json"], "on_failure": "stop", "restores": ["時刻:PMSサーバ VM", "時刻:実機:MFP-A"]},
+      {"name": "機器のゴールデンイメージ復元", "scenarios": ["SC-DEV-05"], "on_failure": "stop", "restores": ["実機:MFP-A の設定(認証設定を含む)"]}
     ],
     "work20": [
-      { "name": "機器のゴールデンイメージ復元", "scenarios": ["SC-DEV-05"], "on_failure": "stop", "restores": ["実機:MFP-A の設定(認証設定を含む)"] }
+      {"name": "検証環境の時刻合わせ", "op": "OP-ENV-001", "run": ["pwsh", "-NoProfile", "-File", "C:/pms-skills/sync-clock/Sync-TestClock.ps1", "-Json"], "on_failure": "stop", "restores": ["時刻:PMSサーバ VM", "時刻:実機:MFP-A"]},
+      {"name": "機器のゴールデンイメージ復元", "scenarios": ["SC-DEV-05"], "on_failure": "stop", "restores": ["実機:MFP-A の設定(認証設定を含む)"]}
     ]
   }
 }

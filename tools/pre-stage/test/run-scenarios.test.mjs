@@ -120,3 +120,61 @@ test('復元エントリは on_failure: stop でなければならない・resto
   assert.equal(ok.code, 0);
   assert.deepEqual(ok.json.results[0].restores, ['実機:A']);
 });
+
+// ── 外部操作のエントリ(op・run)───────────────────────────
+// 差し替えの実行体: 引数の終了コードで終わり、呼ばれたことを calls.txt に残し、ずれを JSON で返す
+const OP_STUB = `import fs from 'node:fs';
+const code = Number(process.argv[2] ?? 0);
+fs.appendFileSync('calls.txt', 'OP ' + code + (process.env.PMS_RESTORE ? ' PMS_RESTORE' : '') + '\\n');
+console.log(JSON.stringify({ offsets_sec: { 'PMSサーバ': { before: 3.2, after: 0.1 } } }));
+if (code) console.error('時刻源に接続できません');
+process.exit(code);
+`;
+
+function opRepo(hooks) {
+  const root = repo(hooks);
+  fs.writeFileSync(path.join(root, 'op.mjs'), OP_STUB);
+  return root;
+}
+const op = (code = 0, extra = {}) => ({ name: '時刻合わせ', op: 'OP-ENV-001', run: [process.execPath, 'op.mjs', String(code)], ...extra });
+
+test('外部操作のエントリ: run を実行し、シナリオと書いた順に並べられる。JSON の出力を output に残し、PMS_RESTORE を外す', () => {
+  const root = opRepo({ work10: [op(0, { restores: ['時刻:PMSサーバ'] }), { name: '機器の復元', scenarios: ['SC-DEV-05'] }] });
+  const r = run(root, '--hook', 'work10');
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(r.json.state, 'passed');
+  assert.deepEqual(r.calls, ['OP 0', 'SC-DEV-05']);
+  assert.equal(r.json.results[0].op, 'OP-ENV-001');
+  assert.equal(r.json.results[0].output.offsets_sec['PMSサーバ'].after, 0.1);
+  assert.deepEqual(r.json.results[0].restores, ['時刻:PMSサーバ']);
+});
+
+test('外部操作のエントリ: 失敗(stop)で止まり終了コード 1。continue なら warning で次へ進む', () => {
+  const stop = run(opRepo({ work20: [op(3), { name: 'b', scenarios: ['SC-USR-01'] }] }), '--hook', 'work20');
+  assert.equal(stop.code, 1);
+  assert.equal(stop.json.state, 'failed');
+  assert.deepEqual(stop.calls, ['OP 3']);
+  assert.match(stop.json.results[0].message, /終了コード 3.*時刻源に接続できません/);
+  const cont = run(opRepo({ work10: [op(1, { on_failure: 'continue' }), { name: 'b', scenarios: ['SC-USR-01'] }] }), '--hook', 'work10');
+  assert.equal(cont.code, 0);
+  assert.equal(cont.json.state, 'warning');
+  assert.deepEqual(cont.calls, ['OP 1', 'SC-USR-01']);
+});
+
+test('外部操作のエントリの設定の誤りは終了コード 2(scenarios と併記・操作IDの書式・run の形)', () => {
+  assert.equal(run(opRepo({ work10: [{ ...op(), scenarios: ['SC-DEV-05'] }] }), '--hook', 'work10').code, 2);
+  assert.equal(run(opRepo({ work10: [{ ...op(), op: 'ENV-001' }] }), '--hook', 'work10').code, 2);
+  assert.equal(run(opRepo({ work10: [{ ...op(), run: [] }] }), '--hook', 'work10').code, 2);
+  assert.equal(run(opRepo({ work10: [{ name: 'x', op: 'OP-ENV-001' }] }), '--hook', 'work10').code, 2);
+  assert.equal(run(opRepo({ work10: [op(0, { restores: ['時刻:A'], on_failure: 'continue' })] }), '--hook', 'work10').code, 2);
+});
+
+test('復元範囲(--restore-scope): 外部操作の復元エントリも、両方の hook にあれば数える', () => {
+  const root = opRepo({
+    work10: [op(0, { restores: ['時刻:PMSサーバ', '時刻:実機:MFP-A'] })],
+    work20: [op(0, { restores: ['時刻:PMSサーバ'] })],
+  });
+  const s = JSON.parse(spawnSync(process.execPath, [SCRIPT, '--root', root, '--restore-scope'], { encoding: 'utf8' }).stdout);
+  assert.deepEqual(s.scenarios, [{ target: '時刻:PMSサーバ', op_work10: 'OP-ENV-001', op_work20: 'OP-ENV-001' }]);
+  assert.deepEqual(s.partial, [{ target: '時刻:実機:MFP-A', only_in: 'work10' }]);
+});

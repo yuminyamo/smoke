@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-03 / 版: v15(テスト環境の定義: 手順版を proc-v013 に更新、test_environment を追加、包括原則3をテスト環境の定義で書き直した(保護ブロック。人間の指示による改訂))
+# 改訂: 2026-10-03 / 版: v16(ログ収集と時刻: 手順版を proc-v014 に更新、kb_category に T12 ログID知見、default.log_window_margin_sec、pre_stage_entry_kind・timestamp_format を追加、golden_image と pre_stage_state を外部操作エントリに合わせた)
+#       2026-10-03 / 版: v15(テスト環境の定義: 手順版を proc-v013 に更新、test_environment を追加、包括原則3をテスト環境の定義で書き直した(保護ブロック。人間の指示による改訂))
 #       2026-10-03 / 版: v14(ステップ1の状態の追加: 手順版を proc-v012 に更新、state_demand_status・id_format.state_demand を追加、initial_state_set の注記を基本の状態と追加の状態に分けた)
 #       2026-10-02 / 版: v13(シナリオ策定方式の分離: 手順版を proc-v011 に更新、scenario_source・default.scenario_source・コンテキストキー scenario_source・手順箇所 MT を追加)
 #       2026-09-28 / 版: v12(検証環境の情報: 手順版を proc-v010 に更新、environment_info・env_attr_kind・env_base_keys を追加)
@@ -31,7 +32,7 @@
 meta:
   step: 1                       # 本語彙が対象とするステップ
   revision: "2026-10-03"
-  procedure_version: proc-v013  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  procedure_version: proc-v014  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -126,9 +127,13 @@ inquiry_answer_kind:            # 問い合わせの回答の区分(作業15 H4)
 
 pre_stage_state:                # 開始前シナリオの結果(00 ■回帰実行の環境前提 開始前シナリオ)。実行体 tools/pre-stage/run-scenarios.mjs の出力の state
   skipped: 設定ファイルがない、または hook がない・空。何もしていない
-  passed: 設定された全シナリオが成功した
+  passed: 設定された全エントリ(シナリオ・外部操作)が成功した
   warning: on_failure: continue のエントリだけが失敗した。作業は始める
   failed: on_failure: stop のエントリが失敗した。作業を始めない
+
+pre_stage_entry_kind:           # 開始前シナリオのエントリの種類(00 ■回帰実行の環境前提 開始前シナリオ)。1つのエントリはどちらか一方
+  シナリオ: scenarios(シナリオIDの配列)を書いたエントリ。回帰テスト(@<シナリオID> のタグ)を Playwright で実行する
+  外部操作: op(KB T05 の操作ID)と run(実行体の呼び出し。文字列の配列)を書いたエントリ。外部操作 skill の実行体を実行し、終了コード0を成功とする(例 時刻合わせ)
 
 pre_stage_on_failure:           # 開始前シナリオのエントリの失敗時の扱い
   stop: 失敗したら以降を実行せず、作業を始めない(既定)
@@ -192,11 +197,11 @@ discrimination:
 # ── ゴールデンイメージ(00 ■回帰実行の環境前提 ゴールデンイメージと復元範囲)──
 golden_image:
   definition: 検証環境を戻す先の決まった基準状態。VM に限らない
-  restore: ゴールデンイメージの復元。VM の復元(skill restore-golden-image)と、開始前シナリオの復元エントリ(設定の restores を書いたエントリ)を合わせたもの
+  restore: ゴールデンイメージの復元。VM の復元(skill restore-golden-image)と、開始前シナリオの復元エントリ(設定の restores を書いたエントリ。シナリオのエントリと外部操作のエントリがある)を合わせたもの
   restore_scope: 復元範囲。VM の復元で戻る対象に、hooks.work10 と hooks.work20 の両方の復元エントリが restores に書いた対象を加えたもの。tools/pre-stage/run-scenarios.mjs --restore-scope が出す
   restore_means:
     VM: PMSサーバ VM(OS・IIS・サービス・DB・VM 上のシミュレータ)を戻す
-    開始前シナリオ: restores に書いた対象(機器の設定など)を、回帰テストになったシナリオで戻す
+    開始前シナリオ: restores に書いた対象(機器の設定・機器の時刻など)を、回帰テストになったシナリオ、または KB T05 に登録した外部操作の実行体で戻す・揃える
 
 # ── 検証環境の情報(00 ■検証環境の情報)──────────────────────
 environment_info:
@@ -346,6 +351,7 @@ kb_category:
   T09: 環境・構成知見 (kb/env/)
   T10: 落とし穴集 (kb/gotchas/)
   T11: 文書ポインタ集 (kb/docs/)
+  T12: ログID知見 (kb/log-ids/) — PMS がログメッセージの種別ごとに割り当てたログIDを主キーに、観測した事象・原因・対処を蓄積する
 
 kb_source:                      # 出所コード。優先順位 OBS > GEN > DOC
   DOC: 文書由来
@@ -451,6 +457,7 @@ default:
   observation_runs: 3           # 非決定値の反復観測回数
   investigation_limit: 3        # 同一目的の調査回数の上限
   inquiry_limit: 3              # 作業15の問い合わせの回数の上限(1シナリオ・1フローあたり。初回を含む)
+  log_window_margin_sec: 10     # 作業15でログを集める時間範囲の前後に足す幅(秒)。操作の記録とサーバーのログの時刻のずれを吸収する
   scenarios_per_feature: "1〜2(3本以上になる機能は範囲を見直す)"
   scenario_source: manual_usecase  # 依頼文に方式の手がかりがないときのシナリオ策定方式(00 ■シナリオ策定方式)
   kb_file_lines: 200
@@ -459,6 +466,8 @@ default:
   max_trials_per_run: 3            # 1回の作業40で試行を開始する改訂の上限
   max_trials_per_location: 1       # 同一手順箇所で同時に試行する改訂の上限
   max_trial_extensions: 1          # 判定期間の延長回数の上限
+
+timestamp_format: "ISO 8601 の日時。秒まで、時差付き(例 2026-10-03T13:50:12+09:00)"   # 探索記録の started_at・ended_at・health_signal.observed_at(付録A)。AI実行マシンの時計で記録する
 
 # ── pipeline.dot が参照するコンテキストキー ──────────────────
 # 各段階は status.yaml の context_updates にこれらを出力する(00の status.yaml 契約)

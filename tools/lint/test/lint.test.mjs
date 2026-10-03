@@ -786,3 +786,28 @@ test('env_value_leak: 設定ファイルの形の誤りは ERROR。env_value_har
   assert.equal(res.code, 0, '警告だけなら終了コード 0');
   assertHas(findings(res, 'env_value_hardcoded'), /prt\.spec\.ts: 接続先\(環境 vm01 の pms\.url\)の値がそのまま書かれています/);
 });
+
+test('health_recorded: proc-v014 以降のフローは、健全性シグナルのあるステップに started_at と observed_at を求める(それより前の版では求めない)', () => {
+  const v14 = (root) => {
+    const p = path.join(root, 'work/PRT/exploration/status.yaml');
+    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('procedure_version: proc-v007', 'procedure_version: proc-v014'));
+    return root;
+  };
+  const missing = findings(lint(v14(healthRepo({ fix: false, st15: false })), '--flow', 'F-001', '--stage', '10'), 'health_recorded');
+  assertHas(missing, /SC-PRT-01-S2 に started_at がない/);
+  assertHas(missing, /SC-PRT-01-S2 の health_signal に observed_at がない/);
+
+  const root = v14(healthRepo({ fix: false, st15: false }));
+  const p = path.join(root, 'work/PRT/exploration/exploration-log.yaml');
+  fs.writeFileSync(p, fs.readFileSync(p, 'utf8')
+    .replace("        verdict: human-check\n        health_signal:\n", "        verdict: human-check\n        started_at: 2026-10-03T13:50:12+09:00\n        ended_at: 2026-10-03T13:51:02+09:00\n        health_signal:\n")
+    .replace("          detail: ジョブが認証エラー\n", "          detail: ジョブが認証エラー\n          observed_at: 2026-10-03T13:51:00+09:00\n"));
+  assert.deepEqual(findings(lint(root, '--flow', 'F-001', '--stage', '10'), 'health_recorded'), []);
+
+  // 書式の誤り(時差なし)
+  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('observed_at: 2026-10-03T13:51:00+09:00', 'observed_at: 2026-10-03 13:51'));
+  assertHas(findings(lint(root, '--flow', 'F-001', '--stage', '10'), 'health_recorded'), /observed_at がない、または書式/);
+
+  // proc-v007 のフローでは求めない
+  assert.deepEqual(findings(lint(healthRepo({ fix: false, st15: false }), '--flow', 'F-001', '--stage', '10'), 'health_recorded'), []);
+});

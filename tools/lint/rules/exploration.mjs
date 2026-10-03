@@ -231,6 +231,8 @@ export function no_temp_locator(repo) {
 // ════════════════════════════════════════════════════════
 // 健全性シグナル(00 ■健全性シグナルと問い合わせ)の記録と、作業10・15の status.yaml との一致
 const HEALTH_SINCE = 7; // proc-v007 で追加
+const TIMESTAMP_SINCE = 14; // proc-v014 で追加(健全性シグナルのあるステップの started_at と observed_at。作業15がログを集める時間範囲に使う)
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 function verNum(v) {
   const m = String(v ?? '').match(/^proc-v(\d{3})$/);
@@ -302,6 +304,17 @@ export function health_recorded(repo) {
     if (items) {
       for (const id of logged) if (!items.includes(id)) add(rel10, `健全性シグナルのある ${id} が health_signal_items にありません`);
       for (const id of items) if (!logged.has(id)) add(rel10, `health_signal_items の ${id} は、探索記録に健全性シグナルがありません`);
+    }
+    if (ver === null || ver >= TIMESTAMP_SINCE) {
+      for (const r of seen.values()) {
+        for (const s of signalSteps(r.sc)) {
+          const where = `${r.file}(${r.id ?? 'id なし'} / ${flow})`;
+          const label = s.step_id ?? 'step_id なし';
+          if (!TIMESTAMP.test(String(s.started_at ?? ''))) add(where, `${label} に started_at がない、または書式(vocab.timestamp_format。例 2026-10-03T13:50:12+09:00)に合いません(作業15がログを集める時間範囲に使う)`);
+          const obs = s.health_signal && typeof s.health_signal === 'object' ? s.health_signal.observed_at : null;
+          if (!TIMESTAMP.test(String(obs ?? ''))) add(where, `${label} の health_signal に observed_at がない、または書式(vocab.timestamp_format)に合いません(作業15がログを集める時間範囲に使う)`);
+        }
+      }
     }
 
     if (!st15) continue;

@@ -1,7 +1,0 @@
-﻿@{
-    GUID             = '9d8e1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b'
-    Description      = 'JEA role: PMS golden image restore only'
-    ModulesToImport  = 'PmsGoldenRestore'
-    # Hyper-V に触れられるのはこの2関数だけ(Get-VM / Remove-VMSnapshot 等は接続ユーザーから見えない)
-    VisibleFunctions = 'Restore-PmsGoldenImage', 'Get-PmsGoldenImageInfo'
-}

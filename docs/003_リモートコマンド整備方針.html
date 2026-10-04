@@ -1,0 +1,914 @@
+<!doctype html>
+<!--
+  AI 向けの読み方:
+  この文書は「第1部 整備方針」と「第2部 初心者向けの解説」に分かれている。
+  リモートコマンドを整備・拡張・利用するときは、第1部だけを読めばよい。第2部は人向けの解説で、新しい規則を含まない
+  (第1部と第2部が食い違ったら第1部が正)。
+  第1部は PART1-END という印のコメント行で終わる。grep -n "PART1-END" で出る最後の行番号を確かめ、その行まで読むこと
+  (この説明にも同じ語が出るため、最後の行が境界)。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>リモートコマンド整備方針</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F2F4F5; --surface:#FFFFFF; --ink:#17202A; --muted:#5B6672; --line:#D5DBE0; --code-bg:#E7EBEE;
+  --ai:#2C5C8F; --ai-soft:#E1EAF4; --human:#9A5B0E; --human-soft:#FAECD8;
+  --stop:#B0362F; --stop-soft:#F8E1DE; --store:#2D6E52; --store-soft:#DDEFE6; --tool:#5B6672; --tool-soft:#E9ECEF;
+  --font-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --font-display:"Zen Kaku Gothic New","Noto Sans JP","Hiragino Sans",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F141A; --surface:#171F28; --ink:#E3E8ED; --muted:#98A4B1; --line:#2A3541; --code-bg:#212B36;
+    --ai:#84AEDB; --ai-soft:#1B2B3C; --human:#E0A55A; --human-soft:#3A2914;
+    --stop:#EE8A80; --stop-soft:#3B1D1A; --store:#7CC6A2; --store-soft:#16302A; --tool:#98A4B1; --tool-soft:#222B35;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F141A; --surface:#171F28; --ink:#E3E8ED; --muted:#98A4B1; --line:#2A3541; --code-bg:#212B36;
+  --ai:#84AEDB; --ai-soft:#1B2B3C; --human:#E0A55A; --human-soft:#3A2914;
+  --stop:#EE8A80; --stop-soft:#3B1D1A; --store:#7CC6A2; --store-soft:#16302A; --tool:#98A4B1; --tool-soft:#222B35;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.85;padding-inline:16px;padding-block:0 80px}
+.wrap{max-width:1040px;margin:0 auto}
+a{color:var(--ai);text-underline-offset:3px}
+a:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+header{padding-block:52px 32px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,5vw,40px);line-height:1.3;text-wrap:balance;margin:10px 0 16px}
+h2{font-family:var(--font-display);font-weight:700;font-size:24px;line-height:1.4;text-wrap:balance;margin:0 0 14px}
+h3{font-family:var(--font-display);font-weight:700;font-size:17px;line-height:1.5;margin:30px 0 10px}
+p{margin:0 0 14px;max-width:46em}
+.lead{font-size:16px;max-width:44em}
+.sub{color:var(--muted);font-size:14px}
+code{font-family:var(--font-mono);font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:3px}
+section{padding-block:40px;border-bottom:1px solid var(--line);scroll-margin-top:12px}
+ul.plain,ol.plain{margin:0 0 14px;padding-left:1.3em;max-width:48em}
+ul.plain li,ol.plain li{margin-bottom:6px}
+.part{margin-top:48px;padding:18px 20px;border-radius:6px;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--ai)}
+.part.human{border-left-color:var(--human)}
+.part h2{margin:0 0 6px}
+.part p{margin:0;font-size:14px;color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:26px}
+.facts div{background:var(--surface);padding:12px 14px}
+.facts dt{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.facts dd{margin:2px 0 0;font-weight:500;font-size:14px;line-height:1.6}
+nav.toc{margin-top:22px;font-size:13px}
+nav.toc .row{display:flex;flex-wrap:wrap;gap:6px 8px;margin-bottom:8px;align-items:center}
+nav.toc .lab{font-size:12.5px;color:var(--muted);margin-right:4px}
+nav.toc a{display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-decoration:none;color:var(--ink)}
+nav.toc a:hover{border-color:var(--ai);color:var(--ai)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface);margin:16px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.65}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.04em;color:var(--muted);font-weight:500;background:var(--bg);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+tr.grp td{background:var(--bg);font-weight:700;font-size:12.5px;color:var(--muted);letter-spacing:.04em;padding-block:6px}
+.rule{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--ai);white-space:nowrap}
+.ng{color:var(--stop);font-weight:700}
+.ok{color:var(--store);font-weight:700}
+.plan{display:inline-block;font-size:11px;padding:0 6px;border-radius:3px;border:1px solid var(--muted);color:var(--muted);white-space:nowrap}
+pre.code{font-family:var(--font-mono);font-size:12.5px;line-height:1.7;background:var(--code-bg);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:12px 0}
+pre.code .c{color:var(--muted)}
+.note{background:var(--human-soft);border-radius:6px;padding:10px 14px;font-size:13.5px;margin:14px 0;max-width:52em}
+.note.ai{background:var(--ai-soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">docs/003 · リモートコマンド · 決定 2026-10-04 · 実装 PmsRemote 1.0.0 / proc-v015</div>
+  <h1>リモートコマンド整備方針</h1>
+  <p class="lead">回帰テストのために、別のマシン(Hyper-V ホスト・PMS サーバー・印刷クライアントなど)でコマンドを実行する仕組みの整備方針です。新しいリモートコマンドを足すときは、この方針に揃えます。</p>
+  <p class="sub">第1部が方針(規範)、第2部が初心者向けの解説です。PowerShell のリモート処理や JEA を知らない方は、第2部から読んでください。AI は第1部だけを読みます。</p>
+  <dl class="facts">
+    <div><dt>枠組み</dt><dd>PowerShell リモート処理 + JEA</dd></div>
+    <div><dt>エンドポイント</dt><dd>実行場所(マシン)ごとに1つ。名前は <code>PmsRemote</code></dd></div>
+    <div><dt>ロール</dt><dd>マシン × 重さ(Read / Change)</dd></div>
+    <div><dt>呼び出し</dt><dd>skill・テストコードは CLI 本体 <code>pms-remote.ps1</code> だけを呼ぶ</dd></div>
+    <div><dt>配置</dt><dd>共通インストーラ。PMS VM へは復元のたびに自動で配置</dd></div>
+    <div><dt>使わないもの</dt><dd>PowerShell Direct、ゴールデンイメージへの焼き込み</dd></div>
+  </dl>
+  <nav class="toc" aria-label="目次">
+    <div class="row"><span class="lab">第1部 方針</span>
+      <a href="#p1">1. 目的と位置づけ</a><a href="#p2">2. 構成</a><a href="#p3">3. 関数の原則</a><a href="#p4">4. 通信と資格情報</a><a href="#p5">5. 配置</a><a href="#p6">6. CLI と skill</a><a href="#p7">7. ファイル配置</a><a href="#p8">8. 機能一覧</a><a href="#p9">9. 追加の手順</a><a href="#p10">10. 既存の移行</a><a href="#p11">11. 採らなかった案</a>
+    </div>
+    <div class="row"><span class="lab">第2部 解説</span>
+      <a href="#b1">1. 何を解決するか</a><a href="#b2">2. PowerShell リモート処理</a><a href="#b3">3. JEA</a><a href="#b4">4. 引数が防御の要</a><a href="#b5">5. 全体像</a><a href="#b6">6. ログ収集の流れ</a><a href="#b7">7. 復元後の配置</a><a href="#b8">8. よくある質問</a><a href="#b9">9. 用語集</a>
+    </div>
+  </nav>
+</header>
+
+<!-- ===================================================================== -->
+<!-- 第1部 整備方針(規範。AI はここから第1部の終わりの印まで読む)          -->
+<!-- ===================================================================== -->
+<div class="part">
+  <h2>第1部 整備方針</h2>
+  <p>規範です。リモートコマンドを整備・拡張するときは、この部に従います。実装で詳細が変わったら、実装と同時にこの部を直します。</p>
+</div>
+
+<section id="p1">
+<h2>1. 目的と位置づけ</h2>
+<h3>1.1 用途</h3>
+<p>リモートコマンドは、AI 実行環境から、テスト環境を構成する別のマシンでコマンドを実行するための仕組みである。用途は次の4つに分ける。</p>
+<div class="tbl"><table>
+<thead><tr><th>用途</th><th>例</th><th>ロールの重さ</th></tr></thead>
+<tbody>
+<tr><td>環境情報の把握</td><td>VM・チェックポイントの状態、サーバーの設定値の確認</td><td>Read</td></tr>
+<tr><td>テスト結果の把握</td><td>ログ収集(SK-LOG)、ファイル参照(SK-FILE)、証跡の取得</td><td>Read</td></tr>
+<tr><td>テストの操作の一環で必要な外部コマンド</td><td>印刷指示</td><td>Change</td></tr>
+<tr><td>テスト環境のセットアップ</td><td>ゴールデンイメージの復元、時刻合わせ(SK-CLOCK)</td><td>Change</td></tr>
+</tbody></table></div>
+
+<h3>1.2 JEA の位置づけ</h3>
+<p><b>JEA は、AI とテストコードが呼べる操作を、定義した関数に限るための「操作の枠」である。セキュリティの境界ではない。</b>配置のために各マシンの管理者の資格情報が存在し、それを使えば JEA を通らずに何でもできるためである。テスト環境は検証用であり、この前提で管理を緩めてよい。ただし次の2点は守る。</p>
+<ul class="plain">
+<li>skill とテストコードは、配置用(管理者)の資格情報を使わない。JEA のエンドポイント以外へ接続しない</li>
+<li>関数の引数を絞る原則(3章)を守る。JEA の枠が意味を持つのは、引数が絞られているときだけである</li>
+</ul>
+
+<h3>1.3 前提</h3>
+<ul class="plain">
+<li>AI 実行環境・Hyper-V ホスト・PMS サーバーVM・印刷クライアントPCは、<b>それぞれ別のマシンとして設計する</b>。同じマシンになる場合も、クライアント設定で接続先を同じにする(<code>localhost</code> など)だけで動くようにする</li>
+<li>対象のマシンはすべて Windows。リモート処理は Windows PowerShell 5.1 で動くこと(PowerShell 7 でも動いてよい)</li>
+<li>ワークグループ(ドメイン非参加)を前提にする</li>
+</ul>
+</section>
+
+<section id="p2">
+<h2>2. 構成</h2>
+<div class="tbl"><table>
+<thead><tr><th>要素</th><th>規則</th></tr></thead>
+<tbody>
+<tr><td><span class="rule">S-1</span> エンドポイント</td><td><b>実行場所(マシン)ごとに1つ。</b>名前はどのマシンでも <code>PmsRemote</code>。マシンごとの違いは、登録するロールで表す。機能ごとにエンドポイントを分けない</td></tr>
+<tr><td><span class="rule">S-2</span> モジュール</td><td><b>1つのパッケージ <code>PmsRemote</code> を全マシンに同じ版で置く。</b>中身は機能(実行場所)ごとのファイルに分ける(<code>Common.ps1</code>・<code>HyperV.ps1</code>・<code>Server.ps1</code>・<code>Client.ps1</code>)。版はパッケージで1つ(<code>PmsRemote.psd1</code> の <code>ModuleVersion</code>)。見せる関数はロールで決まるので、使わない関数が置かれていてもよい</td></tr>
+<tr><td><span class="rule">S-3</span> ロール</td><td><b>マシン × 重さ</b>で分ける。名前は <code>&lt;マシン種別&gt;&lt;重さ&gt;</code>(<code>HyperVRead</code>・<code>HyperVChange</code>・<code>ServerRead</code>・<code>ServerChange</code>・<code>ClientRead</code>・<code>ClientChange</code>)。<b>Read と Change の関数を同じロールに入れない</b></td></tr>
+<tr><td><span class="rule">S-4</span> Read と Change</td><td><b>Read</b> = テスト対象(製品・データ・設定・機器・時計)の状態を変えない。作業用の一時ファイル(収集物など)の作成・削除は Read に含めてよい。<b>Change</b> = それ以外</td></tr>
+<tr><td><span class="rule">S-5</span> 共通の関数</td><td><code>Get-PmsRemoteInfo</code>(版・登録済みのロール・マシン名)、<code>Read-PmsRemoteArtifact</code>(成果物を分割して返す)、<code>Remove-PmsRemoteArtifact</code>(成果物を消す)は、<b>すべてのロールに入れる</b></td></tr>
+<tr><td><span class="rule">S-6</span> 接続許可グループ</td><td>各マシンのローカルグループ <code>PmsRemoteRead</code>(→ そのマシンの Read ロール)と <code>PmsRemoteChange</code>(→ Change ロール)。当面は AI 実行環境のアカウントを両方に入れてよい。分けてあるのは、後でグループの変更だけで絞れるようにするため</td></tr>
+<tr><td><span class="rule">S-7</span> 実行アカウント</td><td>仮想アカウント。権限はエンドポイント単位で、登録したロールが必要とする権限の和にする(Hyper-V ロール → Hyper-V Administrators、Server・Client ロール → ローカル Administrators)。<b>ロールを分けても実行時の権限は分かれない</b>(S-3 の分離は「呼べる操作」の区別である)</td></tr>
+<tr><td><span class="rule">S-8</span> 排他</td><td>同時に走ると壊れる Change の関数は、そのマシンのロック(<code>state\&lt;名前&gt;.lock</code>)を取り、取れなければ <code>LOCKED</code> を返す。<b>マシンをまたいだ排他はしない</b>(例: 復元中に PMS VM でログ収集が走ると、収集は途中で失敗する。それでよい)</td></tr>
+<tr><td><span class="rule">S-9</span> 記録</td><td>エンドポイントの操作記録(トランスクリプト)を <code>%ProgramData%\PmsRemote\Transcripts</code> に残す。Change の関数は <code>state\operations.log</code> に開始・終了を1行ずつ残す。PMS VM の記録は復元で消える(許容する)</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="p3">
+<h2>3. 関数の原則(防御の要)</h2>
+<p>JEA で見せた関数の中身は、制限なしに(管理者として)動く。<b>何ができるかは、関数が受け取る引数で決まる。</b></p>
+<div class="tbl"><table>
+<thead><tr><th>規則</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><span class="rule">F-1</span> 受け取ってよい引数</td><td><b>列挙値</b>(<code>ValidateSet</code>)、<b>時刻</b>(ISO 8601 の時差付き。<code>ValidatePattern</code>)、<b>件数・番号</b>(<code>ValidateRange</code>)、<b>識別子</b>(サーバーが採番したもの、またはクライアントが採番し <code>^[A-Za-z0-9_\-]{1,64}$</code> で検証したもの)</td></tr>
+<tr><td><span class="rule">F-2</span> 受け取ってはいけない引数</td><td><span class="ng">パス・ファイル名・コマンド・スクリプト・正規表現・URL・接続文字列・任意の文字列。</span>識別子からパスを組み立てるときは、固定のフォルダの直下に限る(F-1 のパターンにより <code>..</code> や区切り文字は入らない)</td></tr>
+<tr><td><span class="rule">F-3</span> 対象の固定</td><td>操作の対象(VM名・ツールのパス・引数の並び・出力先・マスクの指定など)は、<b>リモート側の設定</b> <code>%ProgramData%\PmsRemote\config.psd1</code> の機能ごとのセクションで固定する。クライアントからは変えられない</td></tr>
+<tr><td><span class="rule">F-4</span> 設定の原本</td><td>リモート側の設定の原本は、リポジトリの <code>remote/targets/&lt;接続先名&gt;/config.psd1</code> に置き、配置(5章)で送り込む。実行時に AI やクライアントから変える経路はない。原本の書き換えは、人間のレビューと skill の禁止事項で抑える</td></tr>
+<tr><td><span class="rule">F-5</span> 戻り値</td><td>1つのオブジェクトを返す。少なくとも <code>Success</code>・<code>ErrorCode</code>・<code>Message</code> を持つ。<b>想定内の失敗は例外にせず、<code>Success=$false</code> で返す</b></td></tr>
+<tr><td><span class="rule">F-6</span> エラーの区分</td><td><code>ErrorCode</code> は英大文字とアンダースコア(例 <code>TOOL_FAILED</code>)。<code>Message</code> は <code>"区分: 内容"</code> の形にする。秘密の値を含めない</td></tr>
+<tr><td><span class="rule">F-7</span> ファイルの受け渡し</td><td>ファイルの中身を戻り値に入れない。<b>成果物(zip)として <code>state\artifacts\&lt;成果物ID&gt;.zip</code> に置き、成果物IDを返す。</b>クライアントは <code>Read-PmsRemoteArtifact -Id -Index</code> で 4MB ずつ受け取り、<code>Remove-PmsRemoteArtifact</code> で消す。受け取られずに残った成果物は、保持時間(既定24時間)を過ぎたら次の作成時に消す。上限サイズは機能ごとの設定で決める</td></tr>
+<tr><td><span class="rule">F-8</span> 上限</td><td>時間のかかる処理は、設定で上限時間を持ち、超えたら打ち切って区分付きで返す(例 <code>TOOL_TIMEOUT</code>)。時間範囲・件数の上限も設定で持つ</td></tr>
+<tr><td><span class="rule">F-9</span> 製品ツールの扱い</td><td>製品のツールを呼ぶ関数では、ツールの正常終了とみなす終了コード(<code>SuccessExitCodes</code>)を設定で持つ。ツールの標準出力・標準エラーは成果物に入れず、リモート側の作業フォルダに残す(秘密の値を含むおそれがあるため)</td></tr>
+<tr><td><span class="rule">F-10</span> 命名</td><td>関数名は <code>&lt;承認済みの動詞&gt;-Pms&lt;名詞&gt;</code>(例 <code>Invoke-PmsLogCollect</code>・<code>Restore-PmsGoldenImage</code>)</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="p4">
+<h2>4. 通信と資格情報</h2>
+<div class="tbl"><table>
+<thead><tr><th>規則</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><span class="rule">C-1</span> 通信方式</td><td><b>既定は HTTP(5985)+ NTLM。</b>AI 実行環境の WinRM クライアント設定 <code>TrustedHosts</code> に、接続先を登録する(管理者で1回)。通信の中身は NTLM のセッションで暗号化される。HTTPS(5986)はクライアント設定で選べるようにしておくが、既定にしない</td></tr>
+<tr><td><span class="rule">C-2</span> 使わない方式</td><td><span class="ng">PowerShell Direct(<code>-VMName</code>)は使わない。</span>Hyper-V 上の VM にしか使えず、環境によって使えるかどうかが変わるため</td></tr>
+<tr><td><span class="rule">C-3</span> 資格情報</td><td><b>参照名で引く。</b>保存先は <code>%APPDATA%\PmsRemote\cred\&lt;参照名&gt;.xml</code>(<code>Export-Clixml</code>。DPAPI により、保存したユーザーと PC でしか復号できない)。保存は CLI の <code>cred-set &lt;参照名&gt;</code> で行う。参照名を指定しない接続先は、ログオン中のユーザーで接続する</td></tr>
+<tr><td><span class="rule">C-4</span> 通常用と配置用</td><td>接続先ごとに、<b>通常用</b>(JEA の接続許可グループのメンバー)と<b>配置用</b>(そのマシンの管理者)の参照名を分ける。配置用を使うのは CLI の <code>deploy</code> と <code>check-target</code> だけである</td></tr>
+<tr><td><span class="rule">C-5</span> 接続先の一度きりの前提</td><td>各接続先で、(1) WinRM が有効(Windows Server の既定)で、遅延なしの自動開始、(2) ファイアウォールで AI 実行環境から 5985 に接続できる、(3) 配置用の管理者アカウントがあり、<b>パスワードが無期限</b>、(4) ビルトインの Administrator 以外を使うなら <code>LocalAccountTokenFilterPolicy=1</code>(ローカルアカウントでの遠隔管理を許す)。PMS VM ではこれをゴールデンイメージに一度だけ入れる。<code>check-target</code> で確かめられる</td></tr>
+</tbody></table></div>
+
+<h3>4.1 クライアント設定 <code>config/remote-targets.json</code></h3>
+<p>接続先を名前で持つ。機能ごとのクライアント側の設定(起動確認のコマンド・ログの書式など)も、この1つのファイルに置く。</p>
+<pre class="code">{
+  "expectedVersion": "1.0",              <span class="c">// PmsRemote の期待する版(5.4)</span>
+  "targets": {
+    "hyperv-host": {
+      "host": "localhost", "endpoint": "PmsRemote", "transport": "http", "port": 5985,
+      "credential": null, "deployCredential": "hyperv-host-admin",
+      "roles": ["HyperVRead", "HyperVChange"]
+    },
+    "pms-vm": {
+      "host": "pms-test-01", "endpoint": "PmsRemote", "transport": "http", "port": 5985,
+      "credential": "pms-vm", "deployCredential": "pms-vm-admin",
+      "roles": ["ServerRead", "ServerChange"],
+      "restoredBy": "hyperv-host"          <span class="c">// 復元される接続先。復元のあと自動で配置する(5.3)。最初から書く</span>
+    }
+  },
+  "restore":    { "target": "hyperv-host", "winrmTimeoutSec": 30, "readiness": { "command": ["npx", "playwright", "test", "-c", "playwright.readiness.config.ts"], "timeoutSec": 900 },
+                  "markerLog": "work/_common/env-restore-log.jsonl" },
+  "logCollect": { "target": "pms-vm", "logIdPattern": "\\b(?&lt;id&gt;PMS-[A-Z]-\\d{4})\\b", "levelPattern": "...", "scanInclude": ["*.log"], "encoding": "utf-8",
+                  "maxLogIds": 200, "maxFiles": 200 }
+}</pre>
+</section>
+
+<section id="p5">
+<h2>5. 配置(共通インストーラ)</h2>
+<h3>5.1 インストーラ <code>remote/Install-PmsRemote.ps1</code></h3>
+<div class="tbl"><table>
+<thead><tr><th>規則</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><span class="rule">D-1</span> 共通</td><td>全マシン共通の1本。<code>-Role</code> で登録するロールを選ぶ(例 <code>-Role ServerRead,ServerChange</code>)。新しい機能はロールを足すだけで、インストーラを機能ごとに作らない</td></tr>
+<tr><td><span class="rule">D-2</span> 処理の順序</td><td>モジュール配置 → 設定作成 → グループ作成と ACL 付与 → (HTTPS を選んだときだけ)リスナー作成 → エンドポイント登録</td></tr>
+<tr><td><span class="rule">D-3</span> 冪等</td><td>再実行で同じ状態になる。(1) 既存の設定は <code>-Force</code> なしでは上書きしない(差があれば警告する)。(2) 証明書は、同じ名前のものがあれば再利用し、毎回作らない。(3) エンドポイントは、構成(.pssc・ロール・版)が変わったときだけ登録し直す(登録し直すと WinRM が再起動するため)。(4) 版と構成が同じなら何もしない</td></tr>
+<tr><td><span class="rule">D-4</span> 機能ごとの準備</td><td>ロールに固有の確認・準備(例 HyperV: 対象VMと同名チェックポイントがちょうど1つあること)は、機能のファイルに準備用の関数(<code>Initialize-Pms&lt;機能&gt;</code>)として置き、インストーラはそれを呼ぶだけにする</td></tr>
+<tr><td><span class="rule">D-5</span> 2通りの実行</td><td>(a) 対象のマシンで管理者として直接実行する。(b) CLI の <code>deploy</code> が配置用の資格情報で管理者セッションを開き、モジュール・インストーラ・設定の原本を送り込んで実行する。中身は同じ</td></tr>
+<tr><td><span class="rule">D-6</span> 出力</td><td>CLI と同じ約束事(6.2)で、最後の1行に JSON(実施した処理・版・登録したロール)を出す</td></tr>
+</tbody></table></div>
+
+<h3>5.2 ゴールデンイメージに焼き込まない</h3>
+<p><b>PMS VM のゴールデンイメージには、エンドポイントもモジュールも入れない。</b>入れるのは C-5 の一度きりの前提だけである。エンドポイントは、復元のたびに自動で配置する(5.3)。モジュールを更新しても、チェックポイントを取り直す必要はない。</p>
+<p>版が安定したら、配置済みの状態でチェックポイントを取り直してもよい。取り直すと、復元後の配置が「版が同じなので何もしない」になり、復元が数十秒速くなる。<b>任意の最適化</b>であり、必須ではない。取り直す場合は、復元 → 配置 → <code>info</code> で確認 → チェックポイント、の順で行う(作業中のデータを混ぜないため)。</p>
+
+<h3>5.3 復元後の配置</h3>
+<p>クライアント設定で <code>restoredBy</code> を持つ接続先は、CLI の <code>restore</code> が次の順で処理する。<code>-SkipReadiness</code>(回帰テストの一括実行)のときも配置は行う。</p>
+<ol class="plain">
+<li><code>hyperv-host</code> の <code>Restore-PmsGoldenImage</code>(停止 → チェックポイント適用 → 起動 → ハートビート)</li>
+<li>復元した接続先の WinRM が応答するまで待つ(上限は設定)</li>
+<li>その接続先に <code>deploy</code>(版と構成が同じなら何もしない)</li>
+<li>起動確認(Web UI へのログイン。従来どおりテストコード側の起動確認テスト)</li>
+<li>復元記録(マーカー)を追記</li>
+</ol>
+<p><b>配置(2・3)に失敗しても、復元は成功として扱う(警告)。</b>結果は出力の <code>deploy</code>(接続先ごとの <code>status</code>: <code>deployed</code> / <code>skipped</code> / <code>failed</code> と <code>error_code</code>)に残し、終了コードは変えない。その接続先のリモートコマンドは、配置されるまで <code>ENDPOINT_NOT_FOUND</code> や <code>VERSION_MISMATCH</code> で失敗する(ログ収集のように補助的な用途は、それでも作業を止めない)。</p>
+<p><code>restoredBy</code> は最初から書いておく(書き忘れて窓口が配置されないまま運用が続くのを防ぐため)。その接続先の一度きりの前提(C-5)が整うまでは、復元のたびに WinRM の応答を <code>restore.winrmTimeoutSec</code>(既定 30 秒)だけ待ってから、配置の警告が出る。前提には、WinRM を遅延なしの自動開始にすることを含める(遅延開始のままだと、準備が整っていても復元直後の待ち時間内に応答しないことがある)。</p>
+<p>復元しない接続先(Hyper-V ホスト・印刷クライアント)は、人間が <code>deploy</code> を実行する。</p>
+
+<h3>5.4 版</h3>
+<ul class="plain">
+<li>版は <code>メジャー.マイナー.パッチ</code>。パッチ = 関数の中身の修正。マイナー = 関数・ロール・設定キーの追加(後方互換)。メジャー = 引数・戻り値・設定キーの互換を壊す変更</li>
+<li>CLI は、毎回の呼び出しの最初に <code>Get-PmsRemoteInfo</code> で版を確かめる。<b>メジャーが一致し、かつ <code>expectedVersion</code> 以上</b>なら続ける。そうでなければ <code>VERSION_MISMATCH</code>(終了コード2)で止め、<code>deploy</code> を促す</li>
+<li>関数・ロール・設定キーを足したら、マイナー版を上げ、<code>expectedVersion</code> も上げる</li>
+</ul>
+</section>
+
+<section id="p6">
+<h2>6. CLI と skill</h2>
+<h3>6.1 構成</h3>
+<div class="tbl"><table>
+<thead><tr><th>規則</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><span class="rule">W-1</span> CLI 本体</td><td><code>tools/remote/pms-remote.ps1</code>。接続・資格情報・版の確認・成果物の分割受け取り・出力の形式・終了コードの対応づけを一手に持つ。<b>JEA を直接呼んでよいのはこれだけ</b></td></tr>
+<tr><td><span class="rule">W-2</span> 呼び方</td><td><code>pms-remote.ps1 &lt;サブコマンド&gt; [-Target &lt;接続先名&gt;] [引数]</code>。サブコマンドは小文字とハイフン(<code>info</code>・<code>check-target</code>・<code>deploy</code>・<code>cred-set</code>・<code>restore</code>・<code>logs-collect</code>・<code>logs-ids</code> など)。既定の接続先はサブコマンドごとに決めてよい(例 <code>logs-collect</code> は <code>pms-vm</code>)</td></tr>
+<tr><td><span class="rule">W-3</span> skill の実行体</td><td>外部操作 skill には実行体を同梱する。<b>実行体は CLI 本体を固定のサブコマンドで呼ぶだけの薄い入口</b>にする(例 <code>collect-server-logs/scripts/collect-server-logs.ps1</code> → <code>pms-remote.ps1 logs-collect</code>)。引数と出力は入口でそのまま通す</td></tr>
+<tr><td><span class="rule">W-4</span> テストコード</td><td>Playwright(Node)からは、<code>tests/external/remote.ts</code> のヘルパー経由で CLI 本体を子プロセスとして呼ぶ(<code>execFileSync('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-File', ...])</code>)。テストコードから JEA を直接呼ばない</td></tr>
+<tr><td><span class="rule">W-5</span> 実行場所</td><td>リポジトリのルートで実行する(クライアント設定を上位へ探索する。環境変数 <code>PMS_REMOTE_CONFIG</code> で上書きできる)</td></tr>
+</tbody></table></div>
+
+<h3>6.2 出力と終了コード(すべてのサブコマンド共通)</h3>
+<ul class="plain">
+<li>標準出力の<b>最後の1行</b>に JSON を出す。キーは snake_case。非ASCII 文字は <code>\uXXXX</code> にエスケープする(呼び出し側のコードページに依存しないため)。進捗は標準エラーに出す</li>
+<li>共通のキー: <code>success</code>・<code>command</code>・<code>target</code>・<code>error_code</code>・<code>message</code>・<code>started_at</code>・<code>completed_at</code>・<code>duration_sec</code>。機能ごとのキーはこれに足す</li>
+</ul>
+<div class="tbl"><table>
+<thead><tr><th>終了コード</th><th>意味</th><th>例</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>成功</td><td>—</td></tr>
+<tr><td>1</td><td>実行の失敗(1回だけ再実行してよい)</td><td><code>CONNECT_FAILED</code> <code>TOOL_FAILED</code> <code>TOOL_TIMEOUT</code> <code>TRANSFER_FAILED</code></td></tr>
+<tr><td>2</td><td>設定・資格情報・引数・実行環境の誤り(再実行しない)</td><td><code>CONFIG_INVALID</code> <code>CREDENTIAL_INVALID</code> <code>INVALID_ARGUMENT</code> <code>VERSION_MISMATCH</code> <code>ROLE_NOT_AVAILABLE</code></td></tr>
+<tr><td>3</td><td>実行中(ロックが取れない)</td><td><code>LOCKED</code></td></tr>
+<tr><td>4</td><td>成功したが、人間の確認が要る</td><td>復元後、起動確認テストがまだない</td></tr>
+</tbody></table></div>
+<p>区分を終了コードに対応づける表は CLI 本体が持つ。機能ごとに新しい区分を足したら、この表に足す(足さない区分は 1 になる)。</p>
+
+<h3>6.3 skill</h3>
+<ul class="plain">
+<li>リモートコマンドを AI が使う場合は、<b>外部操作 skill</b> として整備する(手順書 00 ■外部操作。KB T05 に登録してから使う)。<code>.kiro/skills/</code> と <code>.github/skills/</code> の両方に置く</li>
+<li>SKILL.md には、いつ使うか(使わない場面を含む)、実行方法、出力の読み方(読むのは最後の1行の JSON だけ)、終了コードごとの対応、確立時の確認(<code>info</code>)、禁止事項を書く</li>
+<li>禁止事項には、少なくとも次を入れる: JEA・<code>Invoke-Command</code>・製品のツールを直接実行しない / 配置用の資格情報・<code>deploy</code> を使わない / <code>remote/</code>・<code>tools/remote/</code>・クライアント設定を書き換えない / 資格情報を探さない・書き出さない / 失敗を回避するために別の手段を編み出さない</li>
+</ul>
+</section>
+
+<section id="p7">
+<h2>7. ファイル配置</h2>
+<pre class="code">remote/                                  <span class="c">リモート側の一式(旧 golden-restore/ を置き換える)</span>
+  module/PmsRemote/
+    PmsRemote.psd1                       <span class="c">版(ModuleVersion)</span>
+    PmsRemote.psm1                       <span class="c">機能ごとのファイルを読み込む</span>
+    Common.ps1  HyperV.ps1  Server.ps1  Client.ps1
+    RoleCapabilities/
+      HyperVRead.psrc  HyperVChange.psrc  ServerRead.psrc  ServerChange.psrc  ClientRead.psrc  ClientChange.psrc
+  Install-PmsRemote.ps1                  <span class="c">共通インストーラ</span>
+  targets/&lt;接続先名&gt;/config.psd1         <span class="c">リモート側の設定の原本(F-4)</span>
+  tests/global-setup.ts                  <span class="c">雛形。リポジトリの tests/ にコピーする(回帰の一括実行前の復元)</span>
+  tests/external/remote.ts               <span class="c">雛形。リポジトリの tests/external/ にコピーする(W-4)</span>
+  examples/server-ready.setup.ts         <span class="c">起動確認テストの雛形(参考)</span>
+  README.md                              <span class="c">導入手順</span>
+tools/remote/pms-remote.ps1              <span class="c">CLI 本体(W-1)</span>
+config/remote-targets.json               <span class="c">クライアント設定(4.1)</span>
+.kiro/skills/&lt;skill&gt;/scripts/&lt;入口&gt;.ps1  <span class="c">skill の実行体 = 薄い入口(W-3)。.github/skills/ にも同じもの</span>
+tests/external/remote.ts                 <span class="c">テストコード用のヘルパー(W-4)</span>
+
+<span class="c">リモート側(各マシン)</span>
+%ProgramData%\PmsRemote\config.psd1       <span class="c">リモート側の設定(配置で作る)</span>
+%ProgramData%\PmsRemote\state\            <span class="c">ロック・操作の記録・成果物(artifacts\)</span>
+%ProgramData%\PmsRemote\Transcripts\      <span class="c">JEA の操作記録</span>
+<span class="c">AI 実行環境</span>
+%APPDATA%\PmsRemote\cred\&lt;参照名&gt;.xml     <span class="c">資格情報(C-3)</span></pre>
+</section>
+
+<section id="p8">
+<h2>8. 機能一覧(マシン × ロール)</h2>
+<div class="tbl"><table>
+<thead><tr><th>マシン(接続先名)</th><th>ロール</th><th>関数</th><th>CLI</th><th>skill</th><th>状態</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="6">共通</td></tr>
+<tr><td>全マシン</td><td>全ロール</td><td><code>Get-PmsRemoteInfo</code> <code>Read-PmsRemoteArtifact</code> <code>Remove-PmsRemoteArtifact</code></td><td><code>info</code>(ほかのサブコマンドの内部でも使う)</td><td>—</td><td>今回</td></tr>
+<tr class="grp"><td colspan="6">Hyper-V ホスト</td></tr>
+<tr><td><code>hyperv-host</code></td><td>HyperVRead</td><td><code>Get-PmsGoldenImageInfo</code></td><td><code>restore -InfoOnly</code></td><td>restore-golden-image</td><td>既存を移行</td></tr>
+<tr><td><code>hyperv-host</code></td><td>HyperVChange</td><td><code>Restore-PmsGoldenImage -RestoreId -Purpose</code></td><td><code>restore</code></td><td>restore-golden-image</td><td>既存を移行</td></tr>
+<tr class="grp"><td colspan="6">PMS サーバーVM</td></tr>
+<tr><td><code>pms-vm</code></td><td>ServerRead</td><td><code>Invoke-PmsLogCollect -From -To</code>(成果物IDを返す)</td><td><code>logs-collect</code> <code>logs-ids</code></td><td>collect-server-logs</td><td>今回</td></tr>
+<tr><td><code>pms-vm</code></td><td>ServerRead</td><td>ファイル参照(種別 × 作成時間帯)</td><td>—</td><td>—</td><td><span class="plan">将来</span> SK-FILE</td></tr>
+<tr><td><code>pms-vm</code></td><td>ServerChange</td><td>時刻合わせ(VM 側)、セットアップ操作</td><td>—</td><td>—</td><td><span class="plan">将来</span> SK-CLOCK ほか</td></tr>
+<tr class="grp"><td colspan="6">印刷クライアントPC</td></tr>
+<tr><td><code>print-client-NN</code></td><td>ClientChange</td><td>印刷指示</td><td>—</td><td>—</td><td><span class="plan">将来</span>(下の注意)</td></tr>
+</tbody></table></div>
+<div class="note"><b>印刷クライアントの注意。</b>JEA の仮想アカウントは、対話ログオンのない別のセッションで動く。ユーザーごとのプリンター接続・印刷ドライバー・GUI アプリからの印刷は、そのままでは動かないことが多い。その場合は、JEA の関数が「特定のユーザーで動くタスクスケジューラのタスクを起動するだけ」にする。エンドポイント・CLI・ロールの枠組みはそのまま使う。整備の前に実機で確かめる。</div>
+
+<h3>8.1 ログ収集の固定値(ServerRead)</h3>
+<p>リモート側の設定 <code>LogCollect</code> で固定する: <code>ExePath</code>・<code>Arguments</code>(<code>{From}</code> <code>{To}</code> <code>{OutDir}</code> <code>{Mask}</code> を置き換える)・<code>MaskArguments</code>(空なら必ず失敗)・<code>WorkRoot</code>(VM 内の出力先の親)・<code>TimeZone</code>(<code>GuestLocal</code> / <code>Utc</code> / <code>AsGiven</code>)・<code>TimeFormat</code>・<code>SuccessExitCodes</code>(既定 <code>@(0)</code>)・<code>TimeoutSec</code>(既定300)・<code>MaxWindowMinutes</code>・<code>MaxArtifactMB</code>(既定200。想定50MB程度)。ログIDの集計(本文を返さない)はクライアント側の CLI が行う。要求は <code>docs/skill整備要求.md</code> の SK-LOG。</p>
+</section>
+
+<section id="p9">
+<h2>9. 新しいリモートコマンドを足す手順</h2>
+<ol class="plain">
+<li><b>用途と重さを決める</b>(1.1、S-4)。Read か Change か</li>
+<li><b>実行場所を決める</b>(どのマシンで動くか)。新しい種類のマシンなら、ロール <code>&lt;種別&gt;Read</code> / <code>&lt;種別&gt;Change</code> と機能のファイルを足す</li>
+<li><b>関数を設計する</b>(3章)。引数は F-1 の範囲だけにする。対象はリモート側の設定のセクションに置く。ファイルを返すなら成果物(F-7)にする</li>
+<li><b>機能のファイルに関数を書き、ロール(.psrc)の <code>VisibleFunctions</code> に足す</b>。Read と Change を混ぜない</li>
+<li><b>設定の原本</b> <code>remote/targets/&lt;接続先名&gt;/config.psd1</code> にセクションを足す。準備が要るなら <code>Initialize-Pms&lt;機能&gt;</code> を書く(D-4)</li>
+<li><b>版を上げる</b>(5.4。通常はマイナー)。<code>config/remote-targets.json</code> の <code>expectedVersion</code> も上げる</li>
+<li><b>CLI 本体にサブコマンドを足す</b>。新しいエラー区分を終了コードの表に足す(6.2)</li>
+<li><b>呼び出し元を作る</b>。AI が使うなら外部操作 skill(薄い入口 + SKILL.md。6.3)、テストコードが使うなら <code>tests/external/remote.ts</code> に関数を足す</li>
+<li><b>禁止操作リストと KB T05</b> を確認する。Change の操作は、手順書の禁止操作リストで扱いを決める</li>
+<li><b>この文書の 8章を更新する</b>。方針そのものを変えるときは、1〜7章も直す</li>
+</ol>
+</section>
+
+<section id="p10">
+<h2>10. 既存の復元の移行(一度に移す)</h2>
+<p>既存のゴールデンイメージ復元(<code>golden-restore/</code>、エンドポイント <code>PmsGoldenRestore</code>)を、この方針に一度に移す。</p>
+<div class="tbl"><table>
+<thead><tr><th>対象</th><th>移行後</th></tr></thead>
+<tbody>
+<tr><td>エンドポイント <code>PmsGoldenRestore</code>、グループ <code>PmsRestoreOperators</code></td><td><code>PmsRemote</code>(HyperVRead / HyperVChange)、<code>PmsRemoteRead</code> / <code>PmsRemoteChange</code>。ホストで旧エンドポイントを登録解除する</td></tr>
+<tr><td>ロール(Info と Restore が同じロール)</td><td>HyperVRead(<code>Get-PmsGoldenImageInfo</code>)と HyperVChange(<code>Restore-PmsGoldenImage</code>)に分ける</td></tr>
+<tr><td><code>golden-restore/host/</code></td><td><code>remote/</code>(モジュールは <code>HyperV.ps1</code>、インストーラは <code>Install-PmsRemote.ps1 -Role HyperVRead,HyperVChange</code>)</td></tr>
+<tr><td><code>%ProgramData%\PmsGoldenRestore\</code></td><td><code>%ProgramData%\PmsRemote\</code>(設定は <code>Restore</code> セクションへ)</td></tr>
+<tr><td><code>config/golden-restore.json</code></td><td><code>config/remote-targets.json</code> に統合(<code>targets.hyperv-host</code> と <code>restore</code>)</td></tr>
+<tr><td><code>restore-golden-image.ps1</code>(自分で <code>Invoke-Command</code>)</td><td>CLI 本体の <code>restore</code> を呼ぶ薄い入口。<code>restore</code> は復元後の配置(5.3)を含む。終了コードと出力のキーは従来どおり</td></tr>
+<tr><td>lint <code>Test-EnvRestoreMarker.ps1</code></td><td>復元記録の場所(<code>markerLog</code>)を <code>config/remote-targets.json</code> の <code>restore</code> から読む</td></tr>
+<tr><td><code>tests/global-setup.ts</code>(雛形 <code>golden-restore/tests/</code>)</td><td><code>tests/external/remote.ts</code> 経由で CLI の <code>restore -SkipReadiness</code> を呼ぶ(雛形は <code>remote/tests/</code>)</td></tr>
+<tr><td>資格情報 <code>%APPDATA%\PmsGoldenRestore\credential.xml</code></td><td>参照名 <code>hyperv-host</code>(<code>%APPDATA%\PmsRemote\cred\</code>)</td></tr>
+<tr><td>手順書</td><td>proc-v015 として改訂する。設定ファイル名、復元後の配置、PMS VM の一度きりの前提(C-5)を ■回帰実行の環境前提 に書く</td></tr>
+<tr><td>PowerShell Direct によるログ収集の試作(未コミット)</td><td>破棄する。流用するのは、成果物の分割受け取り、ログIDの集計、VM 内でツールを動かす処理、出力と終了コードの約束事</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="p11">
+<h2>11. 採らなかった案(蒸し返さないための記録)</h2>
+<div class="tbl"><table>
+<thead><tr><th>案</th><th>採らなかった理由</th></tr></thead>
+<tbody>
+<tr><td>PowerShell Direct(Hyper-V ホスト経由で VM に入る)</td><td>Hyper-V 上の VM にしか使えず、環境によって使えるかどうかが変わる。汎用性が低い</td></tr>
+<tr><td>エンドポイントとモジュールをゴールデンイメージに焼き込む</td><td>モジュールを直すたびにチェックポイントの取り直しが要り、手間が大きい(焼き込みは任意の最適化としてだけ残す。5.2)</td></tr>
+<tr><td>モジュールを共有フォルダから読み込む</td><td>ワークグループでは、仮想アカウントが共有フォルダにアクセスできない</td></tr>
+<tr><td>機能ごとにエンドポイントを分ける</td><td>利用者が機能ごとに接続先を使い分けることになる。実行時の権限も分かれない</td></tr>
+<tr><td>HTTPS を既定にする</td><td>マシンごとの証明書の作成・配布・更新・名前の一致の手間に比べて、隔離された検証ネットワークでの利点が小さい(選べるようにはしておく)</td></tr>
+<tr><td>Read と Change を1つのロールに入れる</td><td>後から「読み取りだけ許す」に絞れなくなる</td></tr>
+<tr><td>素のリモート処理(管理者で接続)を skill から使う</td><td>AI が何でも実行できてしまう。操作の枠(1.2)がなくなる</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- PART1-END 第1部はここまで。以下の第2部は人向けの解説で、新しい規則を含まない(AI は読まなくてよい) -->
+
+<!-- ===================================================================== -->
+<!-- 第2部 初心者向けの解説(人向け)                                        -->
+<!-- ===================================================================== -->
+<style>
+figure{margin:22px 0 10px}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;overflow-x:auto}
+.fig svg{display:block;width:100%;height:auto}
+.fig.mid svg{min-width:720px}
+figcaption{font-size:13px;color:var(--muted);margin-top:8px;max-width:52em}
+.dg{color:var(--ink);font-family:var(--font-body)}
+.dg text{fill:currentColor;font-size:12px}
+.dg .b{font-weight:700}
+.dg .m{fill:var(--muted)}
+.dg .mono{font-family:var(--font-mono)}
+.dg .s105{font-size:10.5px}
+.dg .s11{font-size:11px}
+.dg .s13{font-size:13px}
+.dg .s14{font-size:14px}
+.dg .t-ai{fill:var(--ai)}
+.dg .t-stop{fill:var(--stop)}
+.dg .t-store{fill:var(--store)}
+.dg .t-human{fill:var(--human)}
+.dg .n-ai{fill:var(--ai-soft);stroke:var(--ai);stroke-width:1.5}
+.dg .n-human{fill:var(--human-soft);stroke:var(--human);stroke-width:1.5}
+.dg .n-stop{fill:var(--stop-soft);stroke:var(--stop);stroke-width:1.5}
+.dg .n-store{fill:var(--store-soft);stroke:var(--store);stroke-width:1.5}
+.dg .n-tool{fill:var(--tool-soft);stroke:var(--tool);stroke-width:1.5}
+.dg .n-plain{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.dg .n-dash{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:5 4}
+.dg .n-bg{fill:var(--bg);stroke:var(--line);stroke-width:1}
+.dg .ln{stroke:currentColor;stroke-width:1.5;fill:none}
+.dg .ln-ai{stroke:var(--ai);stroke-width:1.8;fill:none}
+.dg .ln-stop{stroke:var(--stop);stroke-width:1.5;fill:none}
+.dg .ln-m{stroke:var(--muted);stroke-width:1.3;fill:none;stroke-dasharray:4 4}
+.dg .life{stroke:var(--line);stroke-width:1.5;stroke-dasharray:3 4}
+.dg .mk{fill:currentColor}
+.dg .mk-ai{fill:var(--ai)}
+.dg .mk-stop{fill:var(--stop)}
+.dg .mk-m{fill:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.card h4{font-family:var(--font-display);font-size:15px;margin:0 0 6px;line-height:1.5}
+.card p{font-size:13.5px;line-height:1.75;margin:0}
+dl.gloss{display:grid;grid-template-columns:minmax(150px,220px) 1fr;margin:16px 0;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+dl.gloss dt,dl.gloss dd{margin:0;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.7}
+dl.gloss dt{font-weight:700;background:var(--bg)}
+dl.gloss dt:last-of-type,dl.gloss dd:last-of-type{border-bottom:0}
+@media (max-width:560px){dl.gloss{grid-template-columns:1fr} dl.gloss dt{border-bottom:0;padding-bottom:2px}}
+details.qa{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin:8px 0;max-width:52em}
+details.qa summary{cursor:pointer;font-weight:700;font-size:14px}
+details.qa p{font-size:13.5px;margin:8px 0 0}
+</style>
+
+<div class="part human">
+  <h2>第2部 初心者向けの解説</h2>
+  <p>PowerShell のリモート処理や JEA を初めて知る人のための解説です。決まりごとは第1部にあり、この部は第1部を理解するための補助です。</p>
+</div>
+
+<section id="b1">
+<h2>1. この仕組みが解決すること</h2>
+<p>回帰テストを作る AI やテストコードは、<b>AI 実行環境</b>という1台の PC で動いています。ところが、テストに必要な操作の中には、別のマシンでしかできないものがあります。</p>
+<ul class="plain">
+<li>PMS サーバーの中でしか動かない、製品のログ収集ツールを動かしたい</li>
+<li>Hyper-V ホストで、PMS サーバーの VM をゴールデンイメージに戻したい</li>
+<li>将来は、印刷クライアントの PC から印刷を指示したい</li>
+</ul>
+<p>このとき「別のマシンにログインして何でもできる」状態にすると、AI が誤って危険な操作をしてしまうおそれがあります。そこで、<b>決めた操作だけを、決めた形でしか呼べない窓口</b>を各マシンに作ります。その窓口を作る道具が、PowerShell のリモート処理と JEA です。</p>
+</section>
+
+<section id="b2">
+<h2>2. PowerShell リモート処理の基本</h2>
+<p>Windows には、ネットワーク越しに別のマシンで PowerShell のコマンドを実行する仕組みが標準で入っています。これを <b>PowerShell リモート処理</b>と呼びます。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 250" role="img" aria-label="AI 実行環境の PowerShell が Invoke-Command を実行すると、要求がネットワーク(WinRM、ポート5985)を通って PMS サーバーの WinRM サービスに届く。サーバー側の PowerShell がコマンドを実行し、結果がデータとして戻る。">
+      <defs>
+        <marker id="b2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+        <marker id="b2-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-m"/></marker>
+      </defs>
+      <rect x="10" y="20" width="280" height="200" rx="8" class="n-plain"/>
+      <text x="26" y="46" class="b s14">AI 実行環境(手元の PC)</text>
+      <rect x="26" y="66" width="248" height="120" rx="6" class="n-ai"/>
+      <text x="40" y="90" class="b">PowerShell</text>
+      <text x="40" y="116" class="mono s11">Invoke-Command</text>
+      <text x="40" y="134" class="mono s11">  -ComputerName pms-vm</text>
+      <text x="40" y="152" class="mono s11">  -ScriptBlock { Get-Date }</text>
+      <text x="40" y="174" class="s105 m">「pms-vm で Get-Date を実行して」</text>
+
+      <line x1="290" y1="100" x2="568" y2="100" class="ln-ai" marker-end="url(#b2-a)"/>
+      <text x="430" y="88" text-anchor="middle" class="b s13 t-ai">要求を送る</text>
+      <text x="430" y="122" text-anchor="middle" class="s11 m">WinRM(HTTP ポート 5985)</text>
+      <line x1="568" y1="160" x2="290" y2="160" class="ln-m" marker-end="url(#b2-m)"/>
+      <text x="430" y="152" text-anchor="middle" class="s11 m">結果をデータとして返す</text>
+      <text x="430" y="180" text-anchor="middle" class="s105 m">(値は戻るが、画面やファイルは戻らない)</text>
+
+      <rect x="570" y="20" width="280" height="200" rx="8" class="n-plain"/>
+      <text x="586" y="46" class="b s14">PMS サーバー(pms-vm)</text>
+      <rect x="586" y="66" width="248" height="50" rx="6" class="n-tool"/>
+      <text x="710" y="88" text-anchor="middle" class="b">WinRM サービス</text>
+      <text x="710" y="105" text-anchor="middle" class="s105 m">受付。誰からの要求かを確かめる</text>
+      <line x1="710" y1="116" x2="710" y2="134" class="ln" />
+      <rect x="586" y="136" width="248" height="50" rx="6" class="n-ai"/>
+      <text x="710" y="158" text-anchor="middle" class="b">PowerShell</text>
+      <text x="710" y="175" text-anchor="middle" class="s105 m">コマンドを実行する</text>
+    </svg>
+  </div>
+  <figcaption>図1 PowerShell リモート処理。手元で書いたコマンドが、相手のマシンで実行されます。</figcaption>
+</figure>
+<ul class="plain">
+<li><b>WinRM</b>(Windows Remote Management)は、要求を受け付ける Windows のサービスです。Windows Server では最初から動いていて、ポート 5985(HTTP)で待ち受けます</li>
+<li>手元からは <code>Invoke-Command</code> で「どのマシンで」「何を」実行するかを指定します。結果は<b>データ(オブジェクト)</b>として戻ってきます</li>
+<li>接続するときは、相手のマシンのアカウントで認証します。ドメインに参加していない環境では <b>NTLM</b> という方式で認証し、通信の中身も暗号化されます。ただし、手元の PC に「このマシンには NTLM で接続してよい」と登録しておく必要があります(<b>TrustedHosts</b>)</li>
+</ul>
+</section>
+
+<section id="b3">
+<h2>3. JEA:決めた操作だけを呼べる窓口</h2>
+<h3>3.1 素のリモート処理の問題</h3>
+<p>普通のリモート処理は、管理者として接続すると<b>そのマシンで何でもできます</b>。ファイルの削除も、サービスの停止も可能です。AI に管理者の資格情報を渡すと、手順を誤ったときに環境を壊すおそれがあります。</p>
+<p><b>JEA</b>(Just Enough Administration、「必要十分な管理」)は、この問題を解く Windows 標準の仕組みです。接続した人には<b>あらかじめ決めた関数しか見えず</b>、その関数の中身だけが管理者の権限で動きます。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 280" role="img" aria-label="左は素のリモート処理。管理者で接続すると、ファイルの削除やサービスの停止を含むすべてのコマンドが使える。右は JEA。窓口 PmsRemote に接続すると、メニューにある Invoke-PmsLogCollect と Get-PmsRemoteInfo だけが見え、それ以外のコマンドは存在しないように見える。">
+      <defs>
+        <marker id="b3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <!-- left -->
+      <rect x="10" y="10" width="410" height="260" rx="8" class="n-bg"/>
+      <text x="26" y="36" class="b s14">素のリモート処理(管理者で接続)</text>
+      <rect x="26" y="60" width="90" height="44" rx="6" class="n-human"/>
+      <text x="71" y="87" text-anchor="middle" class="b s13">接続する人</text>
+      <line x1="116" y1="82" x2="166" y2="82" class="ln" marker-end="url(#b3-a)"/>
+      <rect x="168" y="52" width="236" height="200" rx="6" class="n-plain"/>
+      <text x="184" y="76" class="b">使えるコマンド: すべて</text>
+      <text x="184" y="102" class="mono s11">Get-Date</text>
+      <text x="184" y="122" class="mono s11">Get-Content C:\どこでも</text>
+      <text x="184" y="142" class="mono s11 t-stop">Remove-Item C:\PMS -Recurse</text>
+      <text x="184" y="162" class="mono s11 t-stop">Stop-Service PMS*</text>
+      <text x="184" y="182" class="mono s11 t-stop">Restart-Computer</text>
+      <text x="184" y="202" class="mono s11">…</text>
+      <text x="184" y="234" class="s11 t-stop b">誤った操作で環境を壊せる</text>
+      <!-- right -->
+      <rect x="440" y="10" width="410" height="260" rx="8" class="n-bg"/>
+      <text x="456" y="36" class="b s14">JEA(窓口 PmsRemote に接続)</text>
+      <rect x="456" y="60" width="90" height="44" rx="6" class="n-human"/>
+      <text x="501" y="87" text-anchor="middle" class="b s13">接続する人</text>
+      <line x1="546" y1="82" x2="596" y2="82" class="ln" marker-end="url(#b3-a)"/>
+      <rect x="598" y="52" width="236" height="200" rx="6" class="n-store"/>
+      <text x="614" y="76" class="b">使えるコマンド: メニューだけ</text>
+      <text x="614" y="102" class="mono s11 t-store b">Invoke-PmsLogCollect</text>
+      <text x="614" y="122" class="mono s11 t-store b">Get-PmsRemoteInfo</text>
+      <text x="614" y="142" class="mono s11 t-store b">Read-PmsRemoteArtifact</text>
+      <line x1="610" y1="160" x2="822" y2="160" class="ln-m"/>
+      <text x="614" y="182" class="mono s11 m">Remove-Item … 見えない</text>
+      <text x="614" y="202" class="mono s11 m">Stop-Service … 見えない</text>
+      <text x="614" y="234" class="s11 b t-store">決めた操作しかできない</text>
+    </svg>
+  </div>
+  <figcaption>図2 素のリモート処理と JEA の違い。JEA では、メニューにない操作はそもそも見えません。</figcaption>
+</figure>
+
+<h3>3.2 JEA の部品(役所の窓口にたとえると)</h3>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 300" role="img" aria-label="JEA の部品の流れ。接続する人(接続許可グループに入っている)が、エンドポイント(窓口)に接続する。窓口はロール(手続きの一覧)に従って関数を見せる。関数の中身(モジュール)は仮想アカウント(代わりに作業する職員)の権限で、PMS のツールやファイルに作用する。">
+      <defs>
+        <marker id="b32-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <rect x="10" y="40" width="140" height="96" rx="6" class="n-human"/>
+      <text x="80" y="66" text-anchor="middle" class="b s13">接続する人</text>
+      <text x="80" y="86" text-anchor="middle" class="s105">接続許可グループ</text>
+      <text x="80" y="102" text-anchor="middle" class="mono s105">PmsRemoteRead</text>
+      <text x="80" y="118" text-anchor="middle" class="mono s105">PmsRemoteChange</text>
+      <line x1="150" y1="88" x2="186" y2="88" class="ln" marker-end="url(#b32-a)"/>
+
+      <rect x="188" y="20" width="430" height="150" rx="8" class="n-ai"/>
+      <text x="204" y="44" class="b s13">エンドポイント <tspan class="mono">PmsRemote</tspan>(.pssc)</text>
+      <rect x="204" y="58" width="190" height="98" rx="6" class="n-plain"/>
+      <text x="299" y="80" text-anchor="middle" class="b">ロール ServerRead(.psrc)</text>
+      <text x="299" y="100" text-anchor="middle" class="mono s105">Invoke-PmsLogCollect</text>
+      <text x="299" y="116" text-anchor="middle" class="mono s105">Get-PmsRemoteInfo</text>
+      <text x="299" y="132" text-anchor="middle" class="mono s105">Read-PmsRemoteArtifact …</text>
+      <rect x="412" y="58" width="190" height="98" rx="6" class="n-plain"/>
+      <text x="507" y="80" text-anchor="middle" class="b">ロール ServerChange(.psrc)</text>
+      <text x="507" y="100" text-anchor="middle" class="mono s105">(時刻合わせなど 将来)</text>
+      <text x="507" y="116" text-anchor="middle" class="mono s105">Get-PmsRemoteInfo …</text>
+      <line x1="618" y1="88" x2="654" y2="88" class="ln" marker-end="url(#b32-a)"/>
+
+      <rect x="656" y="20" width="194" height="70" rx="6" class="n-tool"/>
+      <text x="753" y="46" text-anchor="middle" class="b">モジュール PmsRemote</text>
+      <text x="753" y="66" text-anchor="middle" class="s105 m">関数の中身(制限なしで動く)</text>
+      <rect x="656" y="100" width="194" height="70" rx="6" class="n-tool"/>
+      <text x="753" y="126" text-anchor="middle" class="b">仮想アカウント</text>
+      <text x="753" y="146" text-anchor="middle" class="s105 m">接続ごとに作られる管理者</text>
+
+      <!-- analogy row -->
+      <text x="80" y="212" text-anchor="middle" class="s11 t-human b">申請に来た人</text>
+      <text x="80" y="230" text-anchor="middle" class="s105 m">会員証(グループ)で</text>
+      <text x="80" y="246" text-anchor="middle" class="s105 m">受付を許される</text>
+      <text x="403" y="212" text-anchor="middle" class="s11 t-human b">窓口と、受け付ける手続きの一覧</text>
+      <text x="403" y="230" text-anchor="middle" class="s105 m">一覧にない手続きは頼めない。</text>
+      <text x="403" y="246" text-anchor="middle" class="s105 m">申請書に書ける欄(引数)も決まっている</text>
+      <text x="753" y="212" text-anchor="middle" class="s11 t-human b">奥で作業する職員と作業手順</text>
+      <text x="753" y="230" text-anchor="middle" class="s105 m">申請者の代わりに、</text>
+      <text x="753" y="246" text-anchor="middle" class="s105 m">権限を持って作業する</text>
+      <line x1="10" y1="190" x2="850" y2="190" class="ln-m"/>
+      <text x="10" y="282" class="s105 m">たとえ: 申請者は職員の部屋に入れず、窓口で決まった申請書を出すことしかできない。</text>
+    </svg>
+  </div>
+  <figcaption>図3 JEA の部品。下の段は「役所の窓口」にたとえた場合の対応です。</figcaption>
+</figure>
+<div class="tbl"><table>
+<thead><tr><th>部品</th><th>ファイル</th><th>役割</th></tr></thead>
+<tbody>
+<tr><td>エンドポイント(セッション構成)</td><td><code>.pssc</code></td><td>窓口そのもの。名前(<code>PmsRemote</code>)、誰がどのロールを使えるか、どのアカウントで実行するか、操作記録を残す場所を決める。接続するときは名前で指定する(<code>-ConfigurationName PmsRemote</code>)</td></tr>
+<tr><td>ロール(ロール機能)</td><td><code>.psrc</code></td><td>手続きの一覧。見せる関数の名前を列挙する。この方針では、マシンごとに「読み取り(Read)」と「変更(Change)」の2つに分ける</td></tr>
+<tr><td>モジュール</td><td><code>.psm1</code> など</td><td>関数の中身。この方針では全マシン共通の <code>PmsRemote</code></td></tr>
+<tr><td>仮想アカウント</td><td>—</td><td>接続のたびに自動で作られる一時的なアカウント。関数はこのアカウントの権限(管理者など)で動く。接続した人に管理者の資格情報を渡さずに済む</td></tr>
+<tr><td>接続許可グループ</td><td>—</td><td>そのマシンのローカルグループ。メンバーだけが窓口に接続でき、グループごとに使えるロールが決まる</td></tr>
+</tbody></table></div>
+<p>接続した人が使えるのは、窓口のメニューにある関数を「値をそのまま書いて」呼ぶことだけです(変数やスクリプトの構文は使えません)。CLI が関数を呼ぶときに値を文字列に埋め込んでいるのは、このためです。</p>
+</section>
+
+<section id="b4">
+<h2>4. なぜ「引数の設計」が防御の要なのか</h2>
+<p>JEA の関数の<b>中身</b>は、制限なしに管理者の権限で動きます。そのため、関数が何を受け取るかで、できることが決まります。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 230" role="img" aria-label="悪い例: Get-PmsFile -Path に任意のパスを渡せると、管理者の権限で動くので、どんなファイルでも読めてしまう。良い例: Invoke-PmsLogCollect -From -To は時刻だけを受け取り、ツールのパスや出力先はサーバー側の設定で固定されているので、決まったログしか集められない。">
+      <defs>
+        <marker id="b4-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-stop"/></marker>
+        <marker id="b4-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+      </defs>
+      <text x="10" y="26" class="b s13 t-stop">悪い例</text>
+      <rect x="10" y="38" width="300" height="60" rx="6" class="n-stop"/>
+      <text x="26" y="62" class="mono s13 b">Get-PmsFile -Path &lt;任意&gt;</text>
+      <text x="26" y="84" class="s105 m">パスを受け取る関数</text>
+      <line x1="310" y1="68" x2="420" y2="68" class="ln-stop" marker-end="url(#b4-s)"/>
+      <rect x="422" y="38" width="428" height="60" rx="6" class="n-stop"/>
+      <text x="438" y="62" class="s13">管理者の権限で動くので、<tspan class="b">どのファイルでも読めてしまう</tspan></text>
+      <text x="438" y="84" class="mono s105 m">-Path C:\Windows\System32\config\SAM など</text>
+
+      <text x="10" y="134" class="b s13 t-store">良い例(この方針)</text>
+      <rect x="10" y="146" width="300" height="70" rx="6" class="n-store"/>
+      <text x="26" y="170" class="mono s13 b">Invoke-PmsLogCollect</text>
+      <text x="26" y="190" class="mono s11">  -From 2026-10-03T13:50:00+09:00</text>
+      <text x="26" y="206" class="mono s11">  -To   2026-10-03T13:56:00+09:00</text>
+      <line x1="310" y1="181" x2="420" y2="181" class="ln-ai" marker-end="url(#b4-a)"/>
+      <rect x="422" y="146" width="428" height="70" rx="6" class="n-store"/>
+      <text x="438" y="170" class="s13">受け取るのは<tspan class="b">時刻だけ</tspan>。ツールのパス・出力先・マスクの</text>
+      <text x="438" y="188" class="s13">指定は、サーバー側の設定で固定されている</text>
+      <text x="438" y="206" class="s105 m">→ 決まったツールで、決まったログしか集められない</text>
+    </svg>
+  </div>
+  <figcaption>図4 引数の設計。パスやコマンドを受け取る関数を作ると、JEA の窓口に穴が開きます。</figcaption>
+</figure>
+<p>第1部の 3章(F-1・F-2)が「列挙値・時刻・件数・識別子だけを受け取り、パスやコマンドは受け取らない」と決めているのは、このためです。</p>
+</section>
+
+<section id="b5">
+<h2>5. この方針での全体像</h2>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 400" role="img" aria-label="全体像。AI 実行環境では、skill の入口とテストコードが CLI 本体 pms-remote.ps1 を呼ぶ。CLI はクライアント設定と資格情報を使って、各マシンの窓口 PmsRemote に WinRM で接続する。Hyper-V ホストには HyperVRead と HyperVChange、PMS サーバーVMには ServerRead と ServerChange、印刷クライアントには ClientChange(将来)のロールがある。PMS サーバーVMは Hyper-V ホスト上の VM だが、接続はネットワーク経由。">
+      <defs>
+        <marker id="b5-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+        <marker id="b5-k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <!-- AI env -->
+      <rect x="10" y="10" width="330" height="380" rx="8" class="n-plain"/>
+      <text x="26" y="36" class="b s14">AI 実行環境</text>
+      <rect x="26" y="52" width="140" height="56" rx="6" class="n-human"/>
+      <text x="96" y="76" text-anchor="middle" class="b">skill の入口</text>
+      <text x="96" y="94" text-anchor="middle" class="s105 m">AI が呼ぶ</text>
+      <rect x="184" y="52" width="140" height="56" rx="6" class="n-human"/>
+      <text x="254" y="76" text-anchor="middle" class="b">テストコード</text>
+      <text x="254" y="94" text-anchor="middle" class="s105 m">Playwright(Node)</text>
+      <line x1="96" y1="108" x2="150" y2="146" class="ln" marker-end="url(#b5-k)"/>
+      <line x1="254" y1="108" x2="200" y2="146" class="ln" marker-end="url(#b5-k)"/>
+      <rect x="26" y="148" width="298" height="72" rx="6" class="n-ai"/>
+      <text x="175" y="174" text-anchor="middle" class="b s13">CLI 本体 <tspan class="mono">pms-remote.ps1</tspan></text>
+      <text x="175" y="194" text-anchor="middle" class="s105 m">接続・版の確認・受け取り・出力の形式</text>
+      <text x="175" y="210" text-anchor="middle" class="s105 m">JEA を直接呼ぶのはここだけ</text>
+      <rect x="26" y="240" width="140" height="62" rx="6" class="n-bg"/>
+      <text x="96" y="264" text-anchor="middle" class="b s11">クライアント設定</text>
+      <text x="96" y="282" text-anchor="middle" class="mono s105">remote-targets.json</text>
+      <rect x="184" y="240" width="140" height="62" rx="6" class="n-bg"/>
+      <text x="254" y="264" text-anchor="middle" class="b s11">資格情報</text>
+      <text x="254" y="282" text-anchor="middle" class="s105 m">参照名で引く</text>
+      <line x1="96" y1="240" x2="96" y2="222" class="ln-m"/>
+      <line x1="254" y1="240" x2="254" y2="222" class="ln-m"/>
+      <text x="26" y="330" class="s105 m">マシンを名前で持つ:</text>
+      <text x="26" y="348" class="mono s105">hyperv-host / pms-vm / print-client-01</text>
+      <text x="26" y="372" class="s105 m">同じ PC なら host を localhost にするだけ</text>
+
+      <!-- arrows -->
+      <path d="M324 170 C 380 170, 380 70, 448 70" class="ln-ai" marker-end="url(#b5-a)"/>
+      <path d="M324 184 C 390 184, 400 200, 448 200" class="ln-ai" marker-end="url(#b5-a)"/>
+      <path d="M324 198 C 380 198, 380 330, 448 330" class="ln-ai" marker-end="url(#b5-a)"/>
+      <text x="392" y="150" text-anchor="middle" class="s105 t-ai b">WinRM</text>
+      <text x="392" y="164" text-anchor="middle" class="s105 t-ai">5985</text>
+
+      <!-- hyper-v host -->
+      <rect x="450" y="20" width="400" height="104" rx="8" class="n-plain"/>
+      <text x="466" y="44" class="b s13">Hyper-V ホスト <tspan class="mono s11 m">hyperv-host</tspan></text>
+      <text x="466" y="64" class="s105 m">窓口 PmsRemote</text>
+      <rect x="466" y="72" width="176" height="40" rx="5" class="n-store"/>
+      <text x="554" y="90" text-anchor="middle" class="b s11">HyperVRead</text>
+      <text x="554" y="104" text-anchor="middle" class="s105 m">VM の状態</text>
+      <rect x="658" y="72" width="176" height="40" rx="5" class="n-human"/>
+      <text x="746" y="90" text-anchor="middle" class="b s11">HyperVChange</text>
+      <text x="746" y="104" text-anchor="middle" class="s105 m">ゴールデンイメージ復元</text>
+
+      <!-- pms vm -->
+      <rect x="450" y="150" width="400" height="120" rx="8" class="n-plain"/>
+      <text x="466" y="174" class="b s13">PMS サーバーVM <tspan class="mono s11 m">pms-vm</tspan></text>
+      <text x="466" y="194" class="s105 m">窓口 PmsRemote(復元のたびに自動で配置)</text>
+      <rect x="466" y="204" width="176" height="52" rx="5" class="n-store"/>
+      <text x="554" y="224" text-anchor="middle" class="b s11">ServerRead</text>
+      <text x="554" y="242" text-anchor="middle" class="s105 m">ログ収集・ファイル参照</text>
+      <rect x="658" y="204" width="176" height="52" rx="5" class="n-human"/>
+      <text x="746" y="224" text-anchor="middle" class="b s11">ServerChange</text>
+      <text x="746" y="242" text-anchor="middle" class="s105 m">時刻合わせ・セットアップ</text>
+      <path d="M650 124 L650 150" class="ln-m"/>
+      <text x="642" y="141" text-anchor="end" class="s105 m">ホスト上の VM だが、接続はネットワーク経由</text>
+
+      <!-- print client -->
+      <rect x="450" y="296" width="400" height="94" rx="8" class="n-plain" stroke-dasharray="5 4"/>
+      <text x="466" y="320" class="b s13">印刷クライアントPC <tspan class="mono s11 m">print-client-01</tspan> <tspan class="s105 m">将来</tspan></text>
+      <text x="466" y="340" class="s105 m">窓口 PmsRemote</text>
+      <rect x="658" y="340" width="176" height="40" rx="5" class="n-human"/>
+      <text x="746" y="358" text-anchor="middle" class="b s11">ClientChange</text>
+      <text x="746" y="372" text-anchor="middle" class="s105 m">印刷指示</text>
+    </svg>
+  </div>
+  <figcaption>図5 全体像。窓口の名前はどのマシンでも <code>PmsRemote</code> で、マシンごとに見せるロールが違います。緑は読み取り(Read)、橙は変更(Change)です。</figcaption>
+</figure>
+<div class="cards">
+  <div class="card"><h4>モジュールは全マシン共通</h4><p>関数の中身は1つのパッケージ <code>PmsRemote</code> にまとめ、全マシンに同じ版を置きます。どの関数が見えるかは、そのマシンに登録したロールで決まります。版が1つなので、「どのマシンが古いか」をすぐ確かめられます。</p></div>
+  <div class="card"><h4>Read と Change を分ける</h4><p>状態を変えない操作(Read)と変える操作(Change)を別のロールにします。今は同じアカウントで両方使いますが、後で「この利用者には読み取りだけ」と絞りたくなったときに、グループの変更だけで済みます。</p></div>
+  <div class="card"><h4>呼ぶのは CLI 本体だけ</h4><p>skill もテストコードも、JEA を直接呼ばずに <code>pms-remote.ps1</code> を呼びます。接続の仕方・版の確認・出力の形式が1か所にまとまり、新しいコマンドを足しても使い方が揃います。</p></div>
+</div>
+</section>
+
+<section id="b6">
+<h2>6. 1回のログ収集の流れ</h2>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 470" role="img" aria-label="ログ収集の流れ。skill の入口が CLI に logs-collect を頼む。CLI は PMS サーバーVMの窓口で版を確かめ、Invoke-PmsLogCollect を時刻だけ渡して呼ぶ。窓口の関数は、設定で固定した引数とマスクでログ収集ツールを実行し、結果を zip の成果物にして成果物IDを返す。CLI は Read-PmsRemoteArtifact で 4MB ずつ受け取り、Remove-PmsRemoteArtifact で消す。CLI は展開してログIDを数え、ログIDと件数だけを JSON 1行で skill に返す。">
+      <defs>
+        <marker id="b6-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+        <marker id="b6-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-m"/></marker>
+      </defs>
+      <!-- heads -->
+      <rect x="20" y="10" width="160" height="44" rx="6" class="n-human"/>
+      <text x="100" y="37" text-anchor="middle" class="b">skill の入口</text>
+      <rect x="240" y="10" width="160" height="44" rx="6" class="n-ai"/>
+      <text x="320" y="37" text-anchor="middle" class="b">CLI 本体</text>
+      <rect x="460" y="10" width="180" height="44" rx="6" class="n-store"/>
+      <text x="550" y="30" text-anchor="middle" class="b">pms-vm の窓口</text>
+      <text x="550" y="46" text-anchor="middle" class="s105 m">ServerRead</text>
+      <rect x="700" y="10" width="150" height="44" rx="6" class="n-tool"/>
+      <text x="775" y="37" text-anchor="middle" class="b">ログ収集ツール</text>
+      <line x1="100" y1="54" x2="100" y2="460" class="life"/>
+      <line x1="320" y1="54" x2="320" y2="460" class="life"/>
+      <line x1="550" y1="54" x2="550" y2="460" class="life"/>
+      <line x1="775" y1="54" x2="775" y2="460" class="life"/>
+
+      <line x1="100" y1="84" x2="316" y2="84" class="ln-ai" marker-end="url(#b6-a)"/>
+      <text x="108" y="78" class="mono s105">logs-collect -From -To -OutDir</text>
+
+      <line x1="320" y1="118" x2="546" y2="118" class="ln-ai" marker-end="url(#b6-a)"/>
+      <text x="328" y="112" class="mono s105">Get-PmsRemoteInfo</text>
+      <text x="328" y="132" class="s105 m">版を確かめる(古ければ止まる)</text>
+
+      <line x1="320" y1="166" x2="546" y2="166" class="ln-ai" marker-end="url(#b6-a)"/>
+      <text x="328" y="160" class="mono s105">Invoke-PmsLogCollect -From -To</text>
+      <text x="328" y="180" class="s105 m">渡すのは時刻だけ</text>
+
+      <line x1="550" y1="206" x2="771" y2="206" class="ln-ai" marker-end="url(#b6-a)"/>
+      <text x="558" y="200" class="s105">設定で固定した引数・出力先・マスク</text>
+      <line x1="775" y1="236" x2="554" y2="236" class="ln-m" marker-end="url(#b6-m)"/>
+      <text x="768" y="230" text-anchor="end" class="s105 m">マスク済みのログ一式</text>
+      <text x="558" y="256" class="s105 m">zip にして成果物IDを付ける</text>
+
+      <line x1="550" y1="282" x2="324" y2="282" class="ln-m" marker-end="url(#b6-m)"/>
+      <text x="542" y="276" text-anchor="end" class="s105 m">成果物ID・サイズ・ファイル一覧</text>
+
+      <rect x="314" y="294" width="252" height="56" rx="4" class="n-dash"/>
+      <line x1="320" y1="314" x2="546" y2="314" class="ln-ai" marker-end="url(#b6-a)"/>
+      <text x="328" y="308" class="mono s105">Read-PmsRemoteArtifact -Id -Index</text>
+      <text x="328" y="338" class="s105 m">4MB ずつ、全部受け取るまで繰り返す</text>
+
+      <line x1="320" y1="376" x2="546" y2="376" class="ln-ai" marker-end="url(#b6-a)"/>
+      <text x="328" y="370" class="mono s105">Remove-PmsRemoteArtifact -Id</text>
+
+      <rect x="250" y="392" width="140" height="34" rx="4" class="n-ai"/>
+      <text x="320" y="413" text-anchor="middle" class="s105">展開・ログIDを数える</text>
+
+      <line x1="316" y1="446" x2="104" y2="446" class="ln-m" marker-end="url(#b6-m)"/>
+      <text x="310" y="440" text-anchor="end" class="s105 m">JSON 1行(ログIDと件数だけ)</text>
+    </svg>
+  </div>
+  <figcaption>図6 ログ収集の流れ。AI が受け取るのはログIDと件数の一覧だけで、ログの本文は作業フォルダに置かれ、問い合わせ先に所在だけが渡されます。</figcaption>
+</figure>
+<p>ログのファイル(数十MB)は、関数の戻り値に直接入れずに「成果物」として一度サーバーに置き、4MB ずつ取りに行きます。これは第1部の F-7 の決まりで、ファイル参照や証跡の取得など、ファイルを扱う今後のコマンドでも同じ仕組みを使います。</p>
+</section>
+
+<section id="b7">
+<h2>7. 復元のたびに窓口を配置する仕組み</h2>
+<p>PMS サーバーVMは、作業のたびにゴールデンイメージ(チェックポイント)へ戻されます。戻すと、VM の中に後から入れたものはすべて消えます。窓口(エンドポイントとモジュール)も同じです。</p>
+<p>窓口をゴールデンイメージに入れてしまう(焼き込む)方法もありますが、モジュールを直すたびにチェックポイントを取り直す手間がかかります。そこで<b>復元のたびに、自動で窓口を配置し直す</b>方式にしました。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 300" role="img" aria-label="上段は採用した方式。復元、VM 起動、WinRM の応答待ち、配置(版が同じなら省略)、起動確認(ログイン)、作業開始が自動で続く。下段は採らなかった方式。モジュールを更新するたびに、人が復元、導入、確認、チェックポイントの取り直しを行う必要がある。">
+      <defs>
+        <marker id="b7-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <text x="10" y="24" class="b s13 t-store">採用: 復元後に自動で配置する(毎回の復元に組み込み)</text>
+      <rect x="10" y="38" width="120" height="64" rx="6" class="n-ai"/>
+      <text x="70" y="64" text-anchor="middle" class="b">復元</text>
+      <text x="70" y="84" text-anchor="middle" class="s105 m">hyperv-host</text>
+      <line x1="130" y1="70" x2="152" y2="70" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="154" y="38" width="120" height="64" rx="6" class="n-ai"/>
+      <text x="214" y="64" text-anchor="middle" class="b">VM 起動</text>
+      <text x="214" y="84" text-anchor="middle" class="s105 m">窓口はまだない</text>
+      <line x1="274" y1="70" x2="296" y2="70" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="298" y="38" width="120" height="64" rx="6" class="n-ai"/>
+      <text x="358" y="64" text-anchor="middle" class="b">WinRM 待ち</text>
+      <text x="358" y="84" text-anchor="middle" class="s105 m">応答するまで</text>
+      <line x1="418" y1="70" x2="440" y2="70" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="442" y="38" width="136" height="64" rx="6" class="n-store"/>
+      <text x="510" y="60" text-anchor="middle" class="b">配置 deploy</text>
+      <text x="510" y="78" text-anchor="middle" class="s105 m">管理者で窓口を作る</text>
+      <text x="510" y="93" text-anchor="middle" class="s105 m">版が同じなら省略</text>
+      <line x1="578" y1="70" x2="600" y2="70" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="602" y="38" width="120" height="64" rx="6" class="n-ai"/>
+      <text x="662" y="64" text-anchor="middle" class="b">起動確認</text>
+      <text x="662" y="84" text-anchor="middle" class="s105 m">Web UI にログイン</text>
+      <line x1="722" y1="70" x2="744" y2="70" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="746" y="38" width="104" height="64" rx="6" class="n-plain"/>
+      <text x="798" y="74" text-anchor="middle" class="b">作業開始</text>
+      <text x="10" y="128" class="s11 m">ゴールデンイメージに入れておくのは、WinRM・ファイアウォール・管理者アカウントなど一度きりの前提だけ。モジュールを直しても次の復元で自動的に反映される。</text>
+
+      <line x1="10" y1="152" x2="850" y2="152" class="ln-m"/>
+
+      <text x="10" y="182" class="b s13 t-stop">採らなかった: ゴールデンイメージに焼き込む(モジュールを直すたびに人が行う)</text>
+      <rect x="10" y="196" width="150" height="56" rx="6" class="n-plain"/>
+      <text x="85" y="229" text-anchor="middle" class="b">モジュールを修正</text>
+      <line x1="160" y1="224" x2="182" y2="224" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="184" y="196" width="120" height="56" rx="6" class="n-stop"/>
+      <text x="244" y="229" text-anchor="middle" class="b">復元</text>
+      <line x1="304" y1="224" x2="326" y2="224" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="328" y="196" width="120" height="56" rx="6" class="n-stop"/>
+      <text x="388" y="229" text-anchor="middle" class="b">導入</text>
+      <line x1="448" y1="224" x2="470" y2="224" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="472" y="196" width="120" height="56" rx="6" class="n-stop"/>
+      <text x="532" y="229" text-anchor="middle" class="b">動作確認</text>
+      <line x1="592" y1="224" x2="614" y2="224" class="ln" marker-end="url(#b7-a)"/>
+      <rect x="616" y="196" width="234" height="56" rx="6" class="n-stop"/>
+      <text x="733" y="222" text-anchor="middle" class="b">チェックポイントの取り直し</text>
+      <text x="733" y="240" text-anchor="middle" class="s105 m">ほかの変更が混ざらないよう注意</text>
+      <text x="10" y="280" class="s11 m">版が安定したら、配置済みの状態で一度取り直すのは自由(上段の「配置」が省略になり、復元が数十秒速くなる)。</text>
+    </svg>
+  </div>
+  <figcaption>図7 窓口の配置のしかた。上段が採用した方式です。</figcaption>
+</figure>
+<p>配置には、そのマシンの<b>管理者</b>の資格情報を使います(JEA の窓口を作る作業そのものは、窓口の外で行うしかないため)。この資格情報は配置のときだけ使い、AI の skill からは使いません。第1部の 1.2 で「JEA はセキュリティの境界ではなく、AI の操作の枠」としているのは、この管理者の資格情報が存在するためです。</p>
+</section>
+
+<section id="b8">
+<h2>8. よくある質問</h2>
+<details class="qa"><summary>なぜ HTTPS ではなく HTTP なのですか?</summary>
+<p>HTTP でも、NTLM で接続すると通信の中身は暗号化されます。HTTPS にすると、マシンごとに証明書を作り、手元の PC に信頼させ、期限や名前を管理する手間が増えます。検証環境は隔離されたネットワークにあり、その手間に見合う利点が小さいため、HTTP を既定にしました。必要になれば設定で HTTPS に切り替えられます。</p></details>
+<details class="qa"><summary>PowerShell Direct を使わないのはなぜですか?</summary>
+<p>PowerShell Direct は、Hyper-V ホストからその上の VM にネットワークなしで入れる便利な機能ですが、Hyper-V 上の VM にしか使えません。PMS サーバーが物理マシンや別の仮想基盤に変わると使えなくなるため、どこでも使えるネットワーク経由のリモート処理に揃えました。</p></details>
+<details class="qa"><summary>ロールを Read と Change に分けると、実行する権限も分かれますか?</summary>
+<p>分かれません。関数を実行するアカウント(仮想アカウント)の権限は、窓口(エンドポイント)ごとに決まります。ロールで分かれるのは「誰がどの関数を呼べるか」です。今は同じアカウントで両方を使うので実質的な違いはありませんが、後で読み取りだけに絞りたくなったときに、グループの変更だけで済みます。</p></details>
+<details class="qa"><summary>AI 実行環境と Hyper-V ホストが同じ PC でも動きますか?</summary>
+<p>動きます。クライアント設定で接続先を <code>localhost</code> にするだけです。別々のマシンになっても、接続先の名前を変えるだけで済むように設計しています。</p></details>
+<details class="qa"><summary>新しいリモートコマンドを足したいときは?</summary>
+<p>第1部の 9章の手順に従います。関数の引数を「列挙値・時刻・件数・識別子」に絞ること、Read と Change を混ぜないこと、版を上げること、CLI 本体にサブコマンドを足すことがポイントです。</p></details>
+<details class="qa"><summary>印刷の指示もこの仕組みでできますか?</summary>
+<p>窓口の仕組み自体は使えますが、JEA の仮想アカウントは画面のない別のセッションで動くため、ユーザーごとのプリンターや GUI アプリからの印刷はそのままでは動かないことが多いです。その場合は、窓口の関数から「特定のユーザーで動くタスク」を起動する形にします。整備の前に実機で確かめます。</p></details>
+</section>
+
+<section id="b9">
+<h2>9. 用語集</h2>
+<dl class="gloss">
+<dt>PowerShell リモート処理</dt><dd>ネットワーク越しに別のマシンで PowerShell のコマンドを実行する仕組み。<code>Invoke-Command</code> などで使う</dd>
+<dt>WinRM</dt><dd>Windows Remote Management。リモート処理の要求を受け付ける Windows のサービス。HTTP 5985 / HTTPS 5986</dd>
+<dt>NTLM</dt><dd>ドメインに参加していない環境で使う認証方式。WinRM では通信の中身の暗号化にも使われる</dd>
+<dt>TrustedHosts</dt><dd>手元の PC の WinRM の設定。NTLM で接続してよい相手を登録する</dd>
+<dt>JEA</dt><dd>Just Enough Administration。決めた関数だけを呼べる窓口を作る Windows 標準の仕組み</dd>
+<dt>エンドポイント</dt><dd>JEA の窓口(セッション構成)。この方針では各マシンに1つ、名前は <code>PmsRemote</code></dd>
+<dt>ロール</dt><dd>窓口で見せる関数の一覧(.psrc)。この方針ではマシン × Read/Change</dd>
+<dt>仮想アカウント</dt><dd>接続のたびに自動で作られる一時的なアカウント。関数はこの権限で動く</dd>
+<dt>接続許可グループ</dt><dd>窓口に接続できる人を決めるローカルグループ(<code>PmsRemoteRead</code> / <code>PmsRemoteChange</code>)</dd>
+<dt>CLI 本体</dt><dd><code>tools/remote/pms-remote.ps1</code>。skill とテストコードが呼ぶ唯一の入口</dd>
+<dt>skill の入口</dt><dd>外部操作 skill に同梱する実行体。CLI 本体を決まったサブコマンドで呼ぶだけの薄いスクリプト</dd>
+<dt>配置(deploy)</dt><dd>共通インストーラで、マシンにモジュール・設定・窓口を作ること。PMS VM では復元のたびに自動で行う</dd>
+<dt>成果物</dt><dd>関数が作ったファイル(zip)。サーバーに一時的に置き、CLI が 4MB ずつ受け取って消す</dd>
+<dt>ゴールデンイメージ</dt><dd>PMS サーバーVMを戻す先のチェックポイント。テストのたびにこの状態へ戻す</dd>
+<dt>PowerShell Direct</dt><dd>Hyper-V ホストから VM にネットワークなしで入る機能。この方針では使わない</dd>
+</dl>
+</section>
+
+</div>
+</body>
+</html>

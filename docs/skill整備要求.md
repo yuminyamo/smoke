@@ -138,6 +138,18 @@ AIは skill を作成・改変しない(保護ブロック `EXT_SKILL_ONLY`)。�
 | LOG-6 | 出力の大きさに上限を設け、超えたら一覧の `truncated: true` で知らせる(集めること自体は続けてよい) |
 | LOG-7 | ログの解析(原因の推定)はしない。解析は SK-INQ の役割 |
 
+### 実現方式(2026-10-04 実装。proc-v015)
+
+リモートコマンドの整備方針(`docs/003_リモートコマンド整備方針.html`)に従う。
+
+| 項目 | 実装 |
+|---|---|
+| 経路 | PowerShell リモート処理 + JEA。PMS サーバーVMのエンドポイント `PmsRemote` のロール `ServerRead` の関数 `Invoke-PmsLogCollect -From -To` が、VM の中でツールを実行する。PowerShell Direct は使わない |
+| 呼び出し | skill `collect-server-logs` の実行体 → CLI 本体 `tools/remote/pms-remote.ps1 logs-collect` / `logs-ids`。テストコード・人間も同じ CLI を呼ぶ |
+| 固定するもの | ツールのパス・引数・VM 内の出力先・マスクの指定(空なら必ず失敗)・正常終了とみなす終了コード(既定 0)・上限時間(300 秒)・上限サイズ(200MB)を、リモート側の設定 `remote/targets/pms-vm/config.psd1` の `LogCollect` で固定する。クライアントが渡せるのは時間範囲(ISO 8601 時差付き)だけ |
+| 受け渡し | 集めた一式を zip の成果物にし、CLI が 4MB ずつ受け取って `-OutDir` に展開する(LOG-3)。ログIDの集計(LOG-5・LOG-6)は CLI 側で行い、ログの書式は `config/remote-targets.json` の `logCollect` に置く |
+| 配置 | PMS VM は復元のたびに CLI が窓口を配置し直す(ゴールデンイメージには一度きりの前提だけを入れる)。導入手順は `remote/README.md` |
+
 ### 範囲外
 
 - 任意のファイル・ディレクトリの参照(SK-FILE の範囲。それも定義済みの種別に限る)

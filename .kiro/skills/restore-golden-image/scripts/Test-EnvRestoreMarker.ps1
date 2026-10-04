@@ -59,23 +59,26 @@ if (-not (Test-Path -LiteralPath $StatusFile)) {
 }
 
 if (-not $MarkerLog) {
-    # config/golden-restore.json を上位へ探索して markerLog を得る
+    # リモートコマンドのクライアント設定 config/remote-targets.json を上位へ探索し、restore.markerLog を得る
     $dir = Split-Path -Parent (Resolve-Path -LiteralPath $StatusFile).Path
     $cfgFile = $null
     while ($dir) {
-        $c = Join-Path (Join-Path $dir 'config') 'golden-restore.json'
+        $c = Join-Path (Join-Path $dir 'config') 'remote-targets.json'
         if (Test-Path -LiteralPath $c) { $cfgFile = $c; break }
         $parent = Split-Path -Parent $dir
         if (-not $parent -or $parent -eq $dir) { break }
         $dir = $parent
     }
-    if ($env:PMS_RESTORE_CONFIG) { $cfgFile = $env:PMS_RESTORE_CONFIG }
+    if ($env:PMS_REMOTE_CONFIG) { $cfgFile = $env:PMS_REMOTE_CONFIG }
     $rel = 'work/_common/env-restore-log.jsonl'
     $root = $null
     if ($cfgFile) {
         $cfg = Get-Content -LiteralPath $cfgFile -Raw -Encoding UTF8 | ConvertFrom-Json
-        $p = $cfg.PSObject.Properties['markerLog']
-        if ($p -and $p.Value) { $rel = [string]$p.Value }
+        $r = $cfg.PSObject.Properties['restore']
+        if ($r -and $r.Value) {
+            $p = $r.Value.PSObject.Properties['markerLog']
+            if ($p -and $p.Value) { $rel = [string]$p.Value }
+        }
         $root = Split-Path -Parent (Split-Path -Parent $cfgFile)
     }
     if ([System.IO.Path]::IsPathRooted($rel)) { $MarkerLog = $rel }

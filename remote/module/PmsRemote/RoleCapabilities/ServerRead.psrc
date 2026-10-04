@@ -1,0 +1,8 @@
+﻿@{
+    GUID             = 'd3e9a4f6-2c8b-4e5a-8f43-8b1c5d7e9a23'
+    Description      = 'PmsRemote role ServerRead: PMS server, read (log collection)'
+    ModulesToImport  = 'PmsRemote'
+    # 共通の関数(全ロール)+ このロールの関数。Read と Change の関数を同じロールに入れない(docs/003 S-3)
+    VisibleFunctions = 'Get-PmsRemoteInfo', 'Read-PmsRemoteArtifact', 'Remove-PmsRemoteArtifact',
+                       'Invoke-PmsLogCollect', 'Get-PmsLogCollectInfo'
+}

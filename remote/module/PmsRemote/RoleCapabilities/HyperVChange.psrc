@@ -1,0 +1,8 @@
+﻿@{
+    GUID             = 'c2d8f3e5-1b7a-4d4f-9e32-7a0b4c6d8f12'
+    Description      = 'PmsRemote role HyperVChange: Hyper-V host, change (golden image restore)'
+    ModulesToImport  = 'PmsRemote'
+    # 共通の関数(全ロール)+ このロールの関数。Read と Change の関数を同じロールに入れない(docs/003 S-3)
+    VisibleFunctions = 'Get-PmsRemoteInfo', 'Read-PmsRemoteArtifact', 'Remove-PmsRemoteArtifact',
+                       'Restore-PmsGoldenImage'
+}

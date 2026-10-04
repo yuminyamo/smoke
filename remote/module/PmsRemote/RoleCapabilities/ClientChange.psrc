@@ -1,0 +1,7 @@
+﻿@{
+    GUID             = 'a6b2d7c9-5f1e-4b8d-9c76-1e4f8a0b2d56'
+    Description      = 'PmsRemote role ClientChange: print client, change (none yet)'
+    ModulesToImport  = 'PmsRemote'
+    # 共通の関数(全ロール)+ このロールの関数。Read と Change の関数を同じロールに入れない(docs/003 S-3)
+    VisibleFunctions = 'Get-PmsRemoteInfo', 'Read-PmsRemoteArtifact', 'Remove-PmsRemoteArtifact'
+}

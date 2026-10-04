@@ -1,7 +1,7 @@
 /**
  * 起動確認だけを実行する Playwright 設定(リポジトリのルートに置く)。
  *
- * 復元の実行体(skill restore-golden-image)が、config/golden-restore.json の readiness.command から呼ぶ。
+ * 復元(tools/remote/pms-remote.ps1 restore。skill restore-golden-image)が、config/remote-targets.json の restore.readiness.command から呼ぶ。
  * globalSetup / globalTeardown を持たない(復元の入れ子や、DB 全体の不変条件検査を起こさないため)。
  */
 import { defineConfig } from '@playwright/test';

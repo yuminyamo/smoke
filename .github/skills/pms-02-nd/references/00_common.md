@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-03 / 版: v18(ログ収集と時刻: ■健全性シグナルと問い合わせ に「ログの添付」を加え、作業15がログ収集 skill(外部操作 skill)で集めたログを問い合わせに添付し、ログIDを KB T12 に蓄積するようにした。■回帰実行の環境前提 の開始前シナリオに外部操作のエントリを加え、「時刻合わせ」を新設した。lint `health_recorded` にステップの時刻を加えた。前版 v17 は同日のテスト環境の定義)
+改訂: 2026-10-04 / 版: v19(リモートコマンドの整備: VM の復元とログ収集を、リモートコマンドの共通の仕組み(各マシンの JEA エンドポイント `PmsRemote` と CLI 本体 `tools/remote/pms-remote.ps1`)に移した。復元の設定を `config/remote-targets.json` に統合し、復元のあと PMS VM にリモートコマンドの窓口を配置し直すようにした。■外部操作 にリモートコマンドを使う skill の扱いを加えた。前版 v18 は 2026-10-03 のログ収集と時刻)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -209,6 +209,8 @@
 - **中断からの再開、許可待ち・起動確認待ちからの再開では復元しない。** 途中まで作ったデータと記録が食い違うため。開始時の restore_id(復元記録のID)を flow.md のメモ欄に残し、再開時はそれを使う
 - 作業10・20は、使った復元を status.yaml の `env_restore` に記録する(各作業のスロット8)。lint `env_restored` が復元記録と突き合わせて検査する。**AIは復元したかどうかを確かめ直さない**
 - globalSetup の復元は `PMS_RESTORE=1` を付けたときだけ行う。付けずに実行したとき(作業20の連続実行、個別のデバッグ実行)は復元しない
+- 復元の実行体(リモートコマンドの CLI 本体 `tools/remote/pms-remote.ps1` の `restore`)は、復元のあと PMS VM にリモートコマンドの窓口(JEA エンドポイント `PmsRemote`。ログ収集などに使う)を配置し直す。**窓口はゴールデンイメージに入れない。** PMS VM のゴールデンイメージに入れるのは、WinRM・ファイアウォール・配置用の管理者アカウント(パスワード無期限)などの一度きりの前提だけである(リモートコマンドの整備方針 `docs/003_リモートコマンド整備方針.html` 5章)
+- 配置に失敗しても復元は成功として扱い、復元の出力の `deploy` に記録する。その間、PMS VM のリモートコマンド(ログ収集など)は使えない。**AIは配置を自分で行わない**(CLI の `deploy` と配置用の資格情報を使わない)
 
 ### 起動完了の判定(Web UI へのログイン成功)
 
@@ -218,7 +220,7 @@
 
 - **起動確認テストは、ログイン fixture が使っているログインのシナリオ部品(`tests/flows/`)を呼び、その fixture の established check と同じ条件で成功を判定する。** ログイン操作を別に書かない(ログイン画面が変わったときの修正箇所を1か所にするため)
 - 保存済みのセッション(storageState)を使わない。試行ごとに Cookie のない新しいブラウザコンテキストでログインし直す
-- 成功するまで一定間隔で繰り返し、上限時間(`config/golden-restore.json` の `readiness.timeoutSec`)を超えたら失敗させる。失敗時は最後の試行のエラーとスクリーンショットを残す(ログインの部品が壊れたのか、サーバーが起動しないのかの切り分けのため)
+- 成功するまで一定間隔で繰り返し、上限時間(`config/remote-targets.json` の `restore.readiness.timeoutSec`)を超えたら失敗させる。失敗時は最後の試行のエラーとスクリーンショットを残す(ログインの部品が壊れたのか、サーバーが起動しないのかの切り分けのため)
 - 単独で実行するための設定 `playwright.readiness.config.ts` を持つ(globalSetup・globalTeardown を持たない)。回帰テストの設定では setup project `readiness` とし、全 project の依存にする
 - **起動確認テストを作るのは、ログイン状態の fixture を初めて整備したフローの作業10である**(`stages.md` §10 フェーズA)。以後の復元では起動確認が自動で行われる
 
@@ -434,6 +436,7 @@ waitUntil(condition, options)
 
 - 条件の確認は、**作業10(skill を使って操作を確立するとき)と作業20(コード生成の前)**で行う
 - 条件を満たさない skill は「使える skill がない」と同じに扱い、外部操作需要リストに不足の区分 `実行体なし` で記録する
+- **別のマシンで実行する外部操作(リモートコマンド)を使う skill の実行体は、CLI 本体 `tools/remote/pms-remote.ps1` を呼ぶ入口である**(例: `restore-golden-image`・`collect-server-logs`)。`tests/external/` のラッパも、同じ CLI を `tests/external/remote.ts` 経由で呼ぶ。AIは JEA・`Invoke-Command` を直接呼ばず、CLI の `deploy`・`cred-set` と配置用(管理者)の資格情報を使わない。リモートコマンドの整備(人間が行う)は、リモートコマンドの整備方針 `docs/003_リモートコマンド整備方針.html` に従う
 
 <!-- protected:PROHIBITED_OPS -->
 
@@ -890,14 +893,18 @@ tools/build-skills/                   # skills の生成スクリプト(正本 �
 tools/checks/prohibited-ops.mjs       # 禁止操作リストの記入状態・版の取得と、作業20の開始前の照合(lint prohibition_recheck)
 tools/pre-stage/run-scenarios.mjs     # 開始前シナリオの実行(作業10・20の工程0。■回帰実行の環境前提)
 tools/env/env.mjs                     # 検証環境の情報の読み書き(■検証環境の情報。require / get / set / list / envs / use)
+tools/remote/pms-remote.ps1           # リモートコマンドの CLI 本体(skill・テストコードはこれだけを呼ぶ。docs/003)
+remote/                               # リモートコマンドのリモート側の一式(モジュール PmsRemote・共通インストーラ・接続先ごとの設定の原本 targets/。導入手順は remote/README.md)
 tools/lint/lint.mjs                   # lint のランナー(実装済みの規則を1コマンドで実行する。規則の一覧は ■lint の表)
 tools/git-hooks/pre-commit            # コミットの前の lint(skills_in_sync)。git config core.hooksPath tools/git-hooks で有効にする
 .github/skills/pms-*/                 # 生成物(GitHub Copilot 用)。直接編集しない
 .kiro/skills/pms-*/                   # 生成物(Kiro 用)。直接編集しない
 .github/skills/restore-golden-image/  # 外部操作 skill(ゴールデンイメージ復元。人間が整備。生成の対象外)
 .kiro/skills/restore-golden-image/    # 同上(Kiro 用)
+.github/skills/collect-server-logs/   # 外部操作 skill(ログ収集。人間が整備。生成の対象外)
+.kiro/skills/collect-server-logs/     # 同上(Kiro 用)
 config/
-  golden-restore.json                 # 復元の設定(Hyper-V ホストへの接続・起動確認コマンド)
+  remote-targets.json                 # リモートコマンドのクライアント設定(接続先・資格情報の参照名・期待する版・復元・ログの書式)
   pre-stage-scenarios.json            # 開始前シナリオの設定(人間が書く。なければ実行しない。例: pre-stage-scenarios.sample.json)
   environments.json                   # 検証環境の情報(共有。git に入れる。tools/env/env.mjs が書く。例: environments.sample.json)
   environments.local.json             # 検証環境の情報(各自。秘密情報と各自の上書き。git に入れない)
@@ -952,6 +959,7 @@ work/
 tests/
   pages/ flows/ external/ helpers/ fixtures/ specs/<feature_code>/
   helpers/env.ts                      # 検証環境の情報を読む(envValue。tools/env/env.mjs を呼ぶ。付録F)
+  external/remote.ts                  # リモートコマンドの CLI を呼ぶヘルパー(テストコードは JEA を直接呼ばない)
   readiness/server-ready.setup.ts     # 起動確認テスト(ログイン fixture と同じ部品で Web UI にログインできるまで待つ)
   global-setup.ts                     # 回帰テストセットの実行前の復元(PMS_RESTORE=1 のときだけ)
 traceability/

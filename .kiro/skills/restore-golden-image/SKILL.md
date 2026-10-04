@@ -7,6 +7,7 @@ description: PMS検証環境(Hyper-V上のPMSサーバーVM)をゴールデン�
 
 PMS サーバーVMを、Hyper-V ホスト上のゴールデンイメージ(チェックポイント)へ戻す。
 対象のVM名・チェックポイント名はホスト側で固定されている。あなたが指定するものではない。
+実行体はリモートコマンドの CLI 本体(`tools/remote/pms-remote.ps1 restore`)を呼ぶだけの入口である。復元のあと、PMS VM にリモートコマンドの窓口(ログ収集などに使う)を配置し直すところまで CLI が行う。
 
 **サーバーの起動完了は「Web UI にログインできること」で判定する**(00 ■回帰実行の環境前提とテストデータ規約)。判定の中身はこの skill ではなく、テストコード側の起動確認テスト `tests/readiness/server-ready.setup.ts`(ログイン fixture と同じシナリオ部品を使う)が持つ。実行体は復元のあとにそれを呼ぶだけである。
 
@@ -27,7 +28,7 @@ PMS サーバーVMを、Hyper-V ホスト上のゴールデンイメージ(チ�
 
 ## 実行方法
 
-リポジトリのルートで実行する(設定 `config/golden-restore.json` を上位へ探索するため)。
+リポジトリのルートで実行する(CLI 本体 `tools/remote/pms-remote.ps1` と設定 `config/remote-targets.json` を上位へ探索するため)。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File <このskillのフォルダ>/scripts/restore-golden-image.ps1 -Purpose work10 -FlowId F-003
@@ -44,7 +45,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <このskillのフォルダ>
 
 1. **すぐに** flow.md のメモ欄へ1行残す。作業の再開時はここを見る
    `- env_restore(作業10): RST-20260926-114600-a1b2 / readiness: auto`
-2. 作業を始める
+2. 作業を始める。出力の `deploy` に `"status":"failed"` があっても作業は始めてよい(PMS VM のリモートコマンドが使えないだけで、復元と起動確認は済んでいる)。作業の報告書の環境の項に、その `error_code` を書き添える
 3. 作業の終わりに出力する `status.yaml` の最上位に次を書く
 
 ```yaml
@@ -69,7 +70,7 @@ env_restore:
 | 終了コード | 意味 | 対応 |
 |---|---|---|
 | 1 | 復元の失敗、または起動確認(ログイン)の失敗(`error_code` 参照。`READINESS_FAILED` は時間内にログインできなかった) | **1回だけ**再実行してよい。再度失敗したら作業を始めずに停止し、出力 JSON を添えて人間に報告する |
-| 2 | 設定・資格情報・実行環境の誤り | 再実行しない。停止して人間に報告する |
+| 2 | 設定・資格情報・実行環境の誤り(`VERSION_MISMATCH` は Hyper-V ホストの窓口が古い。`ENDPOINT_NOT_FOUND` は窓口がない) | 再実行しない。停止して人間に報告する |
 | 3 | 別の復元が実行中 | 再実行しない。停止して人間に報告する |
 
 `READINESS_FAILED` が続く場合、サーバーが起動しないのではなく、**ログイン画面が変わってログインの部品が壊れている**可能性もある。起動確認テストの出力とスクリーンショットを報告に添える。起動確認テストやログインの部品をこの場で直さない。
@@ -82,7 +83,8 @@ status.yaml の `env_restore` は lint `env_restored`(`scripts/Test-EnvRestoreMa
 
 ## 禁止事項
 
-- Hyper-V のコマンド(`Restore-VMSnapshot`・`Stop-VM`・`Get-VM` など)を**直接実行しない**。VMの操作はこの skill の実行体だけで行う(禁止操作リスト)
-- 実行体(`scripts/` 配下)や `config/golden-restore.json` を書き換えない
+- Hyper-V のコマンド(`Restore-VMSnapshot`・`Stop-VM`・`Get-VM` など)や `Invoke-Command`・JEA を**直接実行しない**。VMの操作はこの skill の実行体だけで行う(禁止操作リスト)
+- CLI の `deploy`・`cred-set`、配置用(管理者)の資格情報を使わない(配置は復元の中で CLI が行う)
+- 実行体(`scripts/` 配下)、`tools/remote/`、`remote/`、`config/remote-targets.json` を書き換えない
 - 資格情報を探したり、プロンプトや成果物に書き出したりしない
 - 失敗を回避するために別の手段(手動の電源操作、別チェックポイントの適用、自前のログイン確認など)を編み出さない

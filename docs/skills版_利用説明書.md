@@ -199,8 +199,8 @@ skills版/
    ```
    Mac・Linux では、フックに実行権限が要ります。最初に取り込むときに `chmod +x tools/git-hooks/pre-commit` と `git update-index --chmod=+x tools/git-hooks/pre-commit` を実行してからコミットしてください(Windows の Git では不要です)
 5. **旧配置の正本を片付ける。** これまでプロジェクト直下・`claude/` 配下にあった 00 / vocab / pipeline / stages / 90〜95 は、以後は正本として使いません。二重管理にならないよう、削除またはアーカイブします
-6. **ゴールデンイメージの自動復元を導入する。** 作業10・20の開始時と回帰テストの一括実行前に、検証環境を自動で戻す仕組みです(Hyper-V ホスト側の復元専用エンドポイント、外部操作 skill `restore-golden-image`、`config/golden-restore.json`、`tests/global-setup.ts`、`playwright.readiness.config.ts`)。手順は復元の一式に付属の README に従います。規約は 00 ■回帰実行の環境前提 にあります
-7. **(任意)開始前シナリオと問い合わせ skill を用意する。** 作業10・20の開始時に機器などを決まった状態に戻したいときは、そのシナリオが回帰テストになってから `config/pre-stage-scenarios.sample.json` を `config/pre-stage-scenarios.json` にコピーしてシナリオIDを書きます(なければ何もしません。`node tools/pre-stage/run-scenarios.mjs --list` で設定を確かめられます)。作業15が使う問い合わせ用のエージェントは、再現手順と解決してほしいことを渡してテキストで結果を返すコマンドを同梱した skill として置きます(00 ■健全性シグナルと問い合わせ。なければ作業15は記録だけを残します)。サーバーのログを問い合わせに添えたいときは、ログ収集 skill(製品のログ収集ツールで指定した時間範囲のログをマスクして集め、ログIDと件数の一覧を返すコマンドを同梱したもの)も置きます(なければログなしで問い合わせます。00 ■健全性シグナルと問い合わせ ログの添付)。検証環境の時刻を合わせる skill を置いたら、開始前シナリオの `hooks.work10` と `hooks.work20` の両方の先頭に、外部操作のエントリ(`op` と `run`)として加えます(00 ■回帰実行の環境前提 時刻合わせ。整備すべき skill の要求は `docs/skill整備要求.md`)
+6. **リモートコマンドとゴールデンイメージの自動復元を導入する。** 作業10・20の開始時と回帰テストの一括実行前に検証環境を自動で戻す仕組みと、ログ収集など別のマシンでコマンドを実行する仕組みです(各マシンの JEA エンドポイント `PmsRemote`、CLI 本体 `tools/remote/pms-remote.ps1`、外部操作 skill `restore-golden-image`・`collect-server-logs`、`config/remote-targets.json`、`tests/global-setup.ts`・`tests/external/remote.ts`、`playwright.readiness.config.ts`)。手順は `remote/README.md` に従います。PMS サーバーVM のゴールデンイメージには、WinRM や配置用の管理者アカウントなど一度きりの前提だけを入れます(窓口は復元のたびに自動で配置されます)。方針は `docs/003_リモートコマンド整備方針.html`、規約は 00 ■回帰実行の環境前提 と ■外部操作 にあります
+7. **(任意)開始前シナリオと問い合わせ skill を用意する。** 作業10・20の開始時に機器などを決まった状態に戻したいときは、そのシナリオが回帰テストになってから `config/pre-stage-scenarios.sample.json` を `config/pre-stage-scenarios.json` にコピーしてシナリオIDを書きます(なければ何もしません。`node tools/pre-stage/run-scenarios.mjs --list` で設定を確かめられます)。作業15が使う問い合わせ用のエージェントは、再現手順と解決してほしいことを渡してテキストで結果を返すコマンドを同梱した skill として置きます(00 ■健全性シグナルと問い合わせ。なければ作業15は記録だけを残します)。サーバーのログを問い合わせに添えたいときは、ログ収集 skill `collect-server-logs` を使えるようにします(6 のリモートコマンドの導入に含まれます。製品のログ収集ツールの引数・マスクの指定は `remote/targets/pms-vm/config.psd1`、ログIDの書式は `config/remote-targets.json` の `logCollect` に書きます。使えなければログなしで問い合わせます。00 ■健全性シグナルと問い合わせ ログの添付)。検証環境の時刻を合わせる skill を置いたら、開始前シナリオの `hooks.work10` と `hooks.work20` の両方の先頭に、外部操作のエントリ(`op` と `run`)として加えます(00 ■回帰実行の環境前提 時刻合わせ。整備すべき skill の要求は `docs/skill整備要求.md`)
 8. **禁止操作リストを必要に応じて記入する。** `work/_common/prohibited-operations.md` の「禁止操作表」に記入します。**未記入のままでも使えます**(禁止操作なしとして扱い、包括原則だけが働きます)。記入状態は次で確かめられます
    ```
    node tools/checks/prohibited-ops.mjs
@@ -220,7 +220,8 @@ skills版/
    - 入口: `/pms-regression いまどうなってる?` で、フローがないことを答えるか
    - 読み込み: 作業 skill が `references/00_common.md` と `vocab.yaml` を実際に読んでいるか(AIの読み込みの表示で確かめる)
    - 自動起動: Copilot で `pms-40-improve` が自動で使われないか
-   - 復元: `restore-golden-image` の実行体を `-InfoOnly` で動かし、Hyper-V ホストにつながるか
+   - 復元: `restore-golden-image` の実行体を `-InfoOnly` で動かし、Hyper-V ホストにつながるか(`tools/remote/pms-remote.ps1 info -Target hyperv-host` でも確かめられます)
+   - ログ収集: `collect-server-logs` の実行体を `-InfoOnly` で動かし、PMS サーバーVM の窓口・ツール・マスクの指定が揃っているか
    - lint: `node tools/lint/lint.mjs` が動き、`skills_in_sync` が OK になるか(フローがまだなければ、他の規則は検査する成果物がないので OK になります)
    - 環境情報: `node tools/env/env.mjs check` が `"ok":true` になるか。登録した場合は `require` が `"state":"complete"` になるか。`git check-ignore config/environments.local.json` で各自の設定が git の無視の対象になっているか
    - フック: skills のファイルに1文字足してコミットしようとすると止められるか(確かめたら元に戻す)
@@ -329,7 +330,7 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 - lint は37規則のうち15規則を実装済みです(`node tools/lint/lint.mjs --list`)。`requires_covered`(セットアップの抜け)・`blocked_recorded`(blocked の記録の抜け)・`health_recorded`(健全性シグナルの記録)・`env_value_leak`(秘密情報の書き込み)・`env_value_hardcoded`(接続先の直書き)・`status_yaml_valid`・`procedure_version_present`・`operation_registered`・`ext_demand_linked`・`verdict_enum`・`reason_code_enum`・`no_temp_locator` と、既存の `skills_in_sync`・`env_restored`・`prohibition_recheck` です。作業20の突合・生成コードの静的検査・保護ブロックの検査(`protected_unchanged`)などは未実装です
 - pre-commit フックが検査するのは作業ツリーの内容です。正本を直して再生成したら、再生成した skills も同じコミットに含めてください。また、フックは各自が有効にする必要があります(8. の4)
 - lint は、成果物の YAML を簡易的なパーサで読みます。アンカー・エイリアス・タグは使えません。読めないファイルは「成果物の読み取り」の ERROR として出ます
-- 検証環境の情報の秘密情報(パスワードなど)は、各自のパソコンの `config/environments.local.json` に**平文で**保存されます。ファイルの扱いに注意してください。また、AIはログインなどのためにその値を読みます(記録には書きません)。復元の設定 `config/golden-restore.json`(Hyper-V ホスト)は、検証環境の情報とは別のファイルのままです
+- 検証環境の情報の秘密情報(パスワードなど)は、各自のパソコンの `config/environments.local.json` に**平文で**保存されます。ファイルの扱いに注意してください。また、AIはログインなどのためにその値を読みます(記録には書きません)。リモートコマンドのクライアント設定 `config/remote-targets.json`(Hyper-V ホスト・PMS VM の接続先)は、検証環境の情報とは別のファイルです。こちらは資格情報を参照名で持ち、値は各自のパソコンに DPAPI で暗号化して保存します(`pms-remote.ps1 cred-set`)
 - proc-v009 以前の版で始めたフローは、status.yaml に `environment` がなくても lint は求めません。そのフローは旧版のとおり完了させてください
 - proc-v004 より前の版で始めたフローは、禁止操作リストの照合ができません(照合スクリプトが「照合できない」を返します。lint のランナーはそのフローの照合を省きます)。そのフローは旧版のとおり完了させてください
 

@@ -431,7 +431,7 @@ footer{padding-top:30px;font-size:13px;color:var(--muted)}
       <ul>
         <li><b>依頼文</b>: 対象領域(1〜2機能)と、シナリオを何から作るかの手がかり。flow.md に原文のまま転記されます</li>
         <li><b>文献</b>: 利用者マニュアル・仕様書・既存のテストスクリプト(所在を依頼文に書くか、KB の文書ポインタ T11 に登録)</li>
-        <li><b>検証環境</b>: Hyper-V 上の PMS サーバ VM とそのゴールデンイメージ(<code>config/golden-restore.json</code>)</li>
+        <li><b>検証環境</b>: Hyper-V 上の PMS サーバ VM とそのゴールデンイメージ(<code>config/remote-targets.json</code>。復元とログ収集はリモートコマンドの仕組みで行う: <code>docs/003_リモートコマンド整備方針.html</code>)</li>
         <li><b>環境情報</b>: PMS の URL・アカウント・DB・複合機の IP など。共有分は <code>config/environments.json</code>、パスワードは各自の <code>environments.local.json</code>。足りなければAIがまとめて聞き、保存して次から聞きません</li>
         <li><b>禁止操作リスト</b>: <code>work/_common/prohibited-operations.md</code>。AIが実行してはならない操作。未記入でも始められます(包括原則だけが働く)</li>
         <li><b>外部操作 skill</b>(印刷指示・機器操作など)と<b>問い合わせ skill</b>: 人が段階的に整備。なければAIは記録だけ残して先へ進みます。作り方は<a class="more" href="#extop-detail">→ 補足</a></li>
@@ -1409,7 +1409,7 @@ export const test = base.extend&lt;{ userLogin: void }&gt;({
   <!-- ---------------------------------------------------- -->
   <div class="subsec" id="run-commands">
     <h3>回帰テストを直接実行するコマンド</h3>
-    <p>生成された回帰テストは通常の Playwright テストなので、AIを使わずに <code>npx playwright test</code> で実行できます。以下は、<code>golden-restore/README.md</code> の例に沿った <code>playwright.config.ts</code>(project <code>readiness</code>・<code>default</code>・<code>serial-&lt;対象&gt;</code>、globalSetup・globalTeardown)と、下のタグの決まりを前提にした例です。リポジトリのルートで実行します。機能コード <code>PRT</code>・ファイル名は例なので、実際の名前に置き換えてください。</p>
+    <p>生成された回帰テストは通常の Playwright テストなので、AIを使わずに <code>npx playwright test</code> で実行できます。以下は、<code>remote/README.md</code> の例に沿った <code>playwright.config.ts</code>(project <code>readiness</code>・<code>default</code>・<code>serial-&lt;対象&gt;</code>、globalSetup・globalTeardown)と、下のタグの決まりを前提にした例です。リポジトリのルートで実行します。機能コード <code>PRT</code>・ファイル名は例なので、実際の名前に置き換えてください。</p>
     <div class="tbl">
       <table>
         <thead><tr><th>タグ</th><th>付くテスト</th><th>例</th></tr></thead>

@@ -1,0 +1,53 @@
+{
+  "_comment": "リモートコマンドのクライアント設定(docs/003_リモートコマンド整備方針.html 4.1)。接続先を名前で持つ。CLI tools/remote/pms-remote.ps1 がリポジトリのルートから上位へ探索して読む(PMS_REMOTE_CONFIG で上書き可)。資格情報は値を書かず参照名で持つ(pms-remote.ps1 cred-set <参照名> で保存)。credential が null の接続先はログオン中のユーザーで接続する。",
+
+  "expectedVersion": "1.0",
+
+  "targets": {
+    "hyperv-host": {
+      "_comment": "Hyper-V ホスト。AI 実行環境と同じ PC の間は localhost のまま。別のマシンにしたら host を変え、TrustedHosts に登録し、credential / deployCredential の参照名を書いて cred-set する",
+      "host": "localhost",
+      "endpoint": "PmsRemote",
+      "transport": "http",
+      "port": 5985,
+      "credential": null,
+      "deployCredential": null,
+      "roles": ["HyperVRead", "HyperVChange"]
+    },
+    "pms-vm": {
+      "_comment": "PMS サーバーVM。restoredBy により、hyperv-host の復元のたびに窓口を自動で配置する(docs/003 5.3)。PMS VM の準備(remote/README.md 3.1)が整うまでは、復元のたびに WinRM の応答を restore.winrmTimeoutSec 秒待ってから配置の警告が出る(復元は成功する)",
+      "host": "pms-test-01",
+      "endpoint": "PmsRemote",
+      "transport": "http",
+      "port": 5985,
+      "credential": "pms-vm",
+      "deployCredential": "pms-vm-admin",
+      "roles": ["ServerRead", "ServerChange"],
+      "restoredBy": "hyperv-host"
+    }
+  },
+
+  "restore": {
+    "_comment": "ゴールデンイメージの復元(pms-remote.ps1 restore / skill restore-golden-image)。起動完了の判定 = Web UI にログインできること。判定の中身はテストコード側の起動確認テストが持つ。requiredPath がまだない間(ログイン fixture 未整備)は終了コード 4 を返し、人間がログインを確かめる",
+    "target": "hyperv-host",
+    "winrmTimeoutSec": 30,
+    "readiness": {
+      "command": ["npx", "playwright", "test", "-c", "playwright.readiness.config.ts"],
+      "requiredPath": "tests/readiness/server-ready.setup.ts",
+      "timeoutSec": 900
+    },
+    "markerLog": "work/_common/env-restore-log.jsonl"
+  },
+
+  "logCollect": {
+    "_comment": "ログ収集(pms-remote.ps1 logs-collect / skill collect-server-logs)。ツールのパス・引数・マスクの指定はリモート側の設定(remote/targets/pms-vm/config.psd1)で固定し、ここには置かない。ここにはログIDの一覧を作るための、ログの書式だけを置く",
+    "target": "pms-vm",
+    "logIdPattern": "\\b(?<id>PMS-[A-Z]-\\d{4})\\b",
+    "levelPattern": "\\b(?<level>FATAL|ERROR|WARN|INFO|DEBUG|TRACE)\\b",
+    "entryPattern": "",
+    "scanInclude": ["*.log", "*.txt"],
+    "encoding": "utf-8",
+    "maxLogIds": 200,
+    "maxFiles": 200
+  }
+}

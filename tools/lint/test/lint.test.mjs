@@ -811,3 +811,49 @@ test('health_recorded: proc-v014 以降のフローは、健全性シグナル�
   // proc-v007 のフローでは求めない
   assert.deepEqual(findings(lint(healthRepo({ fix: false, st15: false }), '--flow', 'F-001', '--stage', '10'), 'health_recorded'), []);
 });
+
+test('setup_steps_recorded: proc-v016 以降のフローは、built-by-ui のセットアップに steps と各操作の対象を求める(それより前の版では求めない)', () => {
+  const ver = (v, setupLog) => {
+    const root = makeRepo(setupLog ? { 'work/PRT/exploration/setup-log.yaml': setupLog } : {});
+    const p = path.join(root, 'work/PRT/exploration/status.yaml');
+    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('procedure_version: proc-v005', `procedure_version: ${v}`));
+    return root;
+  };
+  // 基準の setup-log: S-ADMIN-LOGIN と S-DEVICE-REGISTERED に steps がない
+  const missing = findings(lint(ver('proc-v016'), '--flow', 'F-001', '--stage', '10'), 'setup_steps_recorded');
+  assertHas(missing, /S-ADMIN-LOGIN \/ F-001\): steps がありません/);
+  assertHas(missing, /S-DEVICE-REGISTERED \/ F-001\): steps がありません/);
+  assert.ok(!missing.some((m) => /S-USER-LOGIN/.test(m)), missing.join('\n'));
+
+  // 操作の対象の欠落(locator・detail・operation_id・action)。provided と blocked は steps がなくても求めない
+  const targets = findings(lint(ver('proc-v016', `feature_code: PRT
+flow_id: F-001
+setups:
+  - state_id: S-USER-LOGIN
+    classification: built-by-ui
+    fixture: fixtures/auth.ts#userLogin
+    steps:
+      - action: goto
+      - action: fill
+        locator: getByLabel('ユーザーID')
+      - action: click
+      - action: external
+      - locator: getByRole('button', { name: 'ログイン' })
+    established_check: ログアウトのリンクが表示される
+  - state_id: S-ADMIN-LOGIN
+    classification: provided
+    fixture: fixtures/auth.ts#adminLogin
+    established_check: 管理メニューが表示される
+  - state_id: S-DEVICE-REGISTERED
+    classification: blocked
+    notes: 操作手段なし
+`), '--flow', 'F-001', '--stage', '10'), 'setup_steps_recorded');
+  assertHas(targets, /steps\[0\]\(action: goto\)に detail がありません/);
+  assertHas(targets, /steps\[2\]\(action: click\)に locator がありません/);
+  assertHas(targets, /steps\[3\]\(action: external\)に operation_id がありません/);
+  assertHas(targets, /steps\[4\] に action がありません/);
+  assert.equal(targets.length, 4, targets.join('\n'));
+
+  // proc-v015 のフローでは求めない
+  assert.deepEqual(findings(lint(ver('proc-v015'), '--flow', 'F-001', '--stage', '10'), 'setup_steps_recorded'), []);
+});

@@ -36,7 +36,7 @@
 
 **検証環境の情報**(PMS の URL・DB の接続先・複合機の IP・アカウントとパスワードなど)は手順書ではなく設定ファイル(`config/environments.json` と、git に入れない `config/environments.local.json`)に持ち、`tools/env/env.mjs` で読み書きする(00 ■検証環境の情報。20章)。
 
-**手順書一式の版**は `vocab.meta.procedure_version`(例 `proc-v002`)で表し、git のタグと一致させる。作業40の改訂と、人間の直接改訂・明示的な指示による改訂のたびに上げる。2026-09-23 の改訂を `proc-v001`、**2026-09-24 の skills 化を `proc-v002`**、**2026-09-26 のゴールデンイメージ自動復元を `proc-v003`**、**同日の blocked の扱いと禁止操作リストの未記入への対応を `proc-v004`**、**同日の lint の実装を `proc-v005`**、**同日の lint の実行の契機を `proc-v006`**、**2026-09-28 の健全性の是正を `proc-v007`**、**同日の作業15の環境の変更と開始前シナリオを `proc-v008`**、**同日のゴールデンイメージの定義の拡張を `proc-v009`**、**同日の検証環境の情報と既存テストスクリプトの参照を `proc-v010`**、**2026-10-02 のシナリオ策定方式の分離を `proc-v011`**、**2026-10-03 のステップ1の状態の追加を `proc-v012`**、**同日のテスト環境の定義を `proc-v013`**、**同日のログ収集と時刻を `proc-v014`**、**2026-10-04 のリモートコマンドの整備を `proc-v015`** とする。
+**手順書一式の版**は `vocab.meta.procedure_version`(例 `proc-v002`)で表し、git のタグと一致させる。作業40の改訂と、人間の直接改訂・明示的な指示による改訂のたびに上げる。2026-09-23 の改訂を `proc-v001`、**2026-09-24 の skills 化を `proc-v002`**、**2026-09-26 のゴールデンイメージ自動復元を `proc-v003`**、**同日の blocked の扱いと禁止操作リストの未記入への対応を `proc-v004`**、**同日の lint の実装を `proc-v005`**、**同日の lint の実行の契機を `proc-v006`**、**2026-09-28 の健全性の是正を `proc-v007`**、**同日の作業15の環境の変更と開始前シナリオを `proc-v008`**、**同日のゴールデンイメージの定義の拡張を `proc-v009`**、**同日の検証環境の情報と既存テストスクリプトの参照を `proc-v010`**、**2026-10-02 のシナリオ策定方式の分離を `proc-v011`**、**2026-10-03 のステップ1の状態の追加を `proc-v012`**、**同日のテスト環境の定義を `proc-v013`**、**同日のログ収集と時刻を `proc-v014`**、**2026-10-04 のリモートコマンドの整備を `proc-v015`**、**2026-10-06 の setup-log の記録の強化を `proc-v016`** とする。
 
 ### AIへの渡し方(skills)
 
@@ -212,7 +212,7 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 | シナリオ粒度の基準例 | 実物を1本作り、few-shot例として `stages.md` 付録Cに埋め込む |
 | ポーリングのタイムアウト既定値 | `vocab.default` に仮置き。実測値で調整 |
 | モデル割り当て | `pipeline.dot` の `model_stylesheet` に `MODEL_OPERATE` / `MODEL_TEXT` / `MODEL_IMPROVE` のプレースホルダを置いてある。実運用のモデル名に置換する。`MODEL_IMPROVE`(作業40)は実行AIと同じモデルでよい(分離の本質はセッションを分けること) |
-| lint の実装 | `00_common.md` の lint 規則表が仕様(38規則)。**2026-09-26(proc-v005)の時点で12規則を実装済み、2026-09-28(proc-v010)の時点で15規則を実装済み**(健全性の `health_recorded`、検証環境の情報の `env_value_leak`・`env_value_hardcoded` を加えた)。**2026-10-03(proc-v012)に `requires_in_state_set` を加え、38規則のうち16規則を実装済み**。 ランナー `node tools/lint/lint.mjs` で1コマンドで実行でき、`skills_in_sync`(生成スクリプトの `--check`)・`env_restored`(`Test-EnvRestoreMarker.ps1`)・`prohibition_recheck`(照合スクリプト)もランナーから呼ぶ。実装状況は `--list` で確かめられ、00 の lint 表の「実装:」とランナーの実装が食い違うとランナーは実行しない。**次の候補**は、作業20の突合(`scenario_id_exists`・`scenario_id_unique`・`traceability_complete`)、`ext_demand_unique`、`vocab_sync`、生成コードの静的検査(`no_fixed_wait`・`select_only`・`ext_wrapper_only`)。**`protected_unchanged` と `imp_tier_valid` は、作業40の区分Aの自律適用を解禁する条件なので、自律適用を始めたい時点までに実装する**(`imp_tier_valid` は作業40を実際に回し始めてからでよい) |
+| lint の実装 | `00_common.md` の lint 規則表が仕様(38規則)。**2026-09-26(proc-v005)の時点で12規則を実装済み、2026-09-28(proc-v010)の時点で15規則を実装済み**(健全性の `health_recorded`、検証環境の情報の `env_value_leak`・`env_value_hardcoded` を加えた)。**2026-10-03(proc-v012)に `requires_in_state_set` を加え、38規則のうち16規則を実装済み**。**2026-10-06(proc-v016)に `setup_steps_recorded` を加え、39規則のうち17規則を実装済み**。 ランナー `node tools/lint/lint.mjs` で1コマンドで実行でき、`skills_in_sync`(生成スクリプトの `--check`)・`env_restored`(`Test-EnvRestoreMarker.ps1`)・`prohibition_recheck`(照合スクリプト)もランナーから呼ぶ。実装状況は `--list` で確かめられ、00 の lint 表の「実装:」とランナーの実装が食い違うとランナーは実行しない。**次の候補**は、作業20の突合(`scenario_id_exists`・`scenario_id_unique`・`traceability_complete`)、`ext_demand_unique`、`vocab_sync`、生成コードの静的検査(`no_fixed_wait`・`select_only`・`ext_wrapper_only`)。**`protected_unchanged` と `imp_tier_valid` は、作業40の区分Aの自律適用を解禁する条件なので、自律適用を始めたい時点までに実装する**(`imp_tier_valid` は作業40を実際に回し始めてからでよい) |
 | lint の実行の契機 | **2026-09-26(proc-v006)に決定した**(16章)。作業10・20が完了報告の前に自分で実行し、入口 skill が作業20の前とフロー完了の前に関所として実行し、コミットの前に pre-commit フックが `skills_in_sync` を実行する。**残る課題**: CI の導入時に全体の lint を加えること。pre-commit フックは各自が有効にする必要がある(`git config core.hooksPath tools/git-hooks`)ため、有効にしていないメンバーのコミットは検査されない |
 | 保護ブロックの基準ハッシュ | lint 実装時に `lint/protected-baseline.yaml` を作成する(本改訂時点の保護ブロックを基準とする) |
 | 作業40の起動判定 | lint `improvement_due` の実装までは人間の指示で起動する。初期値(3フローごと・同一箇所2件・1回あたり試行3件)は `vocab.default` に仮置き(合意済み) |
@@ -237,6 +237,32 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 ---
 
 # 改訂履歴
+
+## 26. 2026-10-06 改訂(setup-log の記録の強化)— 手順版 proc-v016
+
+**人間の指示による改訂である。** 別環境で作業10を GitHub Copilot + gpt6-luna に実施させたところ、作業10を最後まで実施したのに setup-log の安定ロケータの記録が抜けていた。作業20を実行したAIが抜けに気づき、作業10に差し戻したことで発覚した。手順書を確かめると、(1) フェーズAに setup-log へ記録する時機の定めがなく、パートCのあとにまとめて書けてしまう、(2) 付録Bに補足ルールがなく、`steps` と `locator` が必須だと読み取れない、(3) DoD は `established_check` しか求めていない、(4) lint は `steps` と `locator` の有無を見ていない(`no_temp_locator` は一時IDがあるかだけを見る)、という穴があり、抜けがどの原因で起きても作業10の関所を通ってしまう。発生環境での原因の調査は `investigations/001_setup-log記録抜け.md` で依頼中である。本改訂では、**原因によらず効く対策だけを先に入れ**、原因によって中身が変わるものは調査の結果を待つ。
+
+人間の決定(2026-10-06):
+
+> - 調査は終わっていないが、原因によらず手順の改善につながるものは先に導入する
+> - 提案した案(lint 規則・DoD・フェーズAの記録の時機・付録Bの補足ルール)で手順書を修正する
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 26.1 | **§10 フェーズAに、記録の時機を加えた。** 状態を1つ整備・確認したら、次の状態へ進む前に setup-log に記録する(パートCのあとにまとめて書かない)。`built-by-ui` は成功した最短の操作列を `steps` に書き、各操作の安定ロケータは「安定ロケータの解決」と同じ規約で操作の直後に解決して `locator` に書く。fixture・シナリオ部品のコードに書いたことを、記録の代わりにしない | stages §10 |
+| 26.2 | **付録Bに補足ルールを加えた。** `built-by-ui` のエントリには `steps` を必ず書く(作業20は setup-log を根拠に fixture を確かめ、作業30は操作列を転記するため)。各 step の操作の対象は、`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`。`locator` は付録Aと同じく安定ロケータ(またはページオブジェクト/部品のメソッド参照)のみ | stages 付録B |
+| 26.3 | **§10 の DoD に「`built-by-ui` の全エントリに `steps` があり、各 step に操作の対象がある」を加えた** | stages §10 |
+| 26.4 | **lint `setup_steps_recorded`(ERROR)を追加・実装した。** 26.2 の規則を検査する。proc-v016 以降のフローだけに当てる(作業10の status.yaml の `procedure_version` で判定する。それより前の版のフローの成果物は ERROR にしない)。`provided`・`blocked` のエントリは検査しない。テスト1件を追加(計34件)。実装済みは39規則のうち17規則 | 00 ■lint / tools/lint |
+| 26.5 | 手順版を `proc-v016` に更新。調査票の置き場 `investigations/` を新設した(1事象1ファイル。発生環境のAIが回答欄に記入して返す) | vocab / investigations |
+
+### 変更していないもの・調査を待つもの
+
+- **既存資産を流用した状態(`provided`)の setup-log の書き方**(steps を書き写すか、流用元を参照するか)は決めていない。lint も `provided` を検査しない。調査票の Q5 の結果で決める
+- **作業20の差し戻しの基準**(fixture があれば、setup-log の記録不足でもその fixture を使ってよいか)は変えていない。調査票の Q4・Q9 の結果で決める
+- **会話の文脈の要約(コンパクション)や、実行環境の継続確認(continue)への手当て**は入れていない。発生時、作業10の途中で継続確認が2回割り込み、continue の直後に途中の処理の履歴が見えなくなった(要約が起きたかは確かめていない)。調査票の Q11 で要約の有無と時刻を確かめてから決める。26.1 の記録の時機は、要約が原因だった場合にも効く
+- 保護ブロック・`pipeline.dot`・作業20の手順は変更していない
+- すでに作業場所で flow.md を持つフロー(proc-v015 以前で始めたもの)は、旧版のまま完了させる(1フローは1つの版で実行する。lint `procedure_version_present`)。発生環境で差し戻し中のフローも、完了してから本改訂を取り込む
+- 手順改善台帳(作業場所の `work/_common/procedure-improvement.md`)の改訂表への `指示適用` の記録は、本改訂を作業場所に取り込むときに行う
 
 ## 25. 2026-10-04 改訂(リモートコマンドの整備)— 手順版 proc-v015
 

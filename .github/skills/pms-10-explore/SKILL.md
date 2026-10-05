@@ -2,12 +2,12 @@
 name: pms-10-explore
 description: "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、playwright-cli で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。"
 metadata:
-  procedure_version: proc-v015
+  procedure_version: proc-v016
   generated_from: "procedure/stages.md §10"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v015 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v016 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業10 シナリオ生成と探索(手順版 proc-v015)
+# 作業10 シナリオ生成と探索(手順版 proc-v016)
 
 この skill は、手順書の正本の `stages.md` §10 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -43,7 +43,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v015` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v016` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -264,6 +264,7 @@ metadata:
 - 状態需要リストで `採用` の状態(fixture 未整備)は、基本の状態と同じ規約で実操作により整備する。行の「established check の案」と「構築の見込み」は仮説の材料であり、実画面で確かめる。整備・確認できたら行の状態を `整備済` にし、fixture の所在を書く。整備できなければ `採用` のままにし、setup-log に `classification: blocked` と理由を書く
 - **ログイン状態(`S-ADMIN-LOGIN` / `S-USER-LOGIN`)の fixture を本フローで初めて整備した場合は、起動確認テスト `tests/readiness/server-ready.setup.ts` も作る**(00 ■回帰実行の環境前提 / 起動完了の判定)。整備したログインのシナリオ部品を呼び、fixture の established check と同じ条件で成功を判定する。既にあれば作らない
 - `setup-log.yaml`(付録B)に記録する。**`blocked` のシナリオの `requires` も記録する**(整備できなかったものは `classification: blocked` と理由)
+- **状態を1つ整備・確認したら、次の状態へ進む前に setup-log に記録する**(パートCのあとにまとめて書かない。あとでまとめると、操作列とロケータが抜けやすい)。本フローで整備した状態(`built-by-ui`)は、成功した最短の操作列を `steps` に書き、各操作の安定ロケータは「安定ロケータの解決」と同じ規約で操作の直後に解決して `locator` に書く。**fixture・シナリオ部品のコードに書いたことを、setup-log の記録の代わりにしない**(付録B)
 
 **探索の進め方**
 
@@ -438,6 +439,7 @@ metadata:
 - [ ] `操作手段なし` で `blocked` にした全ステップが、需要IDと申し送りIDを参照している
 - [ ] 全シナリオに `carried_data` がある(データを作成していない場合は空で明示)
 - [ ] `setup-log` の全エントリに `established_check` がある(`classification: blocked` を除く)
+- [ ] `setup-log` の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)がある(lint `setup_steps_recorded`)
 - [ ] 状態需要リストで `採用` の状態を本フローで整備・確認できた場合、その行を `整備済` にし fixture の所在を書いた
 - [ ] INV の結果が全シナリオに記録されている(未実施の場合は理由を記載)
 - [ ] 期待結果・判定基準を1件も書き換えていない

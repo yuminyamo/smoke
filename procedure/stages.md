@@ -2,7 +2,7 @@
 
 本書は**各作業に固有な内容だけ**を持つ。原則・規約は `00_common.md`、統制語彙は `vocab.yaml`、実行順序と分岐は `pipeline.dot` を参照する。**それらの再掲を本書に書かない。**
 
-改訂: 2026-10-03 / 版: v14(ログ収集と時刻: §10 で各ステップの開始・終了時刻と健全性シグナルの観測時刻を記録するようにした(付録A)。§15 でログ収集 skill によるログの添付、ログIDの一覧による KB T12 の照会、回答のログIDの確認と KB T12 への記録を加えた。付録Eに T12 を加えた。前版 v13 は同日のステップ1の状態の追加)
+改訂: 2026-10-06 / 版: v15(setup-log の記録の強化: §10 フェーズAで、状態を1つ整備・確認するたびに setup-log に記録し、`built-by-ui` は `steps` と安定ロケータを書くようにした。DoD に lint `setup_steps_recorded` の項目を、付録Bに補足ルールを加えた。前版 v14 は 2026-10-03 のログ収集と時刻)
 
 ---
 
@@ -565,6 +565,7 @@ context_updates:
 - 状態需要リストで `採用` の状態(fixture 未整備)は、基本の状態と同じ規約で実操作により整備する。行の「established check の案」と「構築の見込み」は仮説の材料であり、実画面で確かめる。整備・確認できたら行の状態を `整備済` にし、fixture の所在を書く。整備できなければ `採用` のままにし、setup-log に `classification: blocked` と理由を書く
 - **ログイン状態(`S-ADMIN-LOGIN` / `S-USER-LOGIN`)の fixture を本フローで初めて整備した場合は、起動確認テスト `tests/readiness/server-ready.setup.ts` も作る**(00 ■回帰実行の環境前提 / 起動完了の判定)。整備したログインのシナリオ部品を呼び、fixture の established check と同じ条件で成功を判定する。既にあれば作らない
 - `setup-log.yaml`(付録B)に記録する。**`blocked` のシナリオの `requires` も記録する**(整備できなかったものは `classification: blocked` と理由)
+- **状態を1つ整備・確認したら、次の状態へ進む前に setup-log に記録する**(パートCのあとにまとめて書かない。あとでまとめると、操作列とロケータが抜けやすい)。本フローで整備した状態(`built-by-ui`)は、成功した最短の操作列を `steps` に書き、各操作の安定ロケータは「安定ロケータの解決」と同じ規約で操作の直後に解決して `locator` に書く。**fixture・シナリオ部品のコードに書いたことを、setup-log の記録の代わりにしない**(付録B)
 
 **探索の進め方**
 
@@ -739,6 +740,7 @@ context_updates:
 - [ ] `操作手段なし` で `blocked` にした全ステップが、需要IDと申し送りIDを参照している
 - [ ] 全シナリオに `carried_data` がある(データを作成していない場合は空で明示)
 - [ ] `setup-log` の全エントリに `established_check` がある(`classification: blocked` を除く)
+- [ ] `setup-log` の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)がある(lint `setup_steps_recorded`)
 - [ ] 状態需要リストで `採用` の状態を本フローで整備・確認できた場合、その行を `整備済` にし fixture の所在を書いた
 - [ ] INV の結果が全シナリオに記録されている(未実施の場合は理由を記載)
 - [ ] 期待結果・判定基準を1件も書き換えていない
@@ -1952,6 +1954,13 @@ setups:
       なし(ゴールデンイメージ復元で初期化)
     notes: ''
 ```
+
+補足ルール:
+
+- **`classification: built-by-ui` のエントリには `steps` を必ず書く**(成功した最短の操作列)。fixture(`fixture`)・シナリオ部品(`flow`)のコードに書いたことを、`steps` の代わりにしない。作業20は setup-log の記録を根拠に fixture を確かめ、作業30は操作列を setup-log から転記するためである
+- 各 step には操作の対象を書く。`goto` は `detail`(遷移先。環境情報は `<env:キー>`)、`external` は `operation_id`(KB T05 の操作ID)、それ以外の操作(`click`・`fill` など)は `locator` である(lint `setup_steps_recorded`)
+- `locator` は付録Aの `actions[].locator` と同じく、**安定ロケータ(またはページオブジェクト/部品のメソッド参照)のみ**。snapshot の一時IDを書かない(lint `no_temp_locator`)
+- 記録する時機は §10 フェーズAに従う(状態を1つ整備・確認したら、次の状態へ進む前に記録する)
 
 # 付録C: scenarios.md
 

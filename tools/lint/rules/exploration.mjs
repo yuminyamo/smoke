@@ -1,5 +1,5 @@
 // exploration.mjs — 探索記録・セットアップ記録の検査
-//   requires_covered / blocked_recorded / verdict_enum / no_temp_locator
+//   requires_covered / blocked_recorded / verdict_enum / no_temp_locator / setup_steps_recorded / health_recorded
 
 import fs from 'node:fs';
 
@@ -222,6 +222,39 @@ export function no_temp_locator(repo) {
   for (const s of repo.setupEntries) {
     if (!repo.inFlow(s.flow)) continue;
     check(`${s.file}(${s.e.state_id ?? 'state_id なし'} / ${s.flow ?? 'フロー不明'})`, s.e.state_id ?? 'セットアップ', s.e.steps);
+  }
+  return { findings };
+}
+
+// ════════════════════════════════════════════════════════
+// setup_steps_recorded
+// ════════════════════════════════════════════════════════
+// 本フローで整備したセットアップ(built-by-ui)の操作列と、各操作の対象(付録B 補足ルール)
+const SETUP_STEPS_SINCE = 16; // proc-v016 で追加
+// locator を持たない操作と、代わりに求めるキー。これ以外の操作は locator を求める
+const TARGET_KEY = { goto: 'detail', external: 'operation_id' };
+
+export function setup_steps_recorded(repo) {
+  const findings = [];
+  const add = (file, message) => findings.push({ file, message });
+  for (const s of repo.setupEntries) {
+    if (!repo.inFlow(s.flow) || s.e.classification !== 'built-by-ui') continue;
+    const st10 = repo.statusFiles.find((x) => x.rel === `work/${s.feature}/exploration/status.yaml` && x.flow === s.flow && x.data);
+    if (!st10) continue; // status_yaml_valid が扱う
+    const ver = verNum(st10.data.procedure_version);
+    if (ver !== null && ver < SETUP_STEPS_SINCE) continue;
+    const where = `${s.file}(${s.e.state_id ?? 'state_id なし'} / ${s.flow ?? 'フロー不明'})`;
+    const steps = Array.isArray(s.e.steps) ? s.e.steps.filter((x) => x && typeof x === 'object') : [];
+    if (steps.length === 0) {
+      add(where, 'steps がありません(本フローで整備した状態は、成功した最短の操作列を steps に書く。fixture・シナリオ部品のコードは記録の代わりにならない。付録B)');
+      continue;
+    }
+    steps.forEach((st, i) => {
+      const label = `steps[${i}]`;
+      if (blank(st.action)) { add(where, `${label} に action がありません`); return; }
+      const key = TARGET_KEY[String(st.action)] ?? 'locator';
+      if (blank(st[key])) add(where, `${label}(action: ${st.action})に ${key} がありません${key === 'locator' ? '(安定ロケータまたはページオブジェクト/部品のメソッド参照。付録B)' : '(付録B)'}`);
+    });
   }
   return { findings };
 }

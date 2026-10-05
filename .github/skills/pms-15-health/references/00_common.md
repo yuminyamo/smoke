@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-04 / 版: v19(リモートコマンドの整備: VM の復元とログ収集を、リモートコマンドの共通の仕組み(各マシンの JEA エンドポイント `PmsRemote` と CLI 本体 `tools/remote/pms-remote.ps1`)に移した。復元の設定を `config/remote-targets.json` に統合し、復元のあと PMS VM にリモートコマンドの窓口を配置し直すようにした。■外部操作 にリモートコマンドを使う skill の扱いを加えた。前版 v18 は 2026-10-03 のログ収集と時刻)
+改訂: 2026-10-06 / 版: v20(setup-log の記録の強化: ■lint に `setup_steps_recorded`(setup-log の `built-by-ui` のエントリの `steps` と各 step の操作の対象。proc-v016 以降のフロー)を加えた。前版 v19 は 2026-10-04 のリモートコマンドの整備)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -1091,6 +1091,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `env_value_hardcoded` | WARNING | テストコード(`tests/`)に、検証環境の情報の接続先(種類 `endpoint`)の値がそのまま書かれていない(`envValue` で読む)。実装: `tools/lint/lint.mjs` |
 | `requires_in_state_set` | ERROR | 作業10の対象シナリオ(探索記録のあるもの)の `requires` の全状態が初期状態セット(`vocab.initial_state_set` と、状態需要リストで状態が `採用` / `整備済` の行)にある。申し送り台帳の想定手段が参照する需要ID(`SD-...`)が状態需要リストにある。状態需要リストの需要IDが重複しない。実装: `tools/lint/lint.mjs` |
 | `requires_covered` | ERROR | 作業10: 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある。作業20: コード化した全シナリオの `requires` の全状態に、established check を持つ fixture がある(`S-CLEAN-ENV` は復元そのものなので除く)。実装: `tools/lint/lint.mjs` |
+| `setup_steps_recorded` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象がある(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)。proc-v016 以降のフロー(作業10の status.yaml の `procedure_version` で判定する)。実装: `tools/lint/lint.mjs` |
 | `blocked_recorded` | ERROR | `blocked` の全ステップに `blocked_by`(理由・参照・`resume_from`)があり、blocked のステップより前のステップが判定付きで記録されている。`禁止操作` の blocked は禁止IDまたは包括原則の番号を参照し、status.yaml の `blocked_by_prohibition` に含まれる。実装: `tools/lint/lint.mjs` |
 | `health_recorded` | ERROR | 探索記録(シナリオごとの最新の記録)で `health_signal` のあるステップ・シナリオの判定が `passed` でない。`health_fix` の付いた記録に `health_signal` がない。作業10の status.yaml の `health_signal`・`health_signal_items` が探索記録と一致する(proc-v007 以降のフロー)。作業15の status.yaml の `codeable_items` の各シナリオの最新の記録が `health_fix` 付きの `passed` である。proc-v014 以降のフローでは、`health_signal` のあるステップに `started_at` と `health_signal.observed_at`(`vocab.timestamp_format`)がある(作業15がログを集める時間範囲に使う)。実装: `tools/lint/lint.mjs` |
 | `db_only_has_reason` | WARNING | `verification: DB` に理由が併記されている |

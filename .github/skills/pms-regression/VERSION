@@ -1,3 +1,3 @@
-procedure_version: proc-v015
+procedure_version: proc-v016
 generated_from: procedure/router/SKILL.md
 generator: tools/build-skills/build-skills.mjs

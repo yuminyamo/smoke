@@ -109,7 +109,7 @@ pre.code .c{color:var(--muted)}
       <a href="#p1">1. 目的と位置づけ</a><a href="#p2">2. 構成</a><a href="#p3">3. 関数の原則</a><a href="#p4">4. 通信と資格情報</a><a href="#p5">5. 配置</a><a href="#p6">6. CLI と skill</a><a href="#p7">7. ファイル配置</a><a href="#p8">8. 機能一覧</a><a href="#p9">9. 追加の手順</a><a href="#p10">10. 既存の移行</a><a href="#p11">11. 採らなかった案</a>
     </div>
     <div class="row"><span class="lab">第2部 解説</span>
-      <a href="#b1">1. 何を解決するか</a><a href="#b2">2. PowerShell リモート処理</a><a href="#b3">3. JEA</a><a href="#b4">4. 引数が防御の要</a><a href="#b5">5. 全体像</a><a href="#b6">6. ログ収集の流れ</a><a href="#b7">7. 復元後の配置</a><a href="#b8">8. よくある質問</a><a href="#b9">9. 用語集</a>
+      <a href="#b1">1. 何を解決するか</a><a href="#b2">2. PowerShell リモート処理</a><a href="#b3">3. JEA</a><a href="#b4">4. 引数が防御の要</a><a href="#b5">5. 全体像</a><a href="#b6">6. ログ収集の流れ</a><a href="#b7">7. 復元後の配置</a><a href="#b8">8. 導入手順の地図</a><a href="#b9">9. アカウント</a><a href="#b10">10. エラーの見分け方</a><a href="#b11">11. よくある質問</a><a href="#b12">12. 用語集</a>
     </div>
   </nav>
 </header>
@@ -453,6 +453,11 @@ dl.gloss dt:last-of-type,dl.gloss dd:last-of-type{border-bottom:0}
 details.qa{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin:8px 0;max-width:52em}
 details.qa summary{cursor:pointer;font-weight:700;font-size:14px}
 details.qa p{font-size:13.5px;margin:8px 0 0}
+.tbl.cmd table{min-width:960px}
+.tbl.cmd td:nth-child(2){width:22%}
+.tbl.cmd td:nth-child(2) code{white-space:normal}
+.tbl.cmd td:nth-child(3){width:11%}
+.tbl.cmd td:nth-child(4){width:27%}
 </style>
 
 <div class="part human">
@@ -873,7 +878,343 @@ details.qa p{font-size:13.5px;margin:8px 0 0}
 </section>
 
 <section id="b8">
-<h2>8. よくある質問</h2>
+<h2>8. 導入手順の地図(README の各コマンドは何をしているか)</h2>
+<p><code>remote/README.md</code> の導入手順は、<b>3台のマシンのどこかで</b>、<b>何かを作るか確かめる</b>コマンドの並びです。どのコマンドも「どこで打つか」と「どこに効くか」が分かれば、今それを打つのが正しいか判断できます。下の図の丸数字は、README の「導入の流れ」の番号と同じです。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 640" role="img" aria-label="導入の流れを、コマンドを打つ場所ごとに3列に並べた図。左が AI 実行環境、中央が Hyper-V ホスト、右が PMS サーバーVM。1 TrustedHosts の登録、2 remote-targets.json の確認、3 hyperv-host の config.psd1 の確認は AI 実行環境で行う。4 Hyper-V ホストへの配置は、ホストで直接インストーラを実行するか、AI 実行環境から deploy するかのどちらか一方。5 一度きりの準備は PMS VM の中で行う。6 cred-set は AI 実行環境で、5 で作った PMS VM のアカウントの名前とパスワードを保存する。7 check-target は AI 実行環境から PMS VM の前提を確かめるだけ。8 チェックポイントの取り直しは Hyper-V ホストで行う。9 deploy で PMS VM に窓口を作る。10 info、logs-collect、restore で動作を確かめる。">
+      <defs>
+        <marker id="b8-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+        <marker id="b8-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-m"/></marker>
+      </defs>
+      <!-- lanes -->
+      <rect x="10" y="10" width="280" height="576" rx="8" class="n-bg"/>
+      <text x="26" y="32" class="b s13">AI 実行環境(手元の PC)</text>
+      <text x="26" y="49" class="s105 m">リポジトリのルートでコマンドを打つ</text>
+      <rect x="300" y="10" width="270" height="576" rx="8" class="n-bg"/>
+      <text x="316" y="32" class="b s13">Hyper-V ホスト</text>
+      <text x="316" y="49" class="s105 m">同じ PC なら左の列と同じ場所</text>
+      <rect x="580" y="10" width="270" height="576" rx="8" class="n-bg"/>
+      <text x="596" y="32" class="b s13">PMS サーバーVM</text>
+      <text x="596" y="49" class="s105 m">VM のコンソール(Hyper-V で接続)</text>
+
+      <!-- 1 -->
+      <rect x="20" y="62" width="260" height="42" rx="6" class="n-human"/>
+      <text x="32" y="79" class="b">① TrustedHosts に登録</text>
+      <text x="32" y="96" class="s105 m">PMS VM を「接続してよい相手」に加える</text>
+      <!-- 2 -->
+      <rect x="20" y="114" width="260" height="42" rx="6" class="n-plain"/>
+      <text x="32" y="131" class="b"><tspan class="mono s11">② remote-targets.json</tspan> を合わせる</text>
+      <text x="32" y="148" class="s105 m">接続先の名前(host)と資格情報の参照名</text>
+      <!-- 3 -->
+      <rect x="20" y="166" width="260" height="42" rx="6" class="n-plain"/>
+      <text x="32" y="183" class="b"><tspan class="mono s11">③ hyperv-host/config.psd1</tspan></text>
+      <text x="32" y="200" class="s105 m">復元する VM 名・チェックポイント名</text>
+      <!-- 4 -->
+      <rect x="20" y="218" width="260" height="42" rx="6" class="n-human"/>
+      <text x="32" y="235" class="b">④ <tspan class="mono s11">deploy -Target hyperv-host</tspan></text>
+      <text x="32" y="252" class="s105 m">AI 側から送り込む(右とどちらか一方)</text>
+      <line x1="280" y1="239" x2="308" y2="239" class="ln-ai" marker-end="url(#b8-a)"/>
+      <rect x="310" y="218" width="250" height="42" rx="6" class="n-human"/>
+      <text x="322" y="235" class="b">④ <tspan class="mono s11">Install-PmsRemote.ps1</tspan></text>
+      <text x="322" y="252" class="s105 m">ホストで直接実行。窓口 PmsRemote を作る</text>
+      <!-- 5 -->
+      <rect x="590" y="270" width="250" height="42" rx="6" class="n-human"/>
+      <text x="602" y="287" class="b">⑤ 一度きりの準備</text>
+      <text x="602" y="304" class="s105 m">WinRM・ファイアウォール・アカウント2つ</text>
+      <!-- 6 -->
+      <rect x="20" y="322" width="260" height="42" rx="6" class="n-human"/>
+      <text x="32" y="339" class="b">⑥ <tspan class="mono s11">cred-set pms-vm / pms-vm-admin</tspan></text>
+      <text x="32" y="356" class="s105 m">⑤のアカウントの名前とパスワードを保存</text>
+      <path d="M280 343 C 520 343, 715 346, 715 316" class="ln-m" marker-end="url(#b8-m)"/>
+      <text x="435" y="336" text-anchor="middle" class="s105 m">どのアカウントを保存するか</text>
+      <text x="435" y="360" text-anchor="middle" class="s105 m">(VM は変わらない。保存先は手元)</text>
+      <!-- 7 -->
+      <rect x="20" y="374" width="260" height="42" rx="6" class="n-store"/>
+      <text x="32" y="391" class="b">⑦ <tspan class="mono s11">check-target -Target pms-vm</tspan></text>
+      <text x="32" y="408" class="s105 m">前提を確かめるだけ(何も変えない)</text>
+      <line x1="280" y1="395" x2="588" y2="395" class="ln-ai" marker-end="url(#b8-a)"/>
+      <rect x="590" y="374" width="250" height="42" rx="6" class="n-dash"/>
+      <text x="602" y="391" class="s11">WinRM・管理者・パスワード無期限を</text>
+      <text x="602" y="408" class="s11">見るだけ</text>
+      <!-- 8 -->
+      <rect x="310" y="426" width="250" height="42" rx="6" class="n-human"/>
+      <text x="322" y="443" class="b">⑧ チェックポイントを取り直す</text>
+      <text x="322" y="460" class="s105 m">⑦が成功したときだけ</text>
+      <line x1="560" y1="447" x2="588" y2="447" class="ln-ai" marker-end="url(#b8-a)"/>
+      <rect x="590" y="426" width="250" height="42" rx="6" class="n-dash"/>
+      <text x="602" y="443" class="s11">準備済みの今の状態が</text>
+      <text x="602" y="460" class="s11">ゴールデンイメージになる</text>
+      <!-- 9 -->
+      <rect x="20" y="478" width="260" height="42" rx="6" class="n-human"/>
+      <text x="32" y="495" class="b">⑨ <tspan class="mono s11">deploy -Target pms-vm</tspan></text>
+      <text x="32" y="512" class="s105 m">先に pms-vm/config.psd1 を直しておく</text>
+      <line x1="280" y1="499" x2="588" y2="499" class="ln-ai" marker-end="url(#b8-a)"/>
+      <rect x="590" y="478" width="250" height="42" rx="6" class="n-human"/>
+      <text x="602" y="495" class="b">窓口 PmsRemote を作る</text>
+      <text x="602" y="512" class="s105 m">以後は復元のたびに自動で作り直す</text>
+      <!-- 10 -->
+      <rect x="20" y="530" width="260" height="42" rx="6" class="n-store"/>
+      <text x="32" y="547" class="b">⑩ <tspan class="mono s11">info / logs-collect / restore</tspan></text>
+      <text x="32" y="564" class="s105 m">動作確認。restore だけは VM を戻す</text>
+      <line x1="280" y1="551" x2="308" y2="551" class="ln-ai" marker-end="url(#b8-a)"/>
+      <rect x="310" y="530" width="530" height="42" rx="6" class="n-dash"/>
+      <text x="322" y="547" class="s11">復元 → PMS VM への配置 → 起動確認 が一続きで動くか、</text>
+      <text x="322" y="564" class="s11">ログが集まるかを確かめる</text>
+
+      <!-- legend -->
+      <rect x="10" y="606" width="16" height="12" rx="2" class="n-human"/>
+      <text x="32" y="617" class="s11">変更する操作</text>
+      <rect x="140" y="606" width="16" height="12" rx="2" class="n-store"/>
+      <text x="162" y="617" class="s11">確かめるだけ(何も変えない)</text>
+      <rect x="350" y="606" width="16" height="12" rx="2" class="n-plain"/>
+      <text x="372" y="617" class="s11">リポジトリのファイルを直す</text>
+      <rect x="560" y="606" width="16" height="12" rx="2" class="n-dash"/>
+      <text x="582" y="617" class="s11">その操作が及ぶ先</text>
+    </svg>
+  </div>
+  <figcaption>図8 導入手順の地図。箱が置かれた列が「コマンドを打つ場所」、矢印の先が「効く場所」です。①〜④が README の 1〜2章、⑤〜⑧が 3.1、⑨⑩が 3.2 にあたります。</figcaption>
+</figure>
+
+<h3>8.1 コマンド早見表</h3>
+<p>README のコマンドを、流れの番号の順に並べました。<b>「置き換えるもの」が空欄のコマンドは、そのまま打ってかまいません。</b>以下、<code>pms-remote.ps1 …</code> は <code>powershell -NoProfile -ExecutionPolicy Bypass -File tools\remote\pms-remote.ps1 …</code> の略です(リポジトリのルートで打ちます)。</p>
+<div class="tbl cmd"><table>
+<thead><tr><th>流れ</th><th>コマンド</th><th>打つ場所</th><th>何をするか</th><th>変わるもの</th><th>環境に合わせて置き換えるもの</th></tr></thead>
+<tbody>
+<tr><td>①</td><td><code>Set-Item WSMan:\localhost\Client\TrustedHosts …</code></td><td>AI 実行環境(管理者)</td><td>ドメインに参加していない相手に、パスワード認証(NTLM)で接続してよいと手元の PC に登録する</td><td>手元の WinRM の設定</td><td><code>'pms-test-01'</code> → <code>remote-targets.json</code> の <code>pms-vm.host</code> と同じ名前</td></tr>
+<tr><td>②</td><td>(編集)<code>config/remote-targets.json</code></td><td>リポジトリ</td><td>CLI が「どの名前で接続し、どの資格情報を使うか」を決める</td><td>ファイル</td><td><code>host</code>(参照名はそのままでよい)</td></tr>
+<tr><td>③</td><td>(編集)<code>remote/targets/hyperv-host/config.psd1</code></td><td>リポジトリ</td><td>復元する VM とチェックポイントを固定する(AI からは変えられない値)</td><td>ファイル</td><td><code>VMName</code>・<code>CheckpointName</code></td></tr>
+<tr><td>④</td><td><code>Install-PmsRemote.ps1 …</code> <b>または</b> <code>pms-remote.ps1 deploy -Target hyperv-host</code></td><td>Hyper-V ホスト(管理者)/ AI 実行環境(管理者)</td><td>モジュールの配置、設定の配置、接続許可グループの作成、窓口 <code>PmsRemote</code> の登録。何度実行しても同じ状態になる</td><td>Hyper-V ホストのシステム</td><td>直接実行のときの <code>-OperatorUser</code>(AI を動かす Windows ユーザー)</td></tr>
+<tr><td>⑤</td><td><code>Enable-PSRemoting</code>・<code>sc.exe config WinRM</code>・<code>New-LocalUser</code> など</td><td>PMS VM の中(管理者)</td><td>外から接続できるようにし、接続に使うアカウントを2つ作る</td><td>PMS VM(⑧でゴールデンイメージに入る)</td><td>作るアカウントの名前・パスワード、ファイアウォールで許すアドレス</td></tr>
+<tr><td>⑥</td><td><code>pms-remote.ps1 cred-set pms-vm</code> / <code>cred-set pms-vm-admin</code></td><td>AI 実行環境(<b>AI を動かすユーザーで</b>)</td><td>⑤で作ったアカウントのユーザー名とパスワードを、暗号化して手元に保存する。<b>アカウントを作るのではない</b></td><td><code>%APPDATA%\PmsRemote\cred\</code></td><td>入力欄に打つユーザー名とパスワード(参照名 <code>pms-vm</code> などはそのまま)</td></tr>
+<tr><td>⑦</td><td><code>pms-remote.ps1 check-target -Target pms-vm</code></td><td>AI 実行環境(管理者)</td><td>⑤の準備ができているかを確かめる</td><td>なし</td><td></td></tr>
+<tr><td>⑧</td><td><code>Rename-VMSnapshot</code>・<code>Checkpoint-VM</code></td><td>Hyper-V ホスト(管理者)</td><td>準備した状態を、新しいゴールデンイメージにする</td><td>VM のチェックポイント</td><td>VM 名・チェックポイント名(③と同じ値)</td></tr>
+<tr><td>⑨</td><td><code>pms-remote.ps1 deploy -Target pms-vm</code></td><td>AI 実行環境</td><td>PMS VM に窓口を作る。以後は復元のたびに自動で行われる</td><td>PMS VM のシステム</td><td>(先に <code>pms-vm/config.psd1</code> の <code>LogCollect</code> を直す)</td></tr>
+<tr><td>⑩</td><td><code>pms-remote.ps1 info</code>・<code>logs-collect -InfoOnly</code>・<code>logs-collect</code>・<code>restore</code></td><td>AI 実行環境</td><td>窓口の版、ログ収集の設定、復元の一連の動きを確かめる</td><td><code>restore</code> だけは VM を戻す(作業中のデータは消える)</td><td><code>logs-collect</code> の <code>-From</code>・<code>-To</code>・<code>-OutDir</code></td></tr>
+</tbody></table></div>
+
+<h3>8.2 コマンドを選ぶ場面</h3>
+<p>README で「どちらか」「必要なら」と書いてある箇所は、次の基準で選びます。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 250" role="img" aria-label="Hyper-V ホストへの配置の選び方。AI 実行環境と Hyper-V ホストが別の PC なら、ホストで直接実行する。同じ PC で、管理者の PowerShell から Test-WSMan localhost が応答しなければ、直接実行する(インストーラが WinRM を有効にする)。応答するなら deploy でも直接実行でもよく、deploy は接続許可グループに入れるユーザーを自動で決め、配置後の確認もする。どちらで配置しても結果は同じ。">
+      <defs>
+        <marker id="b82-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <text x="10" y="24" class="b s13">④ Hyper-V ホストへの配置: 直接実行か deploy か</text>
+      <rect x="10" y="44" width="230" height="64" rx="6" class="n-plain"/>
+      <text x="125" y="70" text-anchor="middle" class="b">AI 実行環境と Hyper-V</text>
+      <text x="125" y="88" text-anchor="middle" class="b">ホストは同じ PC?</text>
+      <line x1="240" y1="76" x2="300" y2="76" class="ln" marker-end="url(#b82-a)"/>
+      <text x="270" y="68" text-anchor="middle" class="s11">はい</text>
+      <rect x="302" y="44" width="250" height="64" rx="6" class="n-plain"/>
+      <text x="427" y="68" text-anchor="middle" class="b"><tspan class="mono s11">Test-WSMan localhost</tspan> が</text>
+      <text x="427" y="88" text-anchor="middle" class="b">応答する?(管理者で)</text>
+      <line x1="552" y1="76" x2="612" y2="76" class="ln" marker-end="url(#b82-a)"/>
+      <text x="582" y="68" text-anchor="middle" class="s11">はい</text>
+      <rect x="614" y="44" width="236" height="64" rx="6" class="n-store"/>
+      <text x="732" y="68" text-anchor="middle" class="b">どちらでもよい</text>
+      <text x="732" y="88" text-anchor="middle" class="s105 m">迷ったら deploy(確認付き)</text>
+
+      <line x1="125" y1="108" x2="125" y2="150" class="ln" marker-end="url(#b82-a)"/>
+      <text x="133" y="134" class="s11">いいえ</text>
+      <line x1="427" y1="108" x2="427" y2="150" class="ln" marker-end="url(#b82-a)"/>
+      <text x="435" y="134" class="s11">いいえ(Windows 10/11 の既定)</text>
+      <rect x="10" y="152" width="542" height="64" rx="6" class="n-human"/>
+      <text x="281" y="176" text-anchor="middle" class="b">ホストで直接実行する(<tspan class="mono s11">Install-PmsRemote.ps1</tspan>)</text>
+      <text x="281" y="196" text-anchor="middle" class="s105 m">インストーラが WinRM も有効にする。リポジトリ(またはその remote フォルダ)をホストに置いて実行</text>
+      <text x="614" y="174" class="s11 m">結果はどちらも同じ。</text>
+      <text x="614" y="192" class="s11 m">2回目以降(版を上げたとき)は</text>
+      <text x="614" y="210" class="s11 m">deploy でよい</text>
+      <text x="10" y="242" class="s105 m">別の PC から deploy するには、hyperv-host の資格情報(credential・deployCredential)と TrustedHosts の登録が別に要るため、直接実行のほうが簡単です。</text>
+    </svg>
+  </div>
+  <figcaption>図9 Hyper-V ホストへの配置の選び方。</figcaption>
+</figure>
+<div class="cards">
+  <div class="card"><h4>2.2 旧版からの移行は要る?</h4><p>Hyper-V ホストで <code>Get-PSSessionConfiguration -Name PmsGoldenRestore</code> が結果を返すときだけ行います。エラー(見つからない)になるなら、旧版は入っていないので飛ばします。</p></div>
+  <div class="card"><h4>⑤ ファイアウォールの設定は要る?</h4><p>PMS VM で <code>Get-NetConnectionProfile</code> の <code>NetworkCategory</code> が <code>Public</code> で、AI 実行環境が別のサブネットにあるときに要ります。AI 実行環境から <code>Test-NetConnection &lt;host&gt; -Port 5985</code> が <code>True</code> なら不要です。</p></div>
+  <div class="card"><h4>⑤ LocalAccountTokenFilterPolicy は要る?</h4><p>配置用の管理者に、ビルトインの <code>Administrator</code> 以外のアカウントを使うときに要ります。これがないと、管理者なのに遠隔からは権限が削られ、<code>check-target</code> の <code>admin_elevated</code> が失敗します。</p></div>
+  <div class="card"><h4>deploy に -Force を付ける?</h4><p><code>remote/targets/&lt;接続先&gt;/config.psd1</code> を直したあとに配置するときだけ付けます。付けないと、マシンに置かれた既存の設定は上書きされず、警告だけが出ます(<code>info</code> の <code>config_matches</code> が <code>false</code> のまま)。</p></div>
+  <div class="card"><h4>restore の -Purpose は?</h4><p>人が手で試すときは <code>manual</code>。<code>work10</code>・<code>work20</code>・<code>regression</code> は skill と globalSetup が使う値で、復元記録の突き合わせ(lint)に使われます。</p></div>
+  <div class="card"><h4>チェックポイントを取り直す?</h4><p>⑤を入れて⑦が成功したときは取り直します(必須)。⑨のあとに「配置済みの状態」で取り直すのは任意で、復元のたびの配置が省略になり数十秒速くなるだけです。</p></div>
+</div>
+</section>
+
+<section id="b9">
+<h2>9. 登場するアカウントと資格情報</h2>
+<p>導入でいちばん迷いやすいのが「どのマシンの、誰のアカウントか」です。<b>新しく作るアカウントは PMS VM の中の2つだけ</b>で、AI 実行環境の <code>cred-set</code> は、その2つのユーザー名とパスワードを手元に保存するだけです。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 426" role="img" aria-label="アカウントの対応。AI 実行環境では、あなたの Windows ユーザーが cred-set を実行し、%APPDATA%\PmsRemote\cred に pms-vm.xml と pms-vm-admin.xml を保存する。remote-targets.json の credential と deployCredential が、この参照名を指す。pms-vm.xml には PMS VM の接続用ユーザー(管理者でない)の名前とパスワード、pms-vm-admin.xml には PMS VM の配置用の管理者の名前とパスワードが入る。仮想アカウントは自動で作られるので作らなくてよい。Hyper-V ホストは参照名が null で、ログオン中のあなたのユーザーで接続する。">
+      <defs>
+        <marker id="b9-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+      </defs>
+      <!-- AI env -->
+      <rect x="10" y="10" width="360" height="328" rx="8" class="n-plain"/>
+      <text x="26" y="34" class="b s14">AI 実行環境(手元の PC)</text>
+      <rect x="26" y="48" width="328" height="58" rx="6" class="n-human"/>
+      <text x="40" y="70" class="b">あなたの Windows ユーザー</text>
+      <text x="40" y="90" class="s105 m">AI・テスト・cred-set を動かすユーザー(<tspan class="mono">whoami</tspan> で確認)</text>
+      <rect x="26" y="120" width="328" height="150" rx="6" class="n-bg"/>
+      <text x="40" y="142" class="b s11">cred-set が作るファイル</text>
+      <text x="40" y="158" class="mono s105 m">%APPDATA%\PmsRemote\cred\</text>
+      <rect x="42" y="168" width="200" height="34" rx="5" class="n-store"/>
+      <text x="54" y="190" class="mono s11 b">pms-vm.xml</text>
+      <rect x="42" y="208" width="200" height="34" rx="5" class="n-store"/>
+      <text x="54" y="230" class="mono s11 b">pms-vm-admin.xml</text>
+      <text x="40" y="260" class="s105 m">このユーザー・この PC でしか開けない(DPAPI で暗号化)</text>
+      <rect x="26" y="280" width="328" height="48" rx="6" class="n-plain"/>
+      <text x="40" y="298" class="mono s105">"credential": "pms-vm"  → pms-vm.xml</text>
+      <text x="40" y="316" class="mono s105">"deployCredential": "pms-vm-admin"  → …admin.xml</text>
+
+
+      <!-- PMS VM -->
+      <rect x="490" y="10" width="360" height="328" rx="8" class="n-plain"/>
+      <text x="506" y="34" class="b s14">PMS サーバーVM の中</text>
+      <rect x="506" y="48" width="328" height="84" rx="6" class="n-ai"/>
+      <text x="520" y="70" class="b">接続用ユーザー(例 <tspan class="mono">pmsremote</tspan>)</text>
+      <text x="520" y="88" class="s105">管理者にしない・パスワード無期限</text>
+      <text x="520" y="104" class="s105">deploy が PmsRemoteRead / Change に入れる</text>
+      <text x="520" y="120" class="s105 m">ログ収集など、普段の操作で使う</text>
+      <rect x="506" y="144" width="328" height="84" rx="6" class="n-human"/>
+      <text x="520" y="166" class="b">配置用の管理者(例 <tspan class="mono">pmsadmin</tspan>)</text>
+      <text x="520" y="184" class="s105">Administrators に入れる・パスワード無期限</text>
+      <text x="520" y="200" class="s105">deploy と check-target だけが使う</text>
+      <text x="520" y="216" class="s105 m">AI の skill からは使わない</text>
+      <rect x="506" y="240" width="328" height="66" rx="6" class="n-tool"/>
+      <text x="520" y="262" class="b">仮想アカウント(作らなくてよい)</text>
+      <text x="520" y="280" class="s105 m">接続のたびに自動で作られ、窓口の関数は</text>
+      <text x="520" y="296" class="s105 m">この権限で動く</text>
+
+      <!-- arrows -->
+      <path d="M242 185 C 400 185, 380 92, 504 92" class="ln-ai" marker-end="url(#b9-m)"/>
+      <path d="M242 225 C 400 225, 380 188, 504 188" class="ln-ai" marker-end="url(#b9-m)"/>
+      <text x="440" y="160" text-anchor="middle" class="s105 t-ai b">ユーザー名と</text>
+      <text x="440" y="174" text-anchor="middle" class="s105 t-ai b">パスワードを保存</text>
+
+      <!-- Hyper-V -->
+      <rect x="10" y="352" width="840" height="64" rx="8" class="n-bg"/>
+      <text x="26" y="374" class="b s13">Hyper-V ホスト(hyperv-host)</text>
+      <text x="26" y="394" class="s11">参照名が <tspan class="mono">null</tspan> = cred-set は不要。ログオン中の「あなたの Windows ユーザー」で接続します(新しく作るアカウントはありません)。</text>
+      <text x="26" y="410" class="s11">直接実行の <tspan class="mono">-OperatorUser</tspan> には、このユーザーを書きます(インストーラがホストの接続許可グループに入れる)。</text>
+    </svg>
+  </div>
+  <figcaption>図10 アカウントの対応。左の資格情報ファイルの中身が、右の VM のアカウントです。参照名(<code>pms-vm</code> など)はファイルの名前にすぎず、VM のユーザー名と同じである必要はありません。</figcaption>
+</figure>
+<div class="tbl"><table>
+<thead><tr><th>参照名</th><th>中身(cred-set の入力欄に打つもの)</th><th>使う場面</th><th>そのままでよいもの / 置き換えるもの</th></tr></thead>
+<tbody>
+<tr><td><code>pms-vm</code></td><td>ユーザー名: <code>&lt;PMS VM のコンピューター名&gt;\&lt;接続用ユーザー&gt;</code>(例 <code>PMS-TEST-01\pmsremote</code>)<br>パスワード: そのユーザーのパスワード</td><td>ログ収集など、窓口 <code>PmsRemote</code> への普段の接続。deploy が接続許可グループに入れるユーザーの名前もここから取る</td><td>参照名はそのまま。ユーザー名・パスワードは⑤で作った値。コンピューター名は VM の中で <code>hostname</code> を打つと分かる(Hyper-V 上の VM 名と違うことがある)</td></tr>
+<tr><td><code>pms-vm-admin</code></td><td>ユーザー名: <code>&lt;PMS VM のコンピューター名&gt;\&lt;配置用の管理者&gt;</code>(例 <code>PMS-TEST-01\pmsadmin</code>)<br>パスワード: そのユーザーのパスワード</td><td><code>deploy</code>・<code>check-target</code>(窓口を作る作業は、窓口の外から管理者で行うしかないため)</td><td>同上</td></tr>
+</tbody></table></div>
+<ul class="plain">
+<li><b>cred-set は、AI と回帰テストを動かすのと同じ Windows ユーザーで実行します。</b>保存したファイルは、そのユーザー・その PC でしか開けません(別のユーザーで保存すると <code>CREDENTIAL_INVALID</code>)</li>
+<li>cred-set はパスワードが正しいかを確かめません。間違えていると、⑦の <code>check-target</code> や接続のときに「アクセスが拒否されました」になります。そのときは同じ参照名で cred-set をやり直せば上書きされます</li>
+<li>参照名を変えたいときは、<code>remote-targets.json</code> の <code>credential</code> / <code>deployCredential</code> と cred-set の引数を同じ名前にそろえます。特に理由がなければ変えません</li>
+</ul>
+</section>
+
+<section id="b10">
+<h2>10. エラーが出たときの見分け方</h2>
+<p>CLI もインストーラも、<b>最後の1行に JSON</b> を出します。まず <code>success</code> と <code>error_code</code> を見て、<code>message</code> で詳細を確かめます(<code>check-target</code> なら <code>checks</code> の中で <code>"ok":false</code> の項目)。接続のエラーは、次の図のどの関門で止まったかで直し方が決まります。</p>
+<figure>
+  <div class="fig mid">
+    <svg class="dg" viewBox="0 0 860 310" role="img" aria-label="接続が通る6つの関門。1 名前で見つかる、2 ポート5985の WinRM に届く、3 TrustedHosts に登録済み、4 ユーザーとパスワードの認証、5 窓口 PmsRemote がある、6 版とロールが合う。1から4で止まると CONNECT_FAILED や CREDENTIAL のエラーになり、host の値、VM の WinRM とファイアウォール、TrustedHosts、cred-set を直す。5と6で止まると ENDPOINT_NOT_FOUND、VERSION_MISMATCH、ROLE_NOT_AVAILABLE になり、deploy すれば直る。">
+      <defs>
+        <marker id="b10-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ai"/></marker>
+      </defs>
+      <text x="10" y="24" class="s11 m">AI 実行環境から ▶</text>
+      <text x="850" y="24" text-anchor="end" class="s11 m">▶ 窓口の関数が動く</text>
+      <!-- gates -->
+      <rect x="10" y="36" width="130" height="58" rx="6" class="n-plain"/>
+      <text x="75" y="60" text-anchor="middle" class="b s13">① 名前</text>
+      <text x="75" y="80" text-anchor="middle" class="s105 m">名前で見つかる</text>
+      <line x1="140" y1="65" x2="150" y2="65" class="ln-ai" marker-end="url(#b10-a)"/>
+      <rect x="152" y="36" width="130" height="58" rx="6" class="n-plain"/>
+      <text x="217" y="60" text-anchor="middle" class="b s13">② 5985 番</text>
+      <text x="217" y="80" text-anchor="middle" class="s105 m">WinRM に届く</text>
+      <line x1="282" y1="65" x2="292" y2="65" class="ln-ai" marker-end="url(#b10-a)"/>
+      <rect x="294" y="36" width="130" height="58" rx="6" class="n-plain"/>
+      <text x="359" y="60" text-anchor="middle" class="b s13">③ TrustedHosts</text>
+      <text x="359" y="80" text-anchor="middle" class="s105 m">相手を信頼する</text>
+      <line x1="424" y1="65" x2="434" y2="65" class="ln-ai" marker-end="url(#b10-a)"/>
+      <rect x="436" y="36" width="130" height="58" rx="6" class="n-plain"/>
+      <text x="501" y="60" text-anchor="middle" class="b s13">④ 認証</text>
+      <text x="501" y="80" text-anchor="middle" class="s105 m">ユーザーとパスワード</text>
+      <line x1="566" y1="65" x2="576" y2="65" class="ln-ai" marker-end="url(#b10-a)"/>
+      <rect x="578" y="36" width="130" height="58" rx="6" class="n-store"/>
+      <text x="643" y="60" text-anchor="middle" class="b s13">⑤ 窓口</text>
+      <text x="643" y="80" text-anchor="middle" class="s105 m">PmsRemote がある</text>
+      <line x1="708" y1="65" x2="718" y2="65" class="ln-ai" marker-end="url(#b10-a)"/>
+      <rect x="720" y="36" width="130" height="58" rx="6" class="n-store"/>
+      <text x="785" y="60" text-anchor="middle" class="b s13">⑥ 版・ロール</text>
+      <text x="785" y="80" text-anchor="middle" class="s105 m">関数が呼べる</text>
+
+      <!-- errors -->
+      <text x="10" y="120" class="s105 b t-stop">出るエラー</text>
+      <text x="10" y="138" class="mono s105">CONNECT_FAILED</text>
+      <text x="10" y="154" class="s105">名前を解決できない</text>
+
+      <text x="152" y="120" class="s105 b t-stop">出るエラー</text>
+      <text x="152" y="138" class="mono s105">CONNECT_FAILED</text>
+      <text x="152" y="154" class="s105">応答がない・拒否</text>
+      <text x="152" y="170" class="mono s105">winrm_reachable</text>
+
+      <text x="294" y="120" class="s105 b t-stop">出るエラー</text>
+      <text x="294" y="138" class="mono s105">CONNECT_FAILED</text>
+      <text x="294" y="154" class="s105">「TrustedHosts」</text>
+      <text x="294" y="170" class="mono s105">client_trusted_hosts</text>
+
+      <text x="436" y="120" class="s105 b t-stop">出るエラー</text>
+      <text x="436" y="138" class="mono s105">CREDENTIAL_NOT_FOUND</text>
+      <text x="436" y="154" class="mono s105">CREDENTIAL_INVALID</text>
+      <text x="436" y="170" class="mono s105">CONNECT_FAILED</text>
+      <text x="436" y="186" class="s105">「アクセスが拒否」</text>
+
+      <text x="578" y="120" class="s105 b t-stop">出るエラー</text>
+      <text x="578" y="138" class="mono s105">ENDPOINT_NOT_FOUND</text>
+
+      <text x="720" y="120" class="s105 b t-stop">出るエラー</text>
+      <text x="720" y="138" class="mono s105">VERSION_MISMATCH</text>
+      <text x="720" y="154" class="mono s105">ROLE_NOT_AVAILABLE</text>
+
+      <line x1="10" y1="200" x2="850" y2="200" class="ln-m"/>
+      <!-- fixes -->
+      <text x="10" y="222" class="s105 b t-store">直し方</text>
+      <text x="10" y="240" class="s105">host の値を確かめる</text>
+      <text x="10" y="256" class="s105">DNS か hosts に登録</text>
+
+      <text x="152" y="222" class="s105 b t-store">直し方</text>
+      <text x="152" y="240" class="s105">VM の WinRM と</text>
+      <text x="152" y="256" class="s105">ファイアウォール</text>
+      <text x="152" y="272" class="s105 m">(README ⑤-1〜⑤-3)</text>
+
+      <text x="294" y="222" class="s105 b t-store">直し方</text>
+      <text x="294" y="240" class="s105">README 1章の ①</text>
+      <text x="294" y="256" class="s105">で名前を登録する</text>
+
+      <text x="436" y="222" class="s105 b t-store">直し方</text>
+      <text x="436" y="240" class="s105">AI を動かすユーザー</text>
+      <text x="436" y="256" class="s105">で cred-set し直す</text>
+      <text x="436" y="272" class="s105 m">管理者なら ⑤-5 も</text>
+
+      <text x="578" y="222" class="s105 b t-store">直し方</text>
+      <text x="578" y="240" class="s105">deploy する</text>
+
+      <text x="720" y="222" class="s105 b t-store">直し方</text>
+      <text x="720" y="240" class="s105">deploy する</text>
+
+      <text x="10" y="300" class="s105 m">deploy と check-target は、⑤⑥ の代わりに配置用の管理者で既定の窓口(Microsoft.PowerShell)に入ります。①〜④ は同じです。</text>
+    </svg>
+  </div>
+  <figcaption>図11 接続が通る関門。左で止まるほど「ネットワークと準備」の問題、右で止まるほど「配置」の問題です。⑤⑥ はどれも <code>deploy</code> で直ります。</figcaption>
+</figure>
+<p>接続以外のエラー(チェックポイントが見つからない・ログ収集ツールがない・スクリプトの実行が禁止されている など)と、それぞれの直し方は README の「8. エラーが出たとき」に一覧があります。</p>
+</section>
+
+<section id="b11">
+<h2>11. よくある質問</h2>
 <details class="qa"><summary>なぜ HTTPS ではなく HTTP なのですか?</summary>
 <p>HTTP でも、NTLM で接続すると通信の中身は暗号化されます。HTTPS にすると、マシンごとに証明書を作り、手元の PC に信頼させ、期限や名前を管理する手間が増えます。検証環境は隔離されたネットワークにあり、その手間に見合う利点が小さいため、HTTP を既定にしました。必要になれば設定で HTTPS に切り替えられます。</p></details>
 <details class="qa"><summary>PowerShell Direct を使わないのはなぜですか?</summary>
@@ -888,8 +1229,8 @@ details.qa p{font-size:13.5px;margin:8px 0 0}
 <p>窓口の仕組み自体は使えますが、JEA の仮想アカウントは画面のない別のセッションで動くため、ユーザーごとのプリンターや GUI アプリからの印刷はそのままでは動かないことが多いです。その場合は、窓口の関数から「特定のユーザーで動くタスク」を起動する形にします。整備の前に実機で確かめます。</p></details>
 </section>
 
-<section id="b9">
-<h2>9. 用語集</h2>
+<section id="b12">
+<h2>12. 用語集</h2>
 <dl class="gloss">
 <dt>PowerShell リモート処理</dt><dd>ネットワーク越しに別のマシンで PowerShell のコマンドを実行する仕組み。<code>Invoke-Command</code> などで使う</dd>
 <dt>WinRM</dt><dd>Windows Remote Management。リモート処理の要求を受け付ける Windows のサービス。HTTP 5985 / HTTPS 5986</dd>
@@ -905,6 +1246,11 @@ details.qa p{font-size:13.5px;margin:8px 0 0}
 <dt>配置(deploy)</dt><dd>共通インストーラで、マシンにモジュール・設定・窓口を作ること。PMS VM では復元のたびに自動で行う</dd>
 <dt>成果物</dt><dd>関数が作ったファイル(zip)。サーバーに一時的に置き、CLI が 4MB ずつ受け取って消す</dd>
 <dt>ゴールデンイメージ</dt><dd>PMS サーバーVMを戻す先のチェックポイント。テストのたびにこの状態へ戻す</dd>
+<dt>参照名</dt><dd>保存した資格情報に付ける名前(<code>pms-vm</code> など)。<code>remote-targets.json</code> にはこの名前だけを書き、パスワードは書かない</dd>
+<dt>接続用ユーザー</dt><dd>PMS VM のローカルユーザーで、管理者でないもの。窓口 <code>PmsRemote</code> に接続する。参照名 <code>pms-vm</code></dd>
+<dt>配置用の管理者</dt><dd>PMS VM のローカル管理者。<code>deploy</code> と <code>check-target</code> だけが使う。参照名 <code>pms-vm-admin</code></dd>
+<dt>DPAPI</dt><dd>Windows の暗号化の仕組み。cred-set で保存した資格情報は、保存したユーザー・PC でしか復号できない</dd>
+<dt>LocalAccountTokenFilterPolicy</dt><dd>ローカルの管理者アカウントで遠隔から接続したときに、管理者の権限を削らないための設定(ビルトインの Administrator 以外を使うときに要る)</dd>
 <dt>PowerShell Direct</dt><dd>Hyper-V ホストから VM にネットワークなしで入る機能。この方針では使わない</dd>
 </dl>
 </section>

@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-06 / 版: v20(setup-log の記録の強化: ■lint に `setup_steps_recorded`(setup-log の `built-by-ui` のエントリの `steps` と各 step の操作の対象。proc-v016 以降のフロー)を加えた。前版 v19 は 2026-10-04 のリモートコマンドの整備)
+改訂: 2026-10-07 / 版: v21(低価格モデル対応 段1 共通の土台: ■進行役と記録の道具(pms)を新設した。■ロケータ規約にフェーズAのロケータは `pms act` が取ることを加え、カードが使う規則に規則IDを付けた。■lint に `act_log_linked`・`phase_a_queue_complete` を加え、`setup_steps_recorded` を `provided` に広げた(proc-v017 以降のフロー)。前版 v20 は 2026-10-06 の setup-log の記録の強化)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -58,6 +58,42 @@
 | `pms-40-improve` | §40 手順改善 | 実行AIとは別のセッションで使う |
 
 **skill を直接編集しない。** skill は生成物であり、手順の変更は正本に対して行って再生成する(■手順書の版と配備)。
+
+---
+
+## ■ 進行役と記録の道具(pms)
+
+手順の正しさを、「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らないために、**進行役 `tools/pms/pms.mjs`(以下 pms)が、順序・記録・完了判定を受け持つ。** AIは、pms が出すカードの判断だけを行う。この版では、作業10のフェーズA(初期状態の準備。`stages.md` §10)に使う。
+
+この道具が拠る原則(`docs/94 低価格モデル対応 検討.md` §3 のうち、この版で効くもの):
+
+| # | 原則 | この版での形 |
+|---|---|---|
+| P1 | AIは判断だけをする。順序・記録・集計・完了判定はプログラムが行う | どの状態を整備するかは、pms がシナリオの `requires` から機械的にカードにする。setup-log と台帳の行は pms が書く |
+| P5 | 出力は提出の瞬間に検査し、通らなければ理由を返して差し戻す | `pms submit` が出力を検査し、不合格なら区分(`vocab.pms_reject_kind`)と直し方を返す。同じカードの不合格・出し直しが上限を超えたら人間の確認待ち(STOP)にする |
+| P6 | AIが書かなくても残る記録を優先する。道具の実行がそのまま記録になる | 画面操作は `pms act` が実行し、操作のたびに時刻・ロケータ・操作を記録する。setup-log の操作列はこの記録から作る |
+
+| 道具 | 役割 |
+|---|---|
+| `pms act` | 画面操作を1回ずつ playwright-cli で実行し、操作の記録に1行書く(操作は `vocab.pms_act_action`)。要素の操作の前に `generate-locator` でロケータを取り、区分(`vocab.locator_class`)と一意性を記録する。環境情報の参照 `<env:キー>` は自分で値を取り出して使い、標準出力と記録では値を伏せる |
+| `pms queue build` / `pms next` | 対象シナリオの `requires` からカードを作り(タスクキュー)、1枚ずつ出す。出したカードが提出されないまま `next` が呼ばれたら、同じカードを出し直す。全部終われば `done`、人間の判断が要れば `STOP` を返す |
+| カード | 1枚1判断の依頼文(やること・入力・規則・出力・合格した記入例・終わったら)。種類は `vocab.pms_card_kind`。テンプレートは `procedure/cards/<種類>.md`、出力の schema は `procedure/schemas/<種類>.out.json`(手順書の一部として版の管理を受ける)。**規則は、本書と `stages.md` の規則IDの付いた行(書式 `vocab.id_format.rule`)から pms が差し込む。** テンプレートに規則の文章を書き写さない。保護ブロックは、ブロックごと文言を変えずに差し込む |
+| `pms submit` | カードの出力を schema・操作の記録・lint の規則で検査し、合格なら記録(setup-log・申し送り台帳・外部操作需要リスト・状態需要リスト)を書く |
+| `pms status` | 現在のカード・残りの枚数・止まっている理由 |
+
+| 記録 | 所在 | 書く者 |
+|---|---|---|
+| 操作の記録 | `work/<feature_code>/exploration/act-log.jsonl`(1操作1行) | `pms act` |
+| タスクキュー・出したカード・提出の検査の結果 | `work/_flows/F-<番号>/queue.json`・`cards/C-<番号>.md`・`submit-log.jsonl` | pms |
+| カードの出力 | `work/_flows/F-<番号>/out/C-<番号>.json` | AI |
+| pms の設定 | `config/pms.json`(各自。git に入れない。見本 `config/pms.sample.json`) | 人間 |
+
+- **[R-PMS-1]** 画面操作は必ず `pms act` で行う。playwright-cli を直接呼ばない(直接呼んだ操作は記録に残らず、その操作を含む提出は不合格になる)
+- **[R-PMS-2]** 記録(setup-log・申し送り台帳・外部操作需要リスト・状態需要リスト)を書かない。pms が提出の合格時に書く。AIが書くのは、カードが指定するファイルへの出力の JSON だけである
+- **[R-PMS-3]** `pms submit` が不合格を返したら、返された理由のところだけを直して再提出する。記録や出力を削って通さない。カードの範囲で判断できないときは `cannot_proceed` で提出する
+- **[R-PMS-4]** 道具の出力の `now`(現在のカードと、やること1行)と `next`(次に実行すべきコマンド)に従う。会話が長くなった・要約されたあとは、`node tools/pms/pms.mjs status --flow <フローID>` で現在地を確かめてから続ける
+
+`pms act` と `pms next` の出力に毎回 `now` と `next` を付けるのは、会話が長くなったり要約されたりしても、AIが道具の出力から現在地を取り戻せるようにするためである(`docs/004_フック処理_図解.html` 7章)。コマンドの細部・データの形・終了コードは `tools/pms/README.md` を参照する。
 
 ---
 
@@ -267,10 +303,10 @@ VM の復元では戻らない環境(複合機などの機器の設定)を、作
 
 再実行耐性と並列耐性を同時に満たすためのテストデータ規約:
 
-1. **作成データの一意化**: テストが作成するデータには、実行のたびに一意になる識別子を含める(書式は `vocab.id_format.test_data`。実行識別子はテスト開始時に1回生成し、そのテスト内で使い回す)
+1. **[R-DAT-1]** **作成データの一意化**: テストが作成するデータには、実行のたびに一意になる識別子を含める(書式は `vocab.id_format.test_data`。実行識別子はテスト開始時に1回生成し、そのテスト内で使い回す)
 2. **アサーションの自データスコープ**: 期待結果を環境全体の件数・状態で書かない(「ジョブ一覧が1件になる」は不可)。自テストが作成したデータに限定して検証する。DB検証もWHERE句で自データに絞る
 3. **前提条件は established check で毎回確認する。** 環境がクリーンであることを暗黙の前提にしない
-4. 一意化した値を画面上で特定する場合は、生成した値を変数として保持しロケータに渡す(動的文字列のハードコード禁止はロケータ規約の通り。変数参照は決定的であり問題ない)
+4. **[R-DAT-2]** 一意化した値を画面上で特定する場合は、生成した値を変数として保持しロケータに渡す(動的文字列のハードコード禁止はロケータ規約の通り。変数参照は決定的であり問題ない)
 
 ## ■ 検証環境の情報(接続先・アカウント)
 
@@ -284,7 +320,7 @@ VM の復元では戻らない環境(複合機などの機器の設定)を、作
 | キー | 書式は `vocab.environment_info.key_format`。基本キー(`vocab.env_base_keys`)は全フローで使う。それ以外(機器・連携システムの接続先など)は、必要になった作業が名前を決めて加える。加える前に `list` で既存のキーを確かめ、同じものに別のキーを作らない |
 | テスト環境 | 環境情報に接続先を登録した対象が、包括原則3の**テスト環境**の範囲を定める(`vocab.test_environment`)。対象の一部だけがテスト用のとき(AD のテスト用OUなど)は、聞くときに範囲も確かめ、`set` の `--description` に書く。登録されていない対象はテスト環境の外として扱う |
 | 秘密情報 | 種類 `secret` の値は平文で保存する。**保存先の既定は各自の設定**(`set` が自動で選ぶ)。値を成果物(探索記録・セットアップ記録・シナリオ・KB・報告書・台帳・flow.md・テストコード)と問い合わせの入力に書かない(lint `env_value_leak`) |
-| 成果物での書き方 | 値ではなく `<env:キー>` と書く(例: `goto <env:pms.url>`、`fill ユーザーID <env:pms.user>`)。**テストコードは `tests/helpers/env.ts` の `envValue('<キー>')` で値を読み、接続先・アカウントを直接書かない**(lint `env_value_hardcoded`。`stages.md` 付録F)。外部操作の実行体に渡す機器のホスト・IP も同じ(ラッパが `envValue` で読んで渡す) |
+| 成果物での書き方 | **[R-ENV-1]** 値ではなく `<env:キー>` と書く(例: `goto <env:pms.url>`、`fill ユーザーID <env:pms.user>`)。**テストコードは `tests/helpers/env.ts` の `envValue('<キー>')` で値を読み、接続先・アカウントを直接書かない**(lint `env_value_hardcoded`。`stages.md` 付録F)。外部操作の実行体に渡す機器のホスト・IP も同じ(ラッパが `envValue` で読んで渡す) |
 | 記録 | 作業10・15・20は、使った環境の環境IDを status.yaml の最上位の `environment` に、新しく保存したキーを `context_updates.env_keys_added` に書く(キー名だけ。値は書かない) |
 
 KB(T09 環境・構成知見)に書くのは環境の構成についての知見であり、接続先やアカウントの値は書かない(値は設定ファイル、KB はキーで参照する)。DB操作の安全規約の「サーバ名・DB名をログに残す」は、ログに実際の値を残してよい(秘密情報ではない)。
@@ -637,9 +673,9 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 
 ステップ1では**状態カタログを事前に作らない。** シナリオの `requires` には、**初期状態セット**の状態IDを直接書く。初期状態セットは、`vocab.initial_state_set`(基本の状態。環境に合わせて人間が調整する)と、状態需要リスト(下記)で状態が `採用` / `整備済` の行の状態を合わせたものである。**AIが勝手に状態を追加しないこと。** AIができるのは追加の提案までであり、初期状態セットに加えるのは人間の採用だけである(lint `requires_in_state_set`)。
 
-- 状態は `tests/fixtures/` のセットアップが作る。**他のテスト項目が作ってはならない**
-- ステップ1では実操作(UI操作)による整備のみを行う。DB投入による高速化はステップ2以降。**状態需要リストで追加した状態も同じである**
-- 状態が成立したことの確認(established check)を必ず含める。確認なしのセットアップは、後段の失敗トリアージ(セットアップ失敗か機能不具合か)を不可能にする
+- **[R-STA-1]** 状態は `tests/fixtures/` のセットアップが作る。**他のテスト項目が作ってはならない**
+- **[R-STA-2]** ステップ1では実操作(UI操作)による整備のみを行う。DB投入による高速化はステップ2以降。**状態需要リストで追加した状態も同じである**
+- **[R-STA-3]** 状態が成立したことの確認(established check)を必ず含める。確認なしのセットアップは、後段の失敗トリアージ(セットアップ失敗か機能不具合か)を不可能にする
 
 ### 状態需要リスト(初期状態セットへの追加)
 
@@ -676,10 +712,10 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 | `tests/external/` | 外部操作(KB T05の操作IDと1対1。skill 同梱の実行体を呼ぶ) | `external.printFromPanel()` |
 | `tests/specs/` | シナリオ本体。アサーションはここに書く | — |
 
-- **シナリオ部品にアサーションを書かない。** ただし「その部品が正常に完了したこと」の最小限の確認は含めてよい
-- **シナリオ部品から他のテスト項目を呼んではならない**
-- ステップ2以降で fixture を整備する際、fixture はシナリオ部品を呼ぶ形にする
-- 部品化の判断: **2つ以上のシナリオ(フローをまたいでよい)で同じ操作列が現れたら部品にする。** 1回しか使わない操作列を先回りして部品化しない
+- **[R-PRT-1]** **シナリオ部品にアサーションを書かない。** ただし「その部品が正常に完了したこと」の最小限の確認は含めてよい
+- **[R-PRT-2]** **シナリオ部品から他のテスト項目を呼んではならない**
+- **[R-PRT-3]** ステップ2以降で fixture を整備する際、fixture はシナリオ部品を呼ぶ形にする
+- **[R-PRT-4]** 部品化の判断: **2つ以上のシナリオ(フローをまたいでよい)で同じ操作列が現れたら部品にする。** 1回しか使わない操作列を先回りして部品化しない
 
 ## ■ ロケータ規約(安定ロケータの優先順位)
 
@@ -692,18 +728,19 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 5. `getByTestId(...)` — `data-testid` が既に存在する場合
 6. CSS/構造セレクタ — 最終手段。使用した場合は理由と壊れやすさのリスクを必ず注記する
 
-- 採用したロケータは**その画面状態で一意に1要素へ解決されること**を確認してから記録する
-- **動的に変わる文字列をロケータの name に含めない。** 含めざるを得ない場合は正規表現化する(`パターン一致` 対象がここに該当)
-- 1〜5で取れない要素はCSSで暫定記録した上で `work/_common/testid-requests.md` に画面名・要素の役割・暫定セレクタを記載する。**この依頼は開発側で処理される。** 反映されたら暫定CSSを `getByTestId()` に置換し `// FRAGILE:` を除去する
+- **[R-LOC-1]** 採用したロケータは**その画面状態で一意に1要素へ解決されること**を確認してから記録する
+- **[R-LOC-2]** **動的に変わる文字列をロケータの name に含めない。** 含めざるを得ない場合は正規表現化する(`パターン一致` 対象がここに該当)
+- **[R-LOC-3]** 1〜5で取れない要素はCSSで暫定記録した上で `work/_common/testid-requests.md` に画面名・要素の役割・暫定セレクタを記載する。**この依頼は開発側で処理される。** 反映されたら暫定CSSを `getByTestId()` に置換し `// FRAGILE:` を除去する
+- **[R-LOC-4]** 作業10のフェーズAでは、ロケータは `pms act` が操作の前に `generate-locator` で取り、区分(`vocab.locator_class`)と一意性を記録する。**AIはロケータを手で書かない。** 安定でない・一意でないと警告されたら、別の要素で操作し直すか、6のとおり CSS を暫定で使い、カードの出力の `fragile` に挙げて `testid-requests.md` に記載する(■進行役と記録の道具)
 - 特殊な操作で発見したコツは、KBの該当画面カタログまたは `kb/gotchas/` に記録する
 
 ## ■ ページオブジェクト規約
 
-- 1画面(または画面内の独立した主要領域) = 1クラス。TypeScript で `tests/pages/` に配置
-- クラスには、**実際に操作・参照した要素のみ**を定義する。使っていない要素を推測で網羅しない
-- 構成: ロケータ定義 + 最小限の操作メソッド。アサーションはテスト側に書く
-- 各ロケータには、どの項目IDの探索で確認したかをコメントで残す(例: `// verified: SC-PRT-01-S2`)
-- CSSセレクタを使った箇所には `// FRAGILE:` コメントで理由を注記する
+- **[R-PO-1]** 1画面(または画面内の独立した主要領域) = 1クラス。TypeScript で `tests/pages/` に配置
+- **[R-PO-2]** クラスには、**実際に操作・参照した要素のみ**を定義する。使っていない要素を推測で網羅しない
+- **[R-PO-3]** 構成: ロケータ定義 + 最小限の操作メソッド。アサーションはテスト側に書く
+- **[R-PO-4]** 各ロケータには、どの項目IDの探索で確認したかをコメントで残す(例: `// verified: SC-PRT-01-S2`)
+- **[R-PO-5]** CSSセレクタを使った箇所には `// FRAGILE:` コメントで理由を注記する
 
 ## ■ 不整合レポート(DISC)規約
 
@@ -886,6 +923,8 @@ procedure/                            # 手順書の正本(版は vocab.meta.pro
   00_common.md / vocab.yaml / pipeline.dot / stages.md
   methods/                            # シナリオ策定方式の方式ファイル(1方式1ファイル。■シナリオ策定方式)
   templates/                          # 記入用テンプレート 90〜95 の原本(記入済みの台帳は work/_common/ 側)
+  cards/                              # カードのテンプレート(vocab.pms_card_kind ごとに1つ。■進行役と記録の道具)
+  schemas/                            # カードの出力の schema(<種類>.out.json)
   router/SKILL.md                     # 入口 skill(pms-regression)の原稿。唯一の手書き skill
   skills.config.json                  # skill の生成設定(skill名・説明・生成先)
   docs/                               # 人間向け(000_overview.md 等)。生成の対象外
@@ -895,6 +934,7 @@ tools/pre-stage/run-scenarios.mjs     # 開始前シナリオの実行(作業10�
 tools/env/env.mjs                     # 検証環境の情報の読み書き(■検証環境の情報。require / get / set / list / envs / use)
 tools/remote/pms-remote.ps1           # リモートコマンドの CLI 本体(skill・テストコードはこれだけを呼ぶ。docs/003)
 remote/                               # リモートコマンドのリモート側の一式(モジュール PmsRemote・共通インストーラ・接続先ごとの設定の原本 targets/。導入手順は remote/README.md)
+tools/pms/pms.mjs                     # 進行役(■進行役と記録の道具。queue build / next / act / submit / status / reopen。仕様は tools/pms/README.md)
 tools/lint/lint.mjs                   # lint のランナー(実装済みの規則を1コマンドで実行する。規則の一覧は ■lint の表)
 tools/git-hooks/pre-commit            # コミットの前の lint(skills_in_sync)。git config core.hooksPath tools/git-hooks で有効にする
 .github/skills/pms-*/                 # 生成物(GitHub Copilot 用)。直接編集しない
@@ -905,6 +945,7 @@ tools/git-hooks/pre-commit            # コミットの前の lint(skills_in_syn
 .kiro/skills/collect-server-logs/     # 同上(Kiro 用)
 config/
   remote-targets.json                 # リモートコマンドのクライアント設定(接続先・資格情報の参照名・期待する版・復元・ログの書式)
+  pms.json                            # 進行役の設定(各自。git に入れない。例: pms.sample.json)
   pre-stage-scenarios.json            # 開始前シナリオの設定(人間が書く。なければ実行しない。例: pre-stage-scenarios.sample.json)
   environments.json                   # 検証環境の情報(共有。git に入れる。tools/env/env.mjs が書く。例: environments.sample.json)
   environments.local.json             # 検証環境の情報(各自。秘密情報と各自の上書き。git に入れない)
@@ -924,6 +965,7 @@ work/
   _flows/                             # フロー管理(テンプレート92)
     00_フロー台帳.md
     F-001/flow.md
+    F-001/queue.json / cards/ / out/ / submit-log.jsonl   # 進行役のタスクキュー・出したカード・カードの出力・提出の検査の結果(■進行役と記録の道具)
   _common/                            # 機能横断の資産(フロー横断で累積)
     nondeterministic-catalog.md       # 非決定値カタログ(作業02)
     prohibited-operations.md          # 禁止操作リスト(人間が記入。テンプレート90。未記入のものを初期配置)
@@ -943,6 +985,7 @@ work/
     exploration/
       exploration-log.yaml
       setup-log.yaml
+      act-log.jsonl                   # pms act の操作の記録(1操作1行)
       evidence/
       report.md
       status.yaml                     # 機械可読な段階間契約(後述)
@@ -1091,7 +1134,9 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `env_value_hardcoded` | WARNING | テストコード(`tests/`)に、検証環境の情報の接続先(種類 `endpoint`)の値がそのまま書かれていない(`envValue` で読む)。実装: `tools/lint/lint.mjs` |
 | `requires_in_state_set` | ERROR | 作業10の対象シナリオ(探索記録のあるもの)の `requires` の全状態が初期状態セット(`vocab.initial_state_set` と、状態需要リストで状態が `採用` / `整備済` の行)にある。申し送り台帳の想定手段が参照する需要ID(`SD-...`)が状態需要リストにある。状態需要リストの需要IDが重複しない。実装: `tools/lint/lint.mjs` |
 | `requires_covered` | ERROR | 作業10: 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある。作業20: コード化した全シナリオの `requires` の全状態に、established check を持つ fixture がある(`S-CLEAN-ENV` は復元そのものなので除く)。実装: `tools/lint/lint.mjs` |
-| `setup_steps_recorded` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象がある(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)。proc-v016 以降のフロー(作業10の status.yaml の `procedure_version` で判定する)。実装: `tools/lint/lint.mjs` |
+| `setup_steps_recorded` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象がある(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)。proc-v016 以降のフロー(作業10の status.yaml の `procedure_version` で判定する)。proc-v017 以降のフローでは `classification: provided` のエントリにも当て、流用元(`reused_from.flow_id`)があることも見る(工程0の復元そのものである `S-CLEAN-ENV` を除く)。実装: `tools/lint/lint.mjs` |
+| `act_log_linked` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `act`(カード・連番 `seqs`・`established_check_seq`)があり、各連番が操作の記録(`act-log.jsonl`)に同じフロー・同じカードの成功した操作としてあり、`steps` の各 step と記録の操作・対象・値が順に一致する。`established_check_seq` は同じカードの成功した `assert` である。proc-v017 以降のフロー。実装: `tools/lint/lint.mjs` |
+| `phase_a_queue_complete` | ERROR | 作業10のフェーズAのタスクキュー(`work/_flows/F-<番号>/queue.json`)があり、カードがすべて合格(`passed`)か STOP(`stopped`)として記録されている。proc-v017 以降のフロー。実装: `tools/lint/lint.mjs` |
 | `blocked_recorded` | ERROR | `blocked` の全ステップに `blocked_by`(理由・参照・`resume_from`)があり、blocked のステップより前のステップが判定付きで記録されている。`禁止操作` の blocked は禁止IDまたは包括原則の番号を参照し、status.yaml の `blocked_by_prohibition` に含まれる。実装: `tools/lint/lint.mjs` |
 | `health_recorded` | ERROR | 探索記録(シナリオごとの最新の記録)で `health_signal` のあるステップ・シナリオの判定が `passed` でない。`health_fix` の付いた記録に `health_signal` がない。作業10の status.yaml の `health_signal`・`health_signal_items` が探索記録と一致する(proc-v007 以降のフロー)。作業15の status.yaml の `codeable_items` の各シナリオの最新の記録が `health_fix` 付きの `passed` である。proc-v014 以降のフローでは、`health_signal` のあるステップに `started_at` と `health_signal.observed_at`(`vocab.timestamp_format`)がある(作業15がログを集める時間範囲に使う)。実装: `tools/lint/lint.mjs` |
 | `db_only_has_reason` | WARNING | `verification: DB` に理由が併記されている |

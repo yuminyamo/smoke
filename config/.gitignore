@@ -1,3 +1,5 @@
 # 検証環境の情報の各自の設定(秘密情報を含む)を git に入れない(00_common.md ■検証環境の情報)
 environments.local.json
 environments.local.json.tmp-*
+# 進行役 pms の各自の設定(playwright-cli の呼び出し方など。00_common.md ■進行役と記録の道具)
+pms.json

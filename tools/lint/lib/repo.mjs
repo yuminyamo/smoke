@@ -219,6 +219,42 @@ export class Repo {
     });
   }
 
+  /** 進行役 pms の操作の記録(work/<機能>/exploration/act-log.jsonl)の全行: [{file, feature, line, r}] */
+  get actRecords() {
+    return this.memo('act', () => {
+      const out = [];
+      for (const fc of this.features) {
+        const rel = `work/${fc}/exploration/act-log.jsonl`;
+        if (!this.exists(rel)) continue;
+        this.read(rel).split('\n').forEach((l, i) => {
+          if (!l.trim()) return;
+          try { out.push({ file: rel, feature: fc, line: i + 1, r: JSON.parse(l) }); } catch {
+            this.fileErrors.set(rel, `${i + 1}行目が JSON として読めません`);
+          }
+        });
+      }
+      return out;
+    });
+  }
+
+  /** 進行役 pms のタスクキュー(work/_flows/F-<番号>/queue.json): Map<フローID, {rel, data}> */
+  get flowQueues() {
+    return this.memo('queues', () => {
+      const out = new Map();
+      const dir = this.abs('work/_flows');
+      if (!fs.existsSync(dir)) return out;
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (!e.isDirectory() || !/^F-\d{3}$/.test(e.name)) continue;
+        const rel = `work/_flows/${e.name}/queue.json`;
+        if (!this.exists(rel)) continue;
+        try { out.set(e.name, { rel, data: JSON.parse(this.read(rel)) }); } catch (err) {
+          this.fileErrors.set(rel, `JSON として読めません — ${err.message}`);
+        }
+      }
+      return out;
+    });
+  }
+
   /** scenarios.md のシナリオ定義: Map<シナリオID, {feature, file, line, requires:string[], requiresFound:boolean, steps:string[]}> */
   get scenarioDefs() {
     return this.memo('scen', () => {

@@ -36,7 +36,7 @@
 
 **検証環境の情報**(PMS の URL・DB の接続先・複合機の IP・アカウントとパスワードなど)は手順書ではなく設定ファイル(`config/environments.json` と、git に入れない `config/environments.local.json`)に持ち、`tools/env/env.mjs` で読み書きする(00 ■検証環境の情報。20章)。
 
-**手順書一式の版**は `vocab.meta.procedure_version`(例 `proc-v002`)で表し、git のタグと一致させる。作業40の改訂と、人間の直接改訂・明示的な指示による改訂のたびに上げる。2026-09-23 の改訂を `proc-v001`、**2026-09-24 の skills 化を `proc-v002`**、**2026-09-26 のゴールデンイメージ自動復元を `proc-v003`**、**同日の blocked の扱いと禁止操作リストの未記入への対応を `proc-v004`**、**同日の lint の実装を `proc-v005`**、**同日の lint の実行の契機を `proc-v006`**、**2026-09-28 の健全性の是正を `proc-v007`**、**同日の作業15の環境の変更と開始前シナリオを `proc-v008`**、**同日のゴールデンイメージの定義の拡張を `proc-v009`**、**同日の検証環境の情報と既存テストスクリプトの参照を `proc-v010`**、**2026-10-02 のシナリオ策定方式の分離を `proc-v011`**、**2026-10-03 のステップ1の状態の追加を `proc-v012`**、**同日のテスト環境の定義を `proc-v013`**、**同日のログ収集と時刻を `proc-v014`**、**2026-10-04 のリモートコマンドの整備を `proc-v015`**、**2026-10-06 の setup-log の記録の強化を `proc-v016`** とする。
+**手順書一式の版**は `vocab.meta.procedure_version`(例 `proc-v002`)で表し、git のタグと一致させる。作業40の改訂と、人間の直接改訂・明示的な指示による改訂のたびに上げる。2026-09-23 の改訂を `proc-v001`、**2026-09-24 の skills 化を `proc-v002`**、**2026-09-26 のゴールデンイメージ自動復元を `proc-v003`**、**同日の blocked の扱いと禁止操作リストの未記入への対応を `proc-v004`**、**同日の lint の実装を `proc-v005`**、**同日の lint の実行の契機を `proc-v006`**、**2026-09-28 の健全性の是正を `proc-v007`**、**同日の作業15の環境の変更と開始前シナリオを `proc-v008`**、**同日のゴールデンイメージの定義の拡張を `proc-v009`**、**同日の検証環境の情報と既存テストスクリプトの参照を `proc-v010`**、**2026-10-02 のシナリオ策定方式の分離を `proc-v011`**、**2026-10-03 のステップ1の状態の追加を `proc-v012`**、**同日のテスト環境の定義を `proc-v013`**、**同日のログ収集と時刻を `proc-v014`**、**2026-10-04 のリモートコマンドの整備を `proc-v015`**、**2026-10-06 の setup-log の記録の強化を `proc-v016`**、**2026-10-07 の低価格モデル対応 段1 共通の土台を `proc-v017`** とする。
 
 ### AIへの渡し方(skills)
 
@@ -212,7 +212,7 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 | シナリオ粒度の基準例 | 実物を1本作り、few-shot例として `stages.md` 付録Cに埋め込む |
 | ポーリングのタイムアウト既定値 | `vocab.default` に仮置き。実測値で調整 |
 | モデル割り当て | `pipeline.dot` の `model_stylesheet` に `MODEL_OPERATE` / `MODEL_TEXT` / `MODEL_IMPROVE` のプレースホルダを置いてある。実運用のモデル名に置換する。`MODEL_IMPROVE`(作業40)は実行AIと同じモデルでよい(分離の本質はセッションを分けること) |
-| lint の実装 | `00_common.md` の lint 規則表が仕様(38規則)。**2026-09-26(proc-v005)の時点で12規則を実装済み、2026-09-28(proc-v010)の時点で15規則を実装済み**(健全性の `health_recorded`、検証環境の情報の `env_value_leak`・`env_value_hardcoded` を加えた)。**2026-10-03(proc-v012)に `requires_in_state_set` を加え、38規則のうち16規則を実装済み**。**2026-10-06(proc-v016)に `setup_steps_recorded` を加え、39規則のうち17規則を実装済み**。 ランナー `node tools/lint/lint.mjs` で1コマンドで実行でき、`skills_in_sync`(生成スクリプトの `--check`)・`env_restored`(`Test-EnvRestoreMarker.ps1`)・`prohibition_recheck`(照合スクリプト)もランナーから呼ぶ。実装状況は `--list` で確かめられ、00 の lint 表の「実装:」とランナーの実装が食い違うとランナーは実行しない。**次の候補**は、作業20の突合(`scenario_id_exists`・`scenario_id_unique`・`traceability_complete`)、`ext_demand_unique`、`vocab_sync`、生成コードの静的検査(`no_fixed_wait`・`select_only`・`ext_wrapper_only`)。**`protected_unchanged` と `imp_tier_valid` は、作業40の区分Aの自律適用を解禁する条件なので、自律適用を始めたい時点までに実装する**(`imp_tier_valid` は作業40を実際に回し始めてからでよい) |
+| lint の実装 | `00_common.md` の lint 規則表が仕様(38規則)。**2026-09-26(proc-v005)の時点で12規則を実装済み、2026-09-28(proc-v010)の時点で15規則を実装済み**(健全性の `health_recorded`、検証環境の情報の `env_value_leak`・`env_value_hardcoded` を加えた)。**2026-10-03(proc-v012)に `requires_in_state_set` を加え、38規則のうち16規則を実装済み**。**2026-10-06(proc-v016)に `setup_steps_recorded` を加え、39規則のうち17規則を実装済み**。**2026-10-07(proc-v017)に進行役 pms の記録を見る `act_log_linked`・`phase_a_queue_complete` を加え、41規則のうち19規則を実装済み**。 ランナー `node tools/lint/lint.mjs` で1コマンドで実行でき、`skills_in_sync`(生成スクリプトの `--check`)・`env_restored`(`Test-EnvRestoreMarker.ps1`)・`prohibition_recheck`(照合スクリプト)もランナーから呼ぶ。実装状況は `--list` で確かめられ、00 の lint 表の「実装:」とランナーの実装が食い違うとランナーは実行しない。**次の候補**は、作業20の突合(`scenario_id_exists`・`scenario_id_unique`・`traceability_complete`)、`ext_demand_unique`、`vocab_sync`、生成コードの静的検査(`no_fixed_wait`・`select_only`・`ext_wrapper_only`)。**`protected_unchanged` と `imp_tier_valid` は、作業40の区分Aの自律適用を解禁する条件なので、自律適用を始めたい時点までに実装する**(`imp_tier_valid` は作業40を実際に回し始めてからでよい) |
 | lint の実行の契機 | **2026-09-26(proc-v006)に決定した**(16章)。作業10・20が完了報告の前に自分で実行し、入口 skill が作業20の前とフロー完了の前に関所として実行し、コミットの前に pre-commit フックが `skills_in_sync` を実行する。**残る課題**: CI の導入時に全体の lint を加えること。pre-commit フックは各自が有効にする必要がある(`git config core.hooksPath tools/git-hooks`)ため、有効にしていないメンバーのコミットは検査されない |
 | 保護ブロックの基準ハッシュ | lint 実装時に `lint/protected-baseline.yaml` を作成する(本改訂時点の保護ブロックを基準とする) |
 | 作業40の起動判定 | lint `improvement_due` の実装までは人間の指示で起動する。初期値(3フローごと・同一箇所2件・1回あたり試行3件)は `vocab.default` に仮置き(合意済み) |
@@ -237,6 +237,42 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 ---
 
 # 改訂履歴
+
+## 27. 2026-10-07 改訂(低価格モデル対応 段1 共通の土台)— 手順版 proc-v017
+
+**人間の指示による改訂である。** 人間の指示の原文は「docs/94_改訂指示/01_共通の土台.md に従って改訂して」。作業10を最後まで実施したのに、setup-log の `steps` と安定ロケータが抜けていた(`investigations/001_setup-log記録抜け.md`)。proc-v016 は記録の時機の規則と lint を足したが、記録はまだAIが書いており、低価格のモデルは長い会話の途中でこの義務を落とす。`docs/94 低価格モデル対応 検討.md` は、手順の正しさを「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らない形に変える方針を立て、4段の改訂指示(`docs/94_改訂指示/`)に分けた。本改訂はその段1であり、進行役 `tools/pms/` の `pms act`(操作と記録の一体化)・タスクキュー・カード・提出の検査を作り、作業10のフェーズA(初期状態の準備)をカードで行うようにした。**この段では、カードは作業10と同じ会話の中で順に行う**(サブエージェントやスクリプト実行は段2・段3)。
+
+人間の決定(2026-10-07):
+
+> - docs/94 の提案(`pms act`・タスクキュー・カード・提出時の検査・記録からの生成)で手順書を改訂する
+> - 実行形態は、スクリプト実行(B2: 進行役 `pms run` がカードごとにセッションを起こす)を主な経路とし、IDE 内のループ(B1)を副経路とする
+> - フックは必須にしない。記録の正しさは `pms act`・キュー・`pms submit` で担保する。フックは、段3の計測でやり直しが目立った場合だけ入れる
+> - 導入は4段に分け、段ごとに手順版を上げる
+> - 調査票001の結果を待たず、フェーズAで扱う状態はすべて、カードか pms の機械的な処理で扱う。既存 fixture の流用(`provided`)と、初期状態セットにない状態も含める
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 27.1 | **進行役 `tools/pms/pms.mjs` を新設した。** `queue build`(対象シナリオの `requires` からフェーズAのカードを作る)・`next`(次のカードを出す。提出されないまま呼ばれたら同じカードを出し直し、上限を超えたら STOP)・`act`(画面操作を playwright-cli で1回ずつ実行し、操作の前に `generate-locator` でロケータを取り、区分と一意性・時刻・値(`<env:キー>` は伏せる)を `act-log.jsonl` に1行書く。出力に毎回 `now`・`next`)・`submit`(schema・記録との突き合わせ・あいまい語・lint の規則で検査し、合格なら setup-log と台帳を書く)・`status`・`reopen`(人間が STOP のカードを戻す)。設計は `tools/pms/README.md`(段2以降が読む仕様書)。テスト 17 件 | tools/pms / config/pms.sample.json |
+| 27.2 | **カードを3種類にした。** `setup.build`(状態を `pms act` で作り `assert` で確かめる)・`setup.code`(合格した操作列を部品と fixture にし2回実行する。pms が記録からコードの下書きを載せる)・`setup.reuse`(過去のフローの fixture を1回実行して確かめるだけ。成立しなければ pms が作り直しのカードを出し、既存の fixture・部品を同じ名前のまま直させる)。テンプレートは `procedure/cards/`、出力の schema は `procedure/schemas/`。**規則は原本の規則IDの付いた行から pms が差し込み**、テンプレートに書き写さない。保護ブロック(`EXT_SKILL_ONLY`・`PROHIBITED_OPS`)はブロックごと文言を変えずに差し込む | procedure/cards / schemas |
+| 27.3 | **§10 フェーズAを、pms のカードで行う形に書き換えた。** 状態の列挙・既存 fixture の確認の振り分け・初期状態セット外の記録・状態需要リストの更新・setup-log と台帳の記録は pms が行い、AIはカードの判断だけを行う。「状態を1つ整備したら次へ進む前に記録する」(proc-v016)は、pms が提出の合格時に書くため廃した。フェーズAの画面操作は `pms act` に限る(パートCの探索はこの版では変えない)。カードが使う規則に規則IDを付けた(R-SETB・R-SETC・R-SETR)。入力・出力の表に pms とその記録を加えた | stages §10 |
+| 27.4 | **§10 固有の禁止事項に3つ加えた。** フェーズAで playwright-cli を直接呼ばない / `pms submit` の不合格を、記録や出力を削って通さない / setup-log・申し送り台帳・外部操作需要リスト・状態需要リストをフェーズAで直接編集しない | stages §10 |
+| 27.5 | **§10 DoD を合わせた。** `provided` にも `steps` と流用元を求める項目、`act` と記録の一致(lint `act_log_linked`)、フェーズAのキューのカードがすべて合格か STOP(lint `phase_a_queue_complete`)。報告書の固有セクション1に STOP のカードと作り直した fixture を加えた | stages §10 |
+| 27.6 | **付録Bを合わせた。** proc-v017 以降は setup-log のエントリをすべて pms が書く。`built-by-ui` に記録との対応 `act`(カード・連番)、CSS の暫定ロケータの step に `fragile`。`provided` は流用元のエントリを写し、`reused_from` を書く。`blocked` に `blocked_by`(理由・申し送りID・需要ID/禁止ID)。`S-CLEAN-ENV` は `provided_by` | stages 付録B |
+| 27.7 | **00 に ■進行役と記録の道具(pms)を新設した。** 原則 P1・P5・P6、道具の役割、記録の置き場所、AIへの規則(R-PMS-1〜4)、出力に `now`/`next` を付ける理由。■ロケータ規約に「フェーズAではロケータは `pms act` が取り、AIは手で書かない」(R-LOC-4)を加えた。カードが使う規則に規則IDを付けた(R-STA・R-PRT・R-PO・R-LOC・R-DAT・R-ENV。文言は変えていない)。■ディレクトリ構成に pms の置き場所を加えた | 00 |
+| 27.8 | **lint に2規則を加え、1規則を広げた(すべて proc-v017 以降のフローだけ)。** `act_log_linked`(ERROR。`built-by-ui` の `act` の連番が act-log にあり、step と記録が一致する)・`phase_a_queue_complete`(ERROR。フェーズAのキューのカードがすべて合格か STOP)。`setup_steps_recorded` を `provided` に広げた(`steps` と `reused_from`。`S-CLEAN-ENV` を除く)。テスト1件を追加。実装済みは41規則のうち19規則 | 00 ■lint / tools/lint |
+| 27.9 | **vocab に語彙を加えた。** `pms_card_kind`・`pms_card_status`・`pms_reject_kind`・`pms_act_action`(操作の一覧と setup-log の step への対応)・`locator_class`・`pms_vague_words`・`id_format.card`(`C-<4桁>`)・`id_format.rule`(`R-<区分>-<連番>`)。手順版を `proc-v017` に更新 | vocab |
+| 27.10 | 利用説明書に、pms の導入(`config/pms.json`)・フェーズAの進み方・STOP の扱い・既知の制約を加えた | docs/skills版_利用説明書.md |
+
+### 変更していないもの・後の段で行うもの
+
+- 保護ブロック・`pipeline.dot`・入口 skill(`procedure/router/SKILL.md`)は変更していない(保護ブロックはカードに文言を変えずに引用するだけ)
+- 作業10の工程0・パートA・パートB・パートR・パートP・パートCの探索(フェーズA以外)・作業15・20・30は変えていない。探索のカード(`explore.step`)・`pms run`(カードごとにセッションを起こす)・報告書と status.yaml の記録からの生成・`pms stats` は段2、IDE 内のループは段3、フックは段4(任意)
+- 規則IDは、3種類のカードが使う規則にだけ付けた。00・stages の全体を規則IDで分解するのは後の段
+- `setup.code`・`setup.reuse` の実行(テストの実行)は、この段ではAIが行って結果を書く(pms は回数・終了コード・時刻の形を検査する)。実行の記録を道具が残す形は後の段で検討する
+- 記入用テンプレート(91・93・96)の表の形は変えていない(pms はその形で行を足す)。flow.md のテンプレート(92)のタスクは変えていない
+- すでに作業場所で flow.md を持つフロー(proc-v016 以前で始めたもの)は、旧版のまま完了させる。新しい lint 規則と `setup_steps_recorded` の広げた部分は、proc-v017 以降で始めたフローにだけ当てる
+- 手順改善台帳(作業場所の `work/_common/procedure-improvement.md`)の改訂表への `指示適用` の記録は、本改訂を作業場所に取り込むときに行う
+- playwright-cli の実物での確認はしていない(`tools/pms/README.md` 8章の前提。人間が確かめる)
 
 ## 26. 2026-10-06 改訂(setup-log の記録の強化)— 手順版 proc-v016
 

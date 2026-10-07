@@ -1,0 +1,73 @@
+{
+  "$comment": "カード setup.build の出力(00 ■進行役と記録の道具 / stages.md §10 フェーズA)。tools/pms/lib/schema.mjs が検査する。x-vocab は vocab.yaml のキーを指す(値を書き写さない)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "seqs", "established_check_seq", "fragile", "blocked", "notes"],
+  "properties": {
+    "result": {
+      "enum": ["built", "blocked", "cannot_proceed"],
+      "description": "built = 状態を作り成立を確かめた / blocked = 作れない(理由を blocked に書く)/ cannot_proceed = カードの範囲で判断できない(人間へ回る。理由を notes に書く)"
+    },
+    "seqs": {
+      "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true,
+      "description": "成功した最短の操作の連番(pms act の出力の seq)を順に並べる。snapshot・assert は入れない。built 以外は []"
+    },
+    "established_check_seq": {
+      "type": ["integer", "null"], "minimum": 1,
+      "description": "成立を確かめた pms act assert の連番。built 以外は null"
+    },
+    "fragile": {
+      "type": "array",
+      "description": "CSS の暫定ロケータを使った連番と理由(00 ■ロケータ規約の6。なければ [])",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["seq", "reason"],
+        "properties": {
+          "seq": { "type": "integer", "minimum": 1, "description": "seqs のうち CSS の暫定ロケータの連番" },
+          "reason": { "type": "string", "minLength": 10, "maxLength": 200, "description": "安定ロケータを取れない理由と壊れやすさ(1文)" }
+        }
+      }
+    },
+    "blocked": {
+      "type": ["object", "null"],
+      "description": "blocked のときの理由(それ以外は null)。pms が申し送り台帳・外部操作需要リストに書く",
+      "additionalProperties": false,
+      "required": ["reason", "detail", "ref", "ext_demand"],
+      "properties": {
+        "reason": { "type": "string", "x-vocab": "reason_code", "description": "理由コード" },
+        "detail": { "type": "string", "minLength": 10, "maxLength": 200, "description": "作れない内容(何が足りないか・何に当たるか)を1〜2文で具体的に" },
+        "ref": { "type": ["string", "null"], "maxLength": 40, "description": "参照。禁止操作 なら禁止ID(PROH-<3桁>)か包括原則の番号(包括原則1〜4)。それ以外は null でよい" },
+        "ext_demand": {
+          "type": ["object", "null"],
+          "description": "操作手段なし のとき必須(外部操作需要リストに書く項目)。それ以外は null",
+          "additionalProperties": false,
+          "required": ["operation", "target", "gap", "alternative", "prohibition"],
+          "properties": {
+            "operation": { "type": "string", "minLength": 4, "maxLength": 60, "description": "外部操作を業務語で(skill名・ツール名で書かない。例 クライアントから印刷指示)" },
+            "target": { "type": "string", "pattern": "^(実機|シミュレータ|CLIENT|AD|SMTP|PMS-OS|VM)(:.+)?$", "description": "操作対象(vocab.external_op.target。型番があれば 実機:<型番>)" },
+            "gap": { "type": "string", "x-vocab": "ext_gap", "description": "不足の区分" },
+            "alternative": { "type": "string", "x-vocab": "ext_alternative", "description": "Web UI・DB による代替手段の見込み" },
+            "prohibition": { "type": "string", "minLength": 4, "maxLength": 60, "description": "禁止操作リストの該当行ID(例 PROH-001 条件付き許可)または 該当なし" }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": ["string", "null"], "maxLength": 200,
+      "description": "失敗した試行の要点(1〜2文。なければ null)。cannot_proceed のときは理由(必須)"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "result": { "const": "built" } } },
+      "then": { "properties": { "seqs": { "minItems": 1 }, "established_check_seq": { "type": "integer" }, "blocked": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "result": { "const": "blocked" } } },
+      "then": { "properties": { "seqs": { "maxItems": 0 }, "established_check_seq": { "type": "null" }, "blocked": { "type": "object" } } }
+    },
+    {
+      "if": { "properties": { "result": { "const": "cannot_proceed" } } },
+      "then": { "properties": { "notes": { "type": "string", "minLength": 10 }, "blocked": { "type": "null" } } }
+    }
+  ]
+}

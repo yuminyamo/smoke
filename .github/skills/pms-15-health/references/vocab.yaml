@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-06 / 版: v18(setup-log の記録の強化: 手順版を proc-v016 に更新)
+# 改訂: 2026-10-07 / 版: v19(低価格モデル対応 段1 共通の土台: 手順版を proc-v017 に更新、pms_card_kind・pms_card_status・pms_reject_kind・pms_act_action・locator_class・pms_vague_words・id_format.card・id_format.rule を追加)
+#       2026-10-06 / 版: v18(setup-log の記録の強化: 手順版を proc-v016 に更新)
 #       2026-10-04 / 版: v17(リモートコマンドの整備: 手順版を proc-v015 に更新)
 #       2026-10-03 / 版: v16(ログ収集と時刻: 手順版を proc-v014 に更新、kb_category に T12 ログID知見、default.log_window_margin_sec、pre_stage_entry_kind・timestamp_format を追加、golden_image と pre_stage_state を外部操作エントリに合わせた)
 #       2026-10-03 / 版: v15(テスト環境の定義: 手順版を proc-v013 に更新、test_environment を追加、包括原則3をテスト環境の定義で書き直した(保護ブロック。人間の指示による改訂))
@@ -33,8 +34,8 @@
 
 meta:
   step: 1                       # 本語彙が対象とするステップ
-  revision: "2026-10-06"
-  procedure_version: proc-v016  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  revision: "2026-10-07"
+  procedure_version: proc-v017  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -448,6 +449,8 @@ id_format:
   signal: "SIG-<4桁連番>"                  # 手順改善シグナル
   improvement: "IMP-<3桁連番>"             # 手順の改訂(案)
   improvement_run: "IR-<3桁連番>"          # 作業40の実行
+  card: "C-<4桁連番>"                       # 進行役 pms のカード(フローごとに採番。00 ■進行役と記録の道具)
+  rule: "R-<区分>-<連番>(例 R-LOC-1)"      # 規則ID。00_common.md・stages.md の規則の行に **[R-LOC-1]** の形で付け、カードのテンプレートが {{rule:R-LOC-1}} で引用する
 id_rule: 一度採番したIDは変更しない(他成果物から参照されるため)
 
 # ── 既定値 ──────────────────────────────────────────────
@@ -470,6 +473,79 @@ default:
   max_trial_extensions: 1          # 判定期間の延長回数の上限
 
 timestamp_format: "ISO 8601 の日時。秒まで、時差付き(例 2026-10-03T13:50:12+09:00)"   # 探索記録の started_at・ended_at・health_signal.observed_at(付録A)。AI実行マシンの時計で記録する
+
+# ── 進行役 pms(00 ■進行役と記録の道具。tools/pms/)─────────────────
+pms_card_kind:                  # カードの種類(1枚1判断。テンプレートは procedure/cards/<種類>.md、出力の schema は procedure/schemas/<種類>.out.json)
+  setup.build: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめる(作業10フェーズA)
+  setup.code: 合格した setup.build の操作列を、シナリオ部品と fixture のコードにし、2回実行して確かめる(作業10フェーズA)
+  setup.reuse: 過去のフローの fixture を1回実行し、状態が成立するかを確かめる。再整備・再探索はしない(作業10フェーズA)
+
+pms_card_status:                # キューの中のカードの状態(work/_flows/F-<番号>/queue.json)
+  pending: キューにあり、まだ出していない
+  issued: pms next で出した。合格する提出を待っている(提出されないまま pms next が呼ばれたら同じカードを出し直す)
+  passed: 提出が検査に合格した(記録は pms が書いた)
+  stopped: 人間の確認待ち(STOP)。出した回数・不合格の回数が上限(config/pms.json)に達した、または cannot_proceed で提出された
+
+pms_reject_kind:                # pms submit の不合格の区分(submit-log.jsonl に残す)
+  schema: 出力が schema を満たさない(ファイルがない・JSON でない・必須の欄・許される値)
+  seq_missing: 連番が記録にない・別のカードの記録・失敗した操作・状態を作る操作でない・順序が増えていない
+  unstable_locator: 操作のロケータが安定でない(CSS・構造で、fragile と testid-requests への記載がない)、または一意でない
+  red_flag: あいまいな語、長すぎる・短すぎる欄、blocked なのに参照がない、実行の時刻がカードを出す前、など形式による異常
+  code_mismatch: 部品・fixture のファイルと名前がない、記録の各操作・established check のロケータがコードにない、起動確認テストがない
+  runs: 実行の記録の回数・終了コード・時刻の形が違う
+  reuse_source: 流用元のエントリまたは fixture のファイルがない
+  lint: setup-log に書く予定のエントリが lint(setup_steps_recorded・no_temp_locator・env_value_leak)に違反する
+
+pms_act_action:                 # pms act の操作。step = setup-log の steps[].action(付録B)。step のない操作は記録に残すが steps にしない
+  open:
+    step: goto
+    meaning: ブラウザを開いて URL に移動する(セッション名はフローID。値は <env:キー> でよい)
+  goto:
+    step: goto
+    meaning: 開いているブラウザで URL に移動する
+  snapshot:
+    meaning: 画面の構造と要素参照(ref)を見る
+  click:
+    step: click
+    meaning: 要素をクリックする
+  dblclick:
+    step: dblclick
+    meaning: 要素をダブルクリックする
+  fill:
+    step: fill
+    meaning: 入力欄に値を入れる
+  type:
+    step: type
+    meaning: 要素に1文字ずつ入力する
+  select:
+    step: select
+    meaning: 選択肢を選ぶ
+  check:
+    step: check
+    meaning: チェックを入れる
+  uncheck:
+    step: uncheck
+    meaning: チェックを外す
+  hover:
+    step: hover
+    meaning: 要素にマウスを重ねる
+  press:
+    step: press
+    meaning: 要素でキーを押す(例 Enter)
+  upload:
+    step: upload
+    meaning: ファイルの入力欄にファイルを指定する
+  assert:
+    meaning: 状態の成立を確かめる(visible / hidden / text)。established check に使う
+  ext:
+    step: external
+    meaning: 外部操作 skill の実行体を呼ぶ(KB T05 の操作IDを付ける)
+
+locator_class:                  # pms act が generate-locator で取ったロケータの区分(00 ■ロケータ規約)
+  stable: 00 ■ロケータ規約の1〜5(getByRole・getByLabel・getByPlaceholder・getByText・getByTestId)だけをつないだもの
+  css: それ以外(locator(…) の CSS・構造セレクタ、nth・first など位置に頼るもの)。00 ■ロケータ規約の6
+
+pms_vague_words: [適宜, など, 必要に応じて, 等]   # pms submit が red_flag として検出するあいまいな語(「等」は「〜等」の形)
 
 # ── pipeline.dot が参照するコンテキストキー ──────────────────
 # 各段階は status.yaml の context_updates にこれらを出力する(00の status.yaml 契約)

@@ -2,7 +2,7 @@
 
 本書は**各作業に固有な内容だけ**を持つ。原則・規約は `00_common.md`、統制語彙は `vocab.yaml`、実行順序と分岐は `pipeline.dot` を参照する。**それらの再掲を本書に書かない。**
 
-改訂: 2026-10-06 / 版: v15(setup-log の記録の強化: §10 フェーズAで、状態を1つ整備・確認するたびに setup-log に記録し、`built-by-ui` は `steps` と安定ロケータを書くようにした。DoD に lint `setup_steps_recorded` の項目を、付録Bに補足ルールを加えた。前版 v14 は 2026-10-03 のログ収集と時刻)
+改訂: 2026-10-07 / 版: v16(低価格モデル対応 段1 共通の土台: §10 フェーズAを進行役 `pms` のカード(`setup.build`・`setup.code`・`setup.reuse`)で行うようにし、画面操作を `pms act` に限り、setup-log と台帳の記録を pms が書くようにした。カードが使う規則に規則IDを付けた。固有の禁止事項・DoD・付録Bを合わせた。前版 v15 は 2026-10-06 の setup-log の記録の強化)
 
 ---
 
@@ -421,6 +421,7 @@ context_updates:
 | 開始前シナリオ | `tools/pre-stage/run-scenarios.mjs --hook work10`(設定 `config/pre-stage-scenarios.json`。00 ■回帰実行の環境前提 開始前シナリオ) |
 | 前回の status.yaml | パートPのとき: 当該フローの作業10の status.yaml(`blocked_by_prohibition` と `prohibited_ops`) |
 | lint | `tools/lint/lint.mjs`(完了前の lint)。lint の指摘による差し戻しのときは、入口 skill から渡された指摘 |
+| 進行役 | `node tools/pms/pms.mjs`(フェーズAのキュー・カード・操作の記録 `pms act`・提出の検査。設定 `config/pms.json`。00 ■進行役と記録の道具) |
 
 ## 4. 固有手順
 
@@ -556,16 +557,36 @@ context_updates:
 
 **フェーズA: 初期状態の準備**
 
-- 対象シナリオの `requires` の状態IDを重複排除して列挙する
-- **`requires` の整備は、そのシナリオが途中で `blocked` になる見込みでも省略しない。** `blocked` はステップ単位の判定であり、前提状態の整備はその対象ではない。整備しておけば、blocked が解けたとき(パートP・再探索フロー)と作業20で、前提状態の作り方を探し直さずに済む
-- **既存 fixture があれば実行し、established check が通ることを確認するのみ**(再整備・再探索しない)
-- 無いものだけ実操作で整備する: 文書から仮説を立てて探索し、成功した最短操作列をシナリオ部品(`tests/flows/`)として実装、それを呼ぶ fixture を `tests/fixtures/` に実装する。**established check(状態成立の機械的確認)を必ず実装する**(例: ログイン済→ヘッダーにログアウトリンク表示)
-- 実装したセットアップは2回実行して確認する(2回目が残留データで失敗するなら後始末または専用データ化)。確認できない場合は `verified: false` と明記(作業20の最初の確認対象になる)
-- 初期状態セットにない `requires` は整備を試みず台帳へ記録し、当該シナリオを `blocked` とする
-- 状態需要リストで `採用` の状態(fixture 未整備)は、基本の状態と同じ規約で実操作により整備する。行の「established check の案」と「構築の見込み」は仮説の材料であり、実画面で確かめる。整備・確認できたら行の状態を `整備済` にし、fixture の所在を書く。整備できなければ `採用` のままにし、setup-log に `classification: blocked` と理由を書く
-- **ログイン状態(`S-ADMIN-LOGIN` / `S-USER-LOGIN`)の fixture を本フローで初めて整備した場合は、起動確認テスト `tests/readiness/server-ready.setup.ts` も作る**(00 ■回帰実行の環境前提 / 起動完了の判定)。整備したログインのシナリオ部品を呼び、fixture の established check と同じ条件で成功を判定する。既にあれば作らない
-- `setup-log.yaml`(付録B)に記録する。**`blocked` のシナリオの `requires` も記録する**(整備できなかったものは `classification: blocked` と理由)
-- **状態を1つ整備・確認したら、次の状態へ進む前に setup-log に記録する**(パートCのあとにまとめて書かない。あとでまとめると、操作列とロケータが抜けやすい)。本フローで整備した状態(`built-by-ui`)は、成功した最短の操作列を `steps` に書き、各操作の安定ロケータは「安定ロケータの解決」と同じ規約で操作の直後に解決して `locator` に書く。**fixture・シナリオ部品のコードに書いたことを、setup-log の記録の代わりにしない**(付録B)
+フェーズAは、進行役 `pms`(00 ■進行役と記録の道具)が出すカードで行う。**どの状態を整備するかを決めるのも、setup-log・台帳に記録するのも pms である。** AIはカードの判断だけを行う。
+
+1. `node tools/pms/pms.mjs queue build --flow <フローID> --phase A` を実行する。pms が、対象シナリオ(このフローで作ったシナリオ。再探索フロー・パートPでは `--scenarios <シナリオID,...>` で対象を渡す)の `requires` の状態IDを重複排除して列挙し、状態ごとにカードを作る
+2. `node tools/pms/pms.mjs next --flow <フローID>` を実行し、出力の `body`(カード)の指示どおりに行う。カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)を実行する。不合格なら、返された理由だけを直して再提出する。**`next` が `done` を返すまで、1と2のあとは2を繰り返す**
+3. `next` が `STOP` を返したら、出力の `message` を利用者に伝えて指示を待つ。利用者が続けてよいと答えたら、`pms next` から続ける(STOP のカードは人間の確認待ちとして残り、報告書の固有セクション1に書く)
+4. 中断・会話の要約のあとは、`node tools/pms/pms.mjs status --flow <フローID>` で現在のカードを確かめ、`pms next` から続ける(提出していないカードは、`next` が同じカードを出し直す)
+
+**pms がカードにする規則**(AIは選ばない):
+
+- **`requires` の整備は、そのシナリオが途中で `blocked` になる見込みでも省略しない**(pms は全部の状態をカードにする)。`blocked` はステップ単位の判定であり、前提状態の整備はその対象ではない。整備しておけば、blocked が解けたとき(パートP・再探索フロー)と作業20で、前提状態の作り方を探し直さずに済む
+- 過去のフローで整備・確認済み(`verified: true`)の fixture がある状態は `setup.reuse`(既存 fixture を実行して確かめるだけ)。成立しなければ、pms が作り直しの `setup.build` と `setup.code` を出す(既存の fixture・部品を同じ名前のまま作り直す)。過去の記録に操作列か安定ロケータがないときも、記録を取り直すために `setup.build` を出す
+- それ以外の状態は `setup.build`(画面操作で作る)。合格したら、pms が `setup.code`(部品と fixture のコード)を出す
+- 初期状態セットにない `requires` は、カードにせず、pms が setup-log に `classification: blocked`(理由 `初期状態外`)と申し送り台帳の行を書く。AIは何もしない(当該シナリオはパートCで `blocked` とする)。`S-CLEAN-ENV`(ゴールデンイメージの復元の直後)は工程0の復元そのものなので、pms が `provided` として記録する
+- 状態需要リストで `採用` の状態も、基本の状態と同じくカードで整備する。整備・確認できたら pms が行を `整備済` にし fixture の所在を書く。整備できなければ `採用` のまま、setup-log は `classification: blocked`
+
+**カードの規則**(カードの依頼文に差し込まれる。00 ■進行役と記録の道具):
+
+- **[R-SETB-1]** 状態は、文書(KB・マニュアル)から操作手順の仮説を立て、実画面で探索して作る。文書と実画面が食い違ったら実画面を優先して続ける。試行錯誤してよい。成功した最短の操作列だけを、`pms act` の記録の連番で `seqs` に示す(失敗した試行は `notes` に要点だけ書く)
+- **[R-SETB-2]** 状態の成立は、established check(状態成立の機械的確認。例: ログイン済 → ヘッダーにログアウトリンクが表示される)を `pms act assert` で確かめて示す。確かめられない状態を `built` にしない
+- **[R-SETB-3]** 状態需要リストの行の「established check の案」と「構築の見込み」は仮説の材料であり、実画面で確かめる
+- **[R-SETB-4]** 作れない状態は `blocked` で提出する。理由は `vocab.reason_code` から選ぶ(実操作で作れないなら `状態未整備`、必要な外部操作に使える skill がないなら `操作手段なし`、禁止操作リスト・包括原則に当たるなら `禁止操作`。判別は `vocab.discrimination`)。`禁止操作` は禁止IDか包括原則の番号を、`操作手段なし` は外部操作需要リストに書く項目を添える
+- **[R-SETC-1]** 合格した操作列を、シナリオ部品(`tests/flows/`)として実装し、それを呼ぶ fixture を `tests/fixtures/` に実装する。**established check を fixture に必ず実装する**
+- **[R-SETC-2]** 実装したセットアップは2回実行して確かめる(2回目が残留データで失敗するなら、後始末を足すか専用データにする)。2回とも成功しなければ、pms が `verified: false` と記録する(作業20の最初の確認対象になる)
+- **[R-SETC-3]** ログイン状態(`S-ADMIN-LOGIN` / `S-USER-LOGIN`)の fixture を本フローで初めて整備した場合は、起動確認テスト `tests/readiness/server-ready.setup.ts` も作る(00 ■回帰実行の環境前提 / 起動完了の判定)。整備したログインのシナリオ部品を呼び、fixture の established check と同じ条件で成功を判定する。既にあれば作らない
+- **[R-SETC-4]** 作り直し(既存の fixture で状態が成立しなかった、または記録を取り直した)のときは、既存の fixture・部品を**同じ名前のまま**直す(ほかのテストがその名前で使っているため)
+- **[R-SETR-1]** 既存の fixture は1回実行し、established check が通るかを確かめるだけにする(再整備・再探索しない)。通らなければ直さずに `broken` で提出する(作り直しは pms が別のカードで出す)
+
+**記録**: setup-log(付録B)・申し送り台帳・外部操作需要リスト・状態需要リストへのフェーズAの記録は、すべて pms が提出の合格時に書く(`built-by-ui` の `steps` は `pms act` の記録から作る)。**AIは setup-log と台帳をフェーズAで直接編集しない。** 状態を1つ整備するたびに AI が setup-log に記録する規定(proc-v016)は、pms が書くため廃した。fixture・シナリオ部品のコードに書いたことは、記録の代わりにならない(付録B)
+
+**フェーズAの画面操作は `pms act` で行う**(00 ■進行役と記録の道具)。playwright-cli を直接使わない。直接呼んだ操作は記録に残らず、その操作を含む提出は不合格になる。ロケータは `pms act` が操作の前に取って区分と一意性を記録する(00 ■ロケータ規約)。パートCの探索(フェーズA以外)は、この版では playwright-cli を直接使う(探索のカードは後の版で加える)
 
 **探索の進め方**
 
@@ -639,6 +660,9 @@ context_updates:
 - **使える skill がない外部操作を、独自の手段で実行しない。skill を作成・改変しない**
 - **禁止操作リストが未記入・存在しないことを理由に、シナリオやステップを `blocked` にしない**
 - **`blocked` を理由に、`requires` の整備と、blocked のステップより前の探索・記録を省略しない。** 探索中に確立した操作を、blocked を理由に捨てない
+- **フェーズAで playwright-cli を直接呼ばない**(画面操作は `pms act` で行う)
+- **`pms submit` の不合格を、記録やカードの出力を削って通さない**(返された理由のところを直す。直せなければ `cannot_proceed` で提出する)
+- **setup-log・申し送り台帳・外部操作需要リスト・状態需要リストを、フェーズAで直接編集しない**(pms が書く)
 
 <!-- protected:EXPECTED_IMMUTABLE -->
 
@@ -661,7 +685,9 @@ context_updates:
 |---|---|---|
 | `scenarios` | `work/<feature_code>/scenarios.md` | 付録C。既存があれば追記し、既存行は変更しない |
 | `exploration-log` | `work/<feature_code>/exploration/exploration-log.yaml` | 付録A |
-| `setup-log` | `work/<feature_code>/exploration/setup-log.yaml` | 付録B |
+| `setup-log` | `work/<feature_code>/exploration/setup-log.yaml` | 付録B(フェーズAは pms が書く) |
+| 操作の記録 | `work/<feature_code>/exploration/act-log.jsonl` | `pms act` が書く(1操作1行。00 ■進行役と記録の道具) |
+| フェーズAのキュー・カード・提出の記録 | `work/_flows/F-<番号>/queue.json`・`cards/`・`submit-log.jsonl`(pms が書く)/ `out/`(カードの出力。AIが書く) | 00 ■進行役と記録の道具 |
 | ページオブジェクト・部品 | `tests/pages/`, `tests/flows/`, `tests/external/`, `tests/fixtures/` | 00 |
 | 起動確認テスト | `tests/readiness/server-ready.setup.ts`(ログイン fixture を初めて整備した場合のみ) | 00 ■回帰実行の環境前提 |
 | DISC | `work/_common/discrepancies.md` | 00 |
@@ -675,7 +701,7 @@ context_updates:
 
 報告書の固有セクション(生成と探索をまとめた1つの報告とする):
 
-1. **初期状態セットアップ結果と blocked の一覧**(`vocab.setup_classification` 別。`verified` の有無。`blocked` のシナリオの `requires` を含む。blocked にしたシナリオ・ステップごとの理由・参照・再開するステップ。禁止操作リストの記入状態と版。blocked のシナリオの探索で確立した操作とその反映先)
+1. **初期状態セットアップ結果と blocked の一覧**(`vocab.setup_classification` 別。`verified` の有無。フェーズAで STOP(人間の確認待ち)になったカードと理由、作り直した fixture。`blocked` のシナリオの `requires` を含む。blocked にしたシナリオ・ステップごとの理由・参照・再開するステップ。禁止操作リストの記入状態と版。blocked のシナリオの探索で確立した操作とその反映先)
 2. **DB不変条件の結果**(**違反が1件でもあれば最優先で記載**)
 3. **判定一覧表**(シナリオID・ステップID・判定・検証手段・健全性シグナル(種類と要点。なければ空)・DISC参照・証跡パス)
 4. **非同期待機の実測一覧**(待機条件と実測秒数)
@@ -740,8 +766,9 @@ context_updates:
 - [ ] `操作手段なし` で `blocked` にした全ステップが、需要IDと申し送りIDを参照している
 - [ ] 全シナリオに `carried_data` がある(データを作成していない場合は空で明示)
 - [ ] `setup-log` の全エントリに `established_check` がある(`classification: blocked` を除く)
-- [ ] `setup-log` の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)がある(lint `setup_steps_recorded`)
-- [ ] 状態需要リストで `採用` の状態を本フローで整備・確認できた場合、その行を `整備済` にし fixture の所在を書いた
+- [ ] `setup-log` の `classification: built-by-ui` と `provided` の全エントリに `steps` があり、各 step に操作の対象(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)がある。`provided` には流用元(`reused_from`)がある(lint `setup_steps_recorded`)
+- [ ] `setup-log` の `classification: built-by-ui` の全エントリに `act`(カードと記録の連番)があり、steps が `pms act` の記録と一致する(lint `act_log_linked`)
+- [ ] フェーズAのキューのカードがすべて合格か、STOP として人間に回っている(`node tools/pms/pms.mjs status --flow <フローID>`。lint `phase_a_queue_complete`)。STOP のカードを報告書の固有セクション1に書いた
 - [ ] INV の結果が全シナリオに記録されている(未実施の場合は理由を記載)
 - [ ] 期待結果・判定基準を1件も書き換えていない
 - [ ] 報告書に00の共通骨格と固有セクション1〜11がある(再探索フロー・パートPは1〜12)
@@ -1952,7 +1979,40 @@ setups:
     verified: true
     cleanup: |
       なし(ゴールデンイメージ復元で初期化)
+    act:                                  # 記録との対応(pms が書く)。steps は pms act の記録のこの連番から作った
+      card: C-0001
+      seqs: [1, 3, 5, 6]
+      established_check_seq: 8
     notes: ''
+  - state_id: S-ADMIN-LOGIN
+    classification: provided              # 過去のフローの fixture を流用(setup.reuse で成立を確かめた)
+    flow: flows/auth.ts#loginAsAdmin      # flow・fixture・steps・established_check・cleanup は流用元のエントリをそのまま写す
+    fixture: fixtures/auth.ts#adminLogin
+    steps:
+      - action: goto
+        detail: <env:pms.url>
+      - action: fill
+        locator: getByLabel('ユーザーID')
+        value: <env:pms.admin.user>
+      - action: fill
+        locator: getByLabel('パスワード')
+        value: <env:pms.admin.password>
+      - action: click
+        locator: getByRole('button', { name: 'ログイン' })
+    established_check: getByRole('link', { name: '管理メニュー' }) が表示される
+    verified: true                        # 今回の実行の結果
+    cleanup: なし(ゴールデンイメージ復元で初期化)
+    reused_from:                          # 流用元
+      flow_id: F-001
+      feature_code: AUTH
+    notes: ''
+  - state_id: S-DEVICE-REGISTERED
+    classification: blocked
+    blocked_by:                           # 整備できなかった理由(付録A の blocked_by と同じ語。pms が書く)
+      reason: 操作手段なし                 # vocab.reason_code
+      handoff: HO-PRT-004
+      ext_demand: EXT-003
+    notes: テスト用デバイスの登録には機器パネルでのペアリングが要り、使える skill がない
 ```
 
 補足ルール:
@@ -1960,7 +2020,9 @@ setups:
 - **`classification: built-by-ui` のエントリには `steps` を必ず書く**(成功した最短の操作列)。fixture(`fixture`)・シナリオ部品(`flow`)のコードに書いたことを、`steps` の代わりにしない。作業20は setup-log の記録を根拠に fixture を確かめ、作業30は操作列を setup-log から転記するためである
 - 各 step には操作の対象を書く。`goto` は `detail`(遷移先。環境情報は `<env:キー>`)、`external` は `operation_id`(KB T05 の操作ID)、それ以外の操作(`click`・`fill` など)は `locator` である(lint `setup_steps_recorded`)
 - `locator` は付録Aの `actions[].locator` と同じく、**安定ロケータ(またはページオブジェクト/部品のメソッド参照)のみ**。snapshot の一時IDを書かない(lint `no_temp_locator`)
-- 記録する時機は §10 フェーズAに従う(状態を1つ整備・確認したら、次の状態へ進む前に記録する)
+- **proc-v017 以降のフローでは、setup-log のエントリはすべて進行役 pms が書く**(§10 フェーズA)。`built-by-ui` は `setup.build` のカードの提出が合格したときに `pms act` の記録から `steps`・`established_check`・`act` を書き、`setup.code` の合格で `flow`・`fixture`・`verified`・`cleanup` を埋める。CSS の暫定ロケータの step には `fragile`(理由)が付く
+- `classification: provided` のエントリも `steps` を持つ。`steps`・`flow`・`fixture`・`established_check`・`cleanup` は流用元のエントリからそのまま写し、流用元を `reused_from`(`flow_id`・`feature_code`)に、今回の実行の結果を `verified` に書く(lint `setup_steps_recorded`。proc-v017 以降のフロー)。`S-CLEAN-ENV` は工程0の復元そのものであり、`provided_by` を書いて `steps` を持たない
+- `classification: blocked` のエントリには `blocked_by`(理由 `reason`・申し送りID `handoff`・需要ID `ext_demand` または禁止ID `prohibition`)を書く
 
 # 付録C: scenarios.md
 

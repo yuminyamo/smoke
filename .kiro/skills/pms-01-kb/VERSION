@@ -1,3 +1,3 @@
-procedure_version: proc-v016
+procedure_version: proc-v017
 generated_from: procedure/stages.md §01
 generator: tools/build-skills/build-skills.mjs

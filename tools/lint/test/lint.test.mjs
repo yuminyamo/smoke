@@ -857,3 +857,79 @@ setups:
   // proc-v015 のフローでは求めない
   assert.deepEqual(findings(lint(ver('proc-v015'), '--flow', 'F-001', '--stage', '10'), 'setup_steps_recorded'), []);
 });
+
+test('act_log_linked・phase_a_queue_complete・setup_steps_recorded(provided): proc-v017 以降のフローは pms の記録と突き合わせる(それより前の版では求めない)', () => {
+  const SETUP = (act, provided = '    reused_from: { flow_id: F-000, feature_code: PRT }\n') => `feature_code: PRT
+flow_id: F-001
+setups:
+  - state_id: S-USER-LOGIN
+    classification: built-by-ui
+    fixture: fixtures/auth.ts#userLogin
+    steps:
+      - action: goto
+        detail: <env:pms.url>
+      - action: fill
+        locator: getByLabel('ユーザーID')
+        value: <env:pms.user>
+    established_check: ログアウトのリンクが表示される
+    verified: true
+${act}
+  - state_id: S-ADMIN-LOGIN
+    classification: provided
+    fixture: fixtures/auth.ts#adminLogin
+    steps:
+      - action: click
+        locator: getByRole('button', { name: 'ログイン' })
+    established_check: 管理メニューが表示される
+    verified: true
+${provided}  - state_id: S-CLEAN-ENV
+    classification: provided
+    established_check: 工程0の復元
+    provided_by: 工程0のゴールデンイメージの復元
+  - state_id: S-DEVICE-REGISTERED
+    classification: blocked
+    blocked_by: { reason: 状態未整備, handoff: HO-PRT-001 }
+`;
+  const ACT = '    act: { card: C-0001, seqs: [1, 2], established_check_seq: 3 }';
+  const row = (o) => JSON.stringify({ flow: 'F-001', card: 'C-0001', ok: true, value: null, ...o });
+  const LOG = [
+    row({ seq: 1, action: 'open', value: '<env:pms.url>' }),
+    row({ seq: 2, action: 'fill', locator: "getByLabel('ユーザーID')", value: '<env:pms.user>' }),
+    row({ seq: 3, action: 'assert', locator: "getByRole('link', { name: 'ログアウト' })" }),
+    row({ seq: 4, action: 'click', card: 'C-0002', locator: "getByRole('button')" }),
+  ].join('\n') + '\n';
+  const QUEUE = (status2 = 'stopped') => JSON.stringify({ flow_id: 'F-001', phase: 'A', cards: [{ id: 'C-0001', kind: 'setup.build', state_id: 'S-USER-LOGIN', status: 'passed' }, { id: 'C-0002', kind: 'setup.build', state_id: 'S-DEVICE-REGISTERED', status: status2 }] });
+  const ver = (v, files) => {
+    const root = makeRepo({ 'work/PRT/exploration/act-log.jsonl': LOG, 'work/_flows/F-001/queue.json': QUEUE(), ...files });
+    const p = path.join(root, 'work/PRT/exploration/status.yaml');
+    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('procedure_version: proc-v005', `procedure_version: ${v}`));
+    return root;
+  };
+  const RULES = ['act_log_linked', 'phase_a_queue_complete', 'setup_steps_recorded'];
+  const all = (root) => { const res = lint(root, '--flow', 'F-001', '--stage', '10'); return RULES.flatMap((r) => findings(res, r)); };
+
+  // 一致していれば指摘なし
+  assert.deepEqual(all(ver('proc-v017', { 'work/PRT/exploration/setup-log.yaml': SETUP(ACT) })), []);
+
+  // act がない・連番の記録がない・別のカード・ロケータの食い違い・established check が assert でない
+  const bad = (act, log = LOG) => findings(lint(ver('proc-v017', { 'work/PRT/exploration/setup-log.yaml': SETUP(act), 'work/PRT/exploration/act-log.jsonl': log }), '--flow', 'F-001', '--stage', '10'), 'act_log_linked');
+  assertHas(bad(''), /S-USER-LOGIN \/ F-001\): act\(card・seqs・established_check_seq\)がありません/);
+  assertHas(bad('    act: { card: C-0001, seqs: [1, 9], established_check_seq: 3 }'), /act\.seqs の 9 が F-001 の操作の記録/);
+  assertHas(bad('    act: { card: C-0001, seqs: [1, 4], established_check_seq: 3 }'), /4 は別のカード C-0002/);
+  assertHas(bad(ACT, LOG.replace("getByLabel('ユーザーID')", "getByLabel('ID')")), /steps\[1\] の locator が記録/);
+  assertHas(bad('    act: { card: C-0001, seqs: [1, 2], established_check_seq: 2 }'), /established_check_seq 2 は、カード C-0001 の成功した assert/);
+
+  // provided に流用元がない
+  const prov = findings(lint(ver('proc-v017', { 'work/PRT/exploration/setup-log.yaml': SETUP(ACT, '') }), '--flow', 'F-001', '--stage', '10'), 'setup_steps_recorded');
+  assertHas(prov, /S-ADMIN-LOGIN \/ F-001\): provided のエントリに流用元/);
+  assert.equal(prov.length, 1, prov.join('\n')); // S-CLEAN-ENV は求めない
+
+  // キューがない・終わっていないカード
+  const q1 = findings(lint(ver('proc-v017', { 'work/PRT/exploration/setup-log.yaml': SETUP(ACT), 'work/_flows/F-001/queue.json': null }), '--flow', 'F-001', '--stage', '10'), 'phase_a_queue_complete');
+  assertHas(q1, /F-001 のフェーズAのキューがありません/);
+  const q2 = findings(lint(ver('proc-v017', { 'work/PRT/exploration/setup-log.yaml': SETUP(ACT), 'work/_flows/F-001/queue.json': QUEUE('issued') }), '--flow', 'F-001', '--stage', '10'), 'phase_a_queue_complete');
+  assertHas(q2, /カード C-0002\(setup\.build \/ S-DEVICE-REGISTERED\)が issued のまま/);
+
+  // proc-v016 のフローでは求めない(provided の流用元・act・キュー)
+  assert.deepEqual(all(ver('proc-v016', { 'work/PRT/exploration/setup-log.yaml': SETUP('', ''), 'work/_flows/F-001/queue.json': null })), []);
+});

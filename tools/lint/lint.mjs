@@ -26,7 +26,10 @@
 //   reason_code_enum           申し送り台帳・blocked_by の理由コード
 //   no_temp_locator            探索記録・セットアップ記録の locator に snapshot の一時IDがない
 //   requires_covered           作業10: requires の全状態が setup-log にある / 作業20: コード化したシナリオの requires に fixture がある
-//   setup_steps_recorded       setup-log の built-by-ui のエントリに steps があり、各 step に操作の対象(detail / operation_id / locator)がある(proc-v016 以降)
+//   setup_steps_recorded       setup-log の built-by-ui のエントリに steps があり、各 step に操作の対象(detail / operation_id / locator)がある(proc-v016 以降)。
+//                              proc-v017 以降は provided にも当て、流用元(reused_from)を見る
+//   act_log_linked             setup-log の built-by-ui のエントリの act が pms act の記録(act-log.jsonl)と一致する(proc-v017 以降)
+//   phase_a_queue_complete     作業10のフェーズAのキューのカードがすべて合格か STOP(proc-v017 以降)
 //   blocked_recorded           blocked_by(理由・参照・resume_from)、blocked の手前のステップの記録、blocked_by_prohibition との一致
 //   health_recorded            健全性シグナルのあるステップを passed にしていない、health_fix の記録、作業10・15の status.yaml との一致、健全性シグナルのステップの時刻(proc-v014 以降)
 //   ext_demand_linked          操作手段なし の申し送り・blocked のステップが、外部操作需要リストの需要IDを参照している
@@ -47,11 +50,13 @@ import { requires_covered, blocked_recorded, verdict_enum, no_temp_locator, setu
 import { reason_code_enum, ext_demand_linked, operation_registered, requires_in_state_set } from './rules/ledgers.mjs';
 import { skills_in_sync, prohibition_recheck, env_restored } from './rules/delegated.mjs';
 import { env_value_leak, env_value_hardcoded } from './rules/environment.mjs';
+import { act_log_linked, phase_a_queue_complete } from './rules/pms.mjs';
 
 const IMPLEMENTED = {
   status_yaml_valid, procedure_version_present, verdict_enum, reason_code_enum, no_temp_locator,
   requires_covered, setup_steps_recorded, blocked_recorded, health_recorded, ext_demand_linked, operation_registered, requires_in_state_set,
   skills_in_sync, prohibition_recheck, env_restored, env_value_leak, env_value_hardcoded,
+  act_log_linked, phase_a_queue_complete,
 };
 // 既存のスクリプトを呼ぶ規則(--list の表示用)
 const DELEGATED = {

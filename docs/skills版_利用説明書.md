@@ -5,7 +5,7 @@ PMS 回帰テスト作成の手順書を、GitHub Copilot と Kiro の skills �
 - **第1部 使う人向け** — 回帰テストを作るメンバーが読む部分です。10分で読めます
 - **第2部 管理者向け** — 導入・手順書の改訂・人の判断が必要な場面の対応をする人が読む部分です
 
-手順版: `proc-v011`(2026-10-02)
+手順版: `proc-v017`(2026-10-07)
 
 ---
 
@@ -81,6 +81,7 @@ AIに対象の機能を伝えるだけで、次のことを手順書どおりに
 - 正常に終わらなかったものを問い合わせても解決しなかったときは、記録だけを残してコード生成へ進みます(管理者の確認待ちになります)
 - 2回目は**新しいチャット**で頼むのがおすすめです(1回目のやり取りに引きずられず、記録だけを元にテストを作らせるため)
 - 途中で中断しても、`F-xxx の続き` で再開できます(進み具合はファイルに残っています)
+- シナリオを作ったあとの前提状態の準備(ログイン済みにする・テスト用デバイスを登録する など)は、AIが進行役のプログラム(`tools/pms/pms.mjs`)から1つずつ受け取る「カード」で行います(proc-v017 以降)。画面の操作と記録はプログラムが行うので、AIが記録を書き忘れることはありません。チャットに `pms next`・`pms act`・`pms submit` のコマンドが続けて出るのは正常です
 - コード生成の前とフローの完了の前に、AIが記録を自動で検査します(lint)。決まりを満たしていない箇所が見つかると、「作業10で直します」などと伝えたうえで、AIが自分で前の作業に戻って直します。止まらないので、そのままで構いません
 
 ## 5. 止まって「管理者の判断が必要」と言われたら
@@ -92,6 +93,8 @@ AIは止まった理由と、誰に何を頼めばよいかを伝えてきます
 使い始めのころ(ログインの仕組みがまだテストコードにないうち)は、作業の開始時に検証環境をゴールデンイメージへ戻したあと、AIが「PMS の画面にログインできることを確かめてください」と言って止まります。管理者に確認してもらい、`/pms-regression F-001 の続き。ログイン確認済み(ゆうさん)` のように伝えてください。ログインの仕組みができたあとは、AIが自動で確かめるので止まりません。
 
 記録の検査(lint)で、AIがやり直しても直らない問題が残ったときも止まります。伝えられた内容を管理者に伝えてください。
+
+前提状態の準備のカードで、AIが同じカードを何度やっても合格しなかったとき、またはカードの範囲で判断できなかったときも、「カード C-xxxx は人間の確認待ちです」と伝えて止まります(STOP)。内容を管理者に伝えてください。そのカードを後回しにして残りを進めてよければ、`/pms-regression F-xxx の続き。C-xxxx は後回しでよい(ゆうさん)` のように伝えます(残りのカードを続け、そのカードは報告書に載ります)。管理者が原因を直してそのカードをやり直させるときは、`node tools/pms/pms.mjs reopen --flow F-xxx --card C-xxxx` を実行してから「続き」と伝えます。
 
 作業の始めの準備(開始前シナリオ。例: 機器のゴールデンイメージ復元)が失敗したときも、作業を始めずに止まります。伝えられた内容を管理者に伝え、直ったら `F-xxx の続き` に対応した人と内容を添えて伝えてください。
 
@@ -122,6 +125,7 @@ AIは止まった理由と、誰に何を頼めばよいかを伝えてきます
 - AIに「期待結果を直して」「比較を緩めて」と頼まない(不具合を見逃すテストになります。おかしいと思ったら管理者へ)
 - コード生成(2回目)の途中で、AIに頼まれても画面を手で操作してデータを作らない(テストコードが作らないデータに頼ったテストは、環境を戻したあとに失敗します)
 - `config/environments.local.json`(パスワードなどを保存した各自の設定)をコミットしない・他の人に渡さない(`config/.gitignore` で git に入らないようになっています)
+- 前提状態の準備の途中で、`work/<機能>/exploration/setup-log.yaml`・`act-log.jsonl`・`work/_flows/F-xxx/queue.json` を手で直さない(進行役のプログラムが書く記録です)
 
 ---
 
@@ -151,12 +155,19 @@ skills版/
   config/
     pre-stage-scenarios.sample.json  開始前シナリオの設定例(使うときは pre-stage-scenarios.json にコピー)
     environments.sample.json      検証環境の情報の設定例(読まれない。実際の設定は tools/env/env.mjs が作る)
-    .gitignore                    各自の設定 environments.local.json を git に入れない
+    .gitignore                    各自の設定 environments.local.json・pms.json を git に入れない
   tools/env/
     env.mjs                       検証環境の情報(接続先・アカウント)の読み書き(Node.js のみ)
     lib/ test/env.test.mjs        その部品とテスト(node --test)
   tools/checks/
     prohibited-ops.mjs            禁止操作リストの記入状態・版の取得と、コード生成前の照合(Node.js のみ)
+  procedure/cards/                カードのテンプレート(setup.build・setup.code・setup.reuse)。正本の一部
+  procedure/schemas/              カードの出力の形(JSON Schema)。正本の一部
+  tools/pms/
+    pms.mjs                       進行役。前提状態の準備のカードを出し、画面操作を記録し、AIの出力を検査して記録を書く(Node.js のみ)
+    README.md                     進行役の仕様(データの形・検査・設定)
+    lib/ test/ test-support/      その部品とテスト(node --test。playwright-cli は偽物に差し替える)
+  config/pms.sample.json          進行役の設定例(使うときは pms.json にコピー。pms.json は git に入れない)
   tools/lint/
     lint.mjs                      lint のランナー。実装済みの規則を1コマンドで実行する(Node.js のみ)
     lib/ rules/                   ランナーの部品(YAML・Markdown の読み取り、規則の実装)
@@ -216,13 +227,15 @@ skills版/
    node tools/env/env.mjs require                     (揃っていれば "state":"complete")
    ```
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
-10. **動作を確かめる**(F-001 の前に)
+10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります
+11. **動作を確かめる**(F-001 の前に)
    - 入口: `/pms-regression いまどうなってる?` で、フローがないことを答えるか
    - 読み込み: 作業 skill が `references/00_common.md` と `vocab.yaml` を実際に読んでいるか(AIの読み込みの表示で確かめる)
    - 自動起動: Copilot で `pms-40-improve` が自動で使われないか
    - 復元: `restore-golden-image` の実行体を `-InfoOnly` で動かし、Hyper-V ホストにつながるか(`tools/remote/pms-remote.ps1 info -Target hyperv-host` でも確かめられます)
    - ログ収集: `collect-server-logs` の実行体を `-InfoOnly` で動かし、PMS サーバーVM の窓口・ツール・マスクの指定が揃っているか
    - lint: `node tools/lint/lint.mjs` が動き、`skills_in_sync` が OK になるか(フローがまだなければ、他の規則は検査する成果物がないので OK になります)
+   - 進行役: `node --test tools/pms/test/` が通るか。実物の playwright-cli で `pms act` が動くかは、手元の HTML で確かめます(`tools/pms/README.md` 8章の前提。確かめ方は改訂の完了報告にあります)
    - 環境情報: `node tools/env/env.mjs check` が `"ok":true` になるか。登録した場合は `require` が `"state":"complete"` になるか。`git check-ignore config/environments.local.json` で各自の設定が git の無視の対象になっているか
    - フック: skills のファイルに1文字足してコミットしようとすると止められるか(確かめたら元に戻す)
    - 1本通す: 小さな1機能で F-001 を作業20まで通す
@@ -324,13 +337,15 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 
 ## 13. 既知の制約
 
-- skills の仕組みは Copilot・Kiro ともに比較的新しく、仕様が変わることがあります。動作確認(8. の10)は、ツールの更新後にも行ってください
+- skills の仕組みは Copilot・Kiro ともに比較的新しく、仕様が変わることがあります。動作確認(8. の11)は、ツールの更新後にも行ってください
 - 依頼の内容による自動起動は確実ではありません。使う人には `/pms-regression` を付けるよう案内してください
-- 作業 skill は `references/` のファイルを読む指示を持っていますが、実際に読むかはAIに依存します。8. の10で確かめてください
-- lint は39規則のうち17規則を実装済みです(`node tools/lint/lint.mjs --list`)。`requires_covered`(セットアップの抜け)・`setup_steps_recorded`(セットアップの操作列とロケータの抜け)・`requires_in_state_set`(初期状態セットにない状態)・`blocked_recorded`(blocked の記録の抜け)・`health_recorded`(健全性シグナルの記録)・`env_value_leak`(秘密情報の書き込み)・`env_value_hardcoded`(接続先の直書き)・`status_yaml_valid`・`procedure_version_present`・`operation_registered`・`ext_demand_linked`・`verdict_enum`・`reason_code_enum`・`no_temp_locator` と、既存の `skills_in_sync`・`env_restored`・`prohibition_recheck` です。作業20の突合・生成コードの静的検査・保護ブロックの検査(`protected_unchanged`)などは未実装です
+- 作業 skill は `references/` のファイルを読む指示を持っていますが、実際に読むかはAIに依存します。8. の11で確かめてください
+- lint は41規則のうち19規則を実装済みです(`node tools/lint/lint.mjs --list`)。`requires_covered`(セットアップの抜け)・`setup_steps_recorded`(セットアップの操作列とロケータの抜け)・`act_log_linked`(セットアップの記録と操作の記録の一致)・`phase_a_queue_complete`(前提状態の準備のカードの終わり)・`requires_in_state_set`(初期状態セットにない状態)・`blocked_recorded`(blocked の記録の抜け)・`health_recorded`(健全性シグナルの記録)・`env_value_leak`(秘密情報の書き込み)・`env_value_hardcoded`(接続先の直書き)・`status_yaml_valid`・`procedure_version_present`・`operation_registered`・`ext_demand_linked`・`verdict_enum`・`reason_code_enum`・`no_temp_locator` と、既存の `skills_in_sync`・`env_restored`・`prohibition_recheck` です。作業20の突合・生成コードの静的検査・保護ブロックの検査(`protected_unchanged`)などは未実装です
 - pre-commit フックが検査するのは作業ツリーの内容です。正本を直して再生成したら、再生成した skills も同じコミットに含めてください。また、フックは各自が有効にする必要があります(8. の4)
 - lint は、成果物の YAML を簡易的なパーサで読みます。アンカー・エイリアス・タグは使えません。読めないファイルは「成果物の読み取り」の ERROR として出ます
 - 検証環境の情報の秘密情報(パスワードなど)は、各自のパソコンの `config/environments.local.json` に**平文で**保存されます。ファイルの扱いに注意してください。また、AIはログインなどのためにその値を読みます(記録には書きません)。リモートコマンドのクライアント設定 `config/remote-targets.json`(Hyper-V ホスト・PMS VM の接続先)は、検証環境の情報とは別のファイルです。こちらは資格情報を参照名で持ち、値は各自のパソコンに DPAPI で暗号化して保存します(`pms-remote.ps1 cred-set`)
+- 進行役(`tools/pms/`)のカードで行うのは、proc-v017 では前提状態の準備(作業10のフェーズA)だけです。シナリオの探索(パートC)は、これまでどおり AI が playwright-cli を直接使います。カードは作業10と同じチャットの中で順に行います(カードごとに会話を分ける実行は次の版で入れます)
+- 進行役は playwright-cli の出力の形(ロケータ・結果・URL の出し方)を前提にしています。テストは偽物の playwright-cli で行っており、実物の版が変わると読み取れなくなることがあります(`tools/pms/README.md` 8章。多くは `config/pms.json` で直せます)
 - proc-v009 以前の版で始めたフローは、status.yaml に `environment` がなくても lint は求めません。そのフローは旧版のとおり完了させてください
 - proc-v004 より前の版で始めたフローは、禁止操作リストの照合ができません(照合スクリプトが「照合できない」を返します。lint のランナーはそのフローの照合を省きます)。そのフローは旧版のとおり完了させてください
 

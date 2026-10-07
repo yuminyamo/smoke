@@ -1,0 +1,51 @@
+{
+  "$comment": "カード setup.code の出力(00 ■進行役と記録の道具 / stages.md §10 フェーズA)。tools/pms/lib/schema.mjs が検査する",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "flow", "fixture", "runs", "cleanup", "notes"],
+  "properties": {
+    "result": {
+      "enum": ["coded", "cannot_proceed"],
+      "description": "coded = 部品と fixture を書き、2回実行した / cannot_proceed = カードの範囲で判断できない(人間へ回る。理由を notes に書く)"
+    },
+    "flow": {
+      "type": ["string", "null"], "pattern": "^flows/[A-Za-z0-9_./-]+\\.(ts|js)#[A-Za-z_$][A-Za-z0-9_$]*$",
+      "description": "シナリオ部品(tests/ からの所在#関数名。例 flows/auth.ts#loginAsUser)"
+    },
+    "fixture": {
+      "type": ["string", "null"], "pattern": "^fixtures/[A-Za-z0-9_./-]+\\.(ts|js)#[A-Za-z_$][A-Za-z0-9_$]*$",
+      "description": "fixture(tests/ からの所在#名前。例 fixtures/auth.ts#userLogin)"
+    },
+    "runs": {
+      "type": "array",
+      "description": "fixture を使ったテストの実行を2回分(実行した結果をそのまま書く)。cannot_proceed のときは []",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["command", "exit_code", "started_at", "ended_at"],
+        "properties": {
+          "command": { "type": "string", "minLength": 5, "maxLength": 300, "description": "実行したコマンド" },
+          "exit_code": { "type": "integer", "description": "終了コード" },
+          "started_at": { "type": "string", "description": "開始時刻(vocab.timestamp_format)" },
+          "ended_at": { "type": "string", "description": "終了時刻(vocab.timestamp_format)" }
+        }
+      }
+    },
+    "cleanup": {
+      "type": ["string", "null"], "maxLength": 200,
+      "description": "後始末(例 なし(ゴールデンイメージ復元で初期化))"
+    },
+    "notes": {
+      "type": ["string", "null"], "maxLength": 200,
+      "description": "2回目が残留データで失敗したときの対処など(なければ null)。cannot_proceed のときは理由(必須)"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "result": { "const": "coded" } } },
+      "then": { "properties": { "flow": { "type": "string" }, "fixture": { "type": "string" }, "cleanup": { "type": "string", "minLength": 2 } } }
+    },
+    {
+      "if": { "properties": { "result": { "const": "cannot_proceed" } } },
+      "then": { "properties": { "notes": { "type": "string", "minLength": 10 } } }
+    }
+  ]
+}

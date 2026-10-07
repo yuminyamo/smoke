@@ -1,0 +1,35 @@
+{
+  "$comment": "カード setup.reuse の出力(00 ■進行役と記録の道具 / stages.md §10 フェーズA)。tools/pms/lib/schema.mjs が検査する",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "runs", "notes"],
+  "properties": {
+    "result": {
+      "enum": ["reused", "broken", "cannot_proceed"],
+      "description": "reused = 既存の fixture で状態が成立した / broken = 成立しなかった(作り直しのカードを pms が作る)/ cannot_proceed = カードの範囲で判断できない(理由を notes に書く)"
+    },
+    "runs": {
+      "type": "array",
+      "description": "fixture を使ったテストの実行を1回分(実行した結果をそのまま書く)。cannot_proceed のときは []",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["command", "exit_code", "started_at", "ended_at"],
+        "properties": {
+          "command": { "type": "string", "minLength": 5, "maxLength": 300, "description": "実行したコマンド" },
+          "exit_code": { "type": "integer", "description": "終了コード" },
+          "started_at": { "type": "string", "description": "開始時刻(vocab.timestamp_format)" },
+          "ended_at": { "type": "string", "description": "終了時刻(vocab.timestamp_format)" }
+        }
+      }
+    },
+    "notes": {
+      "type": ["string", "null"], "maxLength": 200,
+      "description": "broken のときは失敗のしかた(1〜2文。必須)。cannot_proceed のときは理由(必須)。reused なら null でよい"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "result": { "enum": ["broken", "cannot_proceed"] } } },
+      "then": { "properties": { "notes": { "type": "string", "minLength": 10 } } }
+    }
+  ]
+}

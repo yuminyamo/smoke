@@ -1,6 +1,8 @@
 // exploration.mjs — 探索記録・セットアップ記録の検査
 //   requires_covered / blocked_recorded / verdict_enum / no_temp_locator / setup_steps_recorded / health_recorded
 
+export { verNum };
+
 import fs from 'node:fs';
 
 const JUDGED = ['passed', 'failed', 'human-check'];
@@ -234,19 +236,26 @@ const SETUP_STEPS_SINCE = 16; // proc-v016 で追加
 // locator を持たない操作と、代わりに求めるキー。これ以外の操作は locator を求める
 const TARGET_KEY = { goto: 'detail', external: 'operation_id' };
 
+const PROVIDED_STEPS_SINCE = 17; // proc-v017 で provided にも広げた(流用元から写す)
+
 export function setup_steps_recorded(repo) {
   const findings = [];
   const add = (file, message) => findings.push({ file, message });
   for (const s of repo.setupEntries) {
-    if (!repo.inFlow(s.flow) || s.e.classification !== 'built-by-ui') continue;
+    const cls = s.e.classification;
+    if (!repo.inFlow(s.flow) || (cls !== 'built-by-ui' && cls !== 'provided')) continue;
     const st10 = repo.statusFiles.find((x) => x.rel === `work/${s.feature}/exploration/status.yaml` && x.flow === s.flow && x.data);
     if (!st10) continue; // status_yaml_valid が扱う
     const ver = verNum(st10.data.procedure_version);
     if (ver !== null && ver < SETUP_STEPS_SINCE) continue;
+    if (cls === 'provided' && ((ver !== null && ver < PROVIDED_STEPS_SINCE) || NO_FIXTURE_STATES.has(s.e.state_id))) continue;
     const where = `${s.file}(${s.e.state_id ?? 'state_id なし'} / ${s.flow ?? 'フロー不明'})`;
+    if (cls === 'provided' && blank(s.e.reused_from?.flow_id)) add(where, 'provided のエントリに流用元(reused_from.flow_id)がありません(流用元のエントリを写し、流用元を書く。付録B)');
     const steps = Array.isArray(s.e.steps) ? s.e.steps.filter((x) => x && typeof x === 'object') : [];
     if (steps.length === 0) {
-      add(where, 'steps がありません(本フローで整備した状態は、成功した最短の操作列を steps に書く。fixture・シナリオ部品のコードは記録の代わりにならない。付録B)');
+      add(where, cls === 'provided'
+        ? 'steps がありません(provided は流用元のエントリの steps をそのまま写す。付録B)'
+        : 'steps がありません(本フローで整備した状態は、成功した最短の操作列を steps に書く。fixture・シナリオ部品のコードは記録の代わりにならない。付録B)');
       continue;
     }
     steps.forEach((st, i) => {

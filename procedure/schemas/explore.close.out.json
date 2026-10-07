@@ -1,0 +1,37 @@
+{
+  "$comment": "カード explore.close の出力(stages.md §10 パートC)。シナリオの判定・requires_setup は pms が記録から決める",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "invariants", "violations", "reflections", "manual_gap", "handoffs", "procedure_signals", "notes"],
+  "properties": {
+    "result": { "enum": ["closed", "cannot_proceed"], "description": "closed = 終わりの処理をした / cannot_proceed = カードの範囲で判断できない(理由を notes に)" },
+    "invariants": { "type": "object", "description": "シナリオ末尾の DB不変条件の結果。vocab.invariant の全キーに pass / fail / 未実施(理由)" },
+    "violations": {
+      "type": "array", "description": "違反(fail にした INV の内容。なければ [])",
+      "items": { "type": "object", "additionalProperties": false, "required": ["inv", "detail"], "properties": {
+        "inv": { "type": "string", "pattern": "^INV-\\d{3}$", "description": "INV のID" },
+        "detail": { "type": "string", "minLength": 10, "maxLength": 300, "description": "違反した行の要点(自シナリオのデータ)" } } }
+    },
+    "reflections": {
+      "type": "array", "description": "探索で確立した操作の反映先(blocked のシナリオでも捨てない。なければ [{target: none}])",
+      "items": { "type": "object", "additionalProperties": false, "required": ["operation", "target", "path"], "properties": {
+        "operation": { "type": "string", "minLength": 4, "maxLength": 120, "description": "確立した操作(業務語で)" },
+        "target": { "type": "string", "x-vocab": "reflection_target", "description": "反映先の区分" },
+        "path": { "type": ["string", "null"], "maxLength": 200, "description": "反映したファイル(none のときは null)" } } }
+    },
+    "manual_gap": { "type": "boolean", "description": "マニュアルにこのシナリオの操作手順の記載がなかったら true" },
+    "handoffs": { "type": "array", "description": "申し送り(explore.step と同じ形。なければ [])",
+      "items": { "type": "object", "additionalProperties": false, "required": ["target", "reason", "means"], "properties": {
+        "target": { "type": "string", "minLength": 10, "maxLength": 200 }, "reason": { "type": "string", "x-vocab": "reason_code" }, "means": { "type": ["string", "null"], "maxLength": 60 } } } },
+    "procedure_signals": { "type": "array", "description": "手順改善シグナル(explore.step と同じ形。なければ [])",
+      "items": { "type": "object", "additionalProperties": false, "required": ["type", "location", "event", "impact", "response", "proposal"], "properties": {
+        "type": { "type": "string", "x-vocab": "signal_type" }, "location": { "type": "string", "pattern": "^(ST|CM|VO|PD|TP|MT)/.+" },
+        "event": { "type": "string", "minLength": 10, "maxLength": 200 }, "impact": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "response": { "type": "string", "minLength": 4, "maxLength": 200 }, "proposal": { "type": ["string", "null"], "maxLength": 200 } } } },
+    "notes": { "type": ["string", "null"], "maxLength": 300, "description": "補足(なければ null)。cannot_proceed のときは理由(必須)" }
+  },
+  "allOf": [
+    { "if": { "properties": { "result": { "const": "cannot_proceed" } } }, "then": { "properties": { "notes": { "type": "string", "minLength": 10 } } } },
+    { "if": { "properties": { "result": { "const": "closed" } } }, "then": { "properties": { "reflections": { "minItems": 1 } } } }
+  ]
+}

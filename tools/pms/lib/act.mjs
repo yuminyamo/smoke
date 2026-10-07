@@ -1,8 +1,9 @@
 // act.mjs — pms act: 画面操作を1回ずつ実行し、そのたびに操作の記録(act-log.jsonl)に1行書く
 
+import fs from 'node:fs';
 import { PlaywrightCli, classifyLocator, envGet, parsePageUrl, parseRanCode, runExternal } from './cli.mjs';
 import { secretsToMask, mask, maskDeep, MIN_MASK_LENGTH } from './store.mjs';
-import { PMS, todoOf, submitCommand } from './queue.mjs';
+import { PMS, todoOf, submitCommand, ACT_KINDS, targetOf } from './queue.mjs';
 import { timestamp, UsageError } from './util.mjs';
 
 const ENV_REF = /^<env:([a-z][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)*)>$/;
@@ -28,7 +29,7 @@ export function act(ctx, opt, args) {
   const q = store.loadQueue(opt.flow);
   if (!opt.card) throw new UsageError('--card がありません');
   const c = store.card(q, opt.card);
-  if (c.kind !== 'setup.build') throw new UsageError(`${c.id} は ${c.kind} のカードです。pms act は setup.build のカードで使う`);
+  if (!ACT_KINDS.has(c.kind)) throw new UsageError(`${c.id} は ${c.kind} のカードです。pms act は ${[...ACT_KINDS].join('・')} のカードで使う`);
   if (c.status !== 'issued') {
     throw new UsageError(`${c.id} は出ていないカードです(状態 ${c.status})。${PMS} next --flow ${q.flow_id} で今のカードを確かめる`);
   }
@@ -36,15 +37,15 @@ export function act(ctx, opt, args) {
   const allowed = proc.values('pms_act_action');
   if (!action) throw new UsageError(`操作がありません(${allowed.join(' / ')})`);
   if (!allowed.includes(action)) throw new UsageError(`操作 ${action} は vocab.pms_act_action にありません(${allowed.join(' / ')})`);
-  if (!['open', 'goto', 'snapshot'].includes(action) && !opt.intent) throw new UsageError(`${action} には --intent "<この操作の目的>" が要ります`);
+  if (!['open', 'goto', 'snapshot', 'screenshot'].includes(action) && !opt.intent) throw new UsageError(`${action} には --intent "<この操作の目的>" が要ります`);
 
-  const now = { flow: q.flow_id, card: c.id, kind: c.kind, state_id: c.state_id, todo: todoOf(c) };
+  const now = { flow: q.flow_id, card: c.id, kind: c.kind, state_id: c.state_id ?? null, target: targetOf(c), todo: todoOf(c) };
   const actCmd = `${PMS} act --flow ${q.flow_id} --card ${c.id}`;
   const masks = secretsToMask(root);
   const warnings = [];
   const prev = [...store.actRecords(q)].reverse().find((a) => a.url_after);
   const row = {
-    flow: q.flow_id, seq: store.nextSeq(q), card: c.id, state_id: c.state_id, action,
+    flow: q.flow_id, seq: store.nextSeq(q), card: c.id, state_id: c.state_id ?? null, ...(c.step_id ? { step_id: c.step_id } : {}), action,
     ref: null, locator: null, locator_class: null, unique: null, value: null, intent: opt.intent ?? null,
     code: null, url_before: prev?.url_after ?? null, url_after: null,
     started_at: timestamp(), ended_at: null, ok: false, error: null,
@@ -85,6 +86,20 @@ export function act(ctx, opt, args) {
       row.code = `await page.goto(${jsString(u.recorded)});`;
       row.url_after = parsePageUrl(r.stdout) ?? (row.ok ? cli.evaluate('page.url()').value : null);
       if (!row.ok) row.error = `${action} が失敗した(終了コード ${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 300)}`;
+    } else if (action === 'screenshot') {
+      const ref = rest[0] ?? null;
+      if (rest.length > 1 || (ref && !/^[A-Za-z0-9]+$/.test(ref))) throw new UsageError('screenshot [ref(要素だけを撮るときの要素参照)]');
+      const name = `${c.step_id ?? c.state_id ?? c.id}_${row.seq}.png`;
+      const rel = `${paths.evidenceDir(c.feature)}/${name}`;
+      fs.mkdirSync(paths.abs(paths.evidenceDir(c.feature)), { recursive: true });
+      const args = cfg.screenshot_args.flatMap((a) => (a === '{ref}' ? (ref ? [ref] : []) : [a.replace('{file}', paths.abs(rel)).replace('{ref}', ref ?? '')]));
+      const r = cli.call(args);
+      rawOut = r.stdout;
+      row.ref = ref;
+      row.evidence = `evidence/${name}`;
+      row.ok = r.code === 0 && fs.existsSync(paths.abs(rel));
+      row.url_after = row.url_before;
+      if (!row.ok) row.error = r.code !== 0 ? `screenshot が失敗した(終了コード ${r.code}): ${(r.stderr || r.stdout).trim().slice(0, 300)}` : `スクリーンショットのファイル ${rel} ができなかった`;
     } else if (action === 'ext') {
       const dd = rest.indexOf('--');
       const opIdx = rest.indexOf('--op');
@@ -165,6 +180,12 @@ export function act(ctx, opt, args) {
   if (!rec.ok) {
     next = `${actCmd} snapshot`;
     hint = '操作に失敗した(記録は残した)。snapshot で画面を確かめてからやり直す';
+  } else if (action === 'assert' && c.kind === 'explore.step') {
+    next = submitCommand(q, c, paths);
+    hint = `期待結果の確認に使える(verification.screen_seqs に ${rec.seq})。証跡が要るなら screenshot を撮り、${paths.out(q.flow_id, c.id)} に出力の JSON を書いてから提出する`;
+  } else if (action === 'screenshot') {
+    next = submitCommand(q, c, paths);
+    hint = `証跡を保存した(evidence に ${rec.seq})。判定が決まったら ${paths.out(q.flow_id, c.id)} に出力の JSON を書いてから提出する`;
   } else if (action === 'assert') {
     next = submitCommand(q, c, paths);
     hint = `状態の成立を確かめた。${paths.out(q.flow_id, c.id)} に出力の JSON を書いてから提出する(seqs に成功した最短の操作の連番、established_check_seq に ${rec.seq})`;
@@ -177,7 +198,7 @@ export function act(ctx, opt, args) {
   }
   const result = {
     ok: rec.ok, seq: rec.seq, action, locator: rec.locator, locator_class: rec.locator_class, unique: rec.unique,
-    url_after: rec.url_after, error: rec.error, warnings: maskDeep(warnings, masks), now, next, hint,
+    url_after: rec.url_after, error: rec.error, ...(rec.evidence ? { evidence: rec.evidence } : {}), warnings: maskDeep(warnings, masks), now, next, hint,
   };
   if (action === 'snapshot') {
     return { code: rec.ok ? 0 : 1, out: `${mask(rawOut, masks).replace(/\n*$/, '')}\n\n--- pms ---\n${JSON.stringify(result)}` };

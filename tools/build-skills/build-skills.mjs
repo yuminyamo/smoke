@@ -12,10 +12,13 @@
 // このスクリプトで再生成する(00_common.md ■手順書の版と配備)。
 // このスクリプトは設定にある skill のディレクトリだけを作り直し、同じ skills ディレクトリにある
 // 他の skill(外部操作 skill など)には触れない。
+// カードの種類ごとのエージェント(正本 procedure/cards/agents.yaml。00_common.md ■進行役と記録の道具)も生成する。
+// 各ターゲットの agents_dir の中の <prefix>*(例 pms-card-*)だけを作り直し、ほかのエージェントには触れない。
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../lint/lib/yaml-lite.mjs';
 
 // ── 引数 ─────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -73,13 +76,17 @@ if (targets.length === 0) fail(`ターゲット ${opt.target} は設定にあり
 
 const output = new Map(); // リポジトリ相対パス → 内容
 const managedDirs = [];   // 作り直す skill ディレクトリ(リポジトリ相対)
+const managedAgents = []; // 作り直すエージェント: { dir, prefix }
 const sizeReport = [];
+const agentsDef = loadAgents();
 
 for (const target of targets) {
   // 入口(ルーター)
   buildRouter(target);
   // 作業ごとの skill
   for (const sk of config.skills) buildWorkSkill(target, sk);
+  // カードの種類ごとのエージェント
+  if (agentsDef) buildAgents(target);
 }
 
 // 生成物の保護ブロック検査
@@ -112,22 +119,36 @@ if (opt.check) {
     }
     for (const rel of onDisk) if (!output.has(rel)) diffs.push(`余分   ${rel}`);
   }
+  for (const { dir, prefix } of managedAgents) {
+    const abs = path.join(ROOT, dir);
+    const onDisk = fs.existsSync(abs) ? fs.readdirSync(abs).filter((f) => f.startsWith(prefix)).map((f) => path.posix.join(dir, f)) : [];
+    for (const rel of [...output.keys()].filter((k) => k.startsWith(`${dir}/${prefix}`))) {
+      const p = path.join(ROOT, rel);
+      if (!fs.existsSync(p)) diffs.push(`なし   ${rel}`);
+      else if (normalize(fs.readFileSync(p, 'utf8')) !== output.get(rel)) diffs.push(`不一致 ${rel}`);
+    }
+    for (const rel of onDisk) if (!output.has(rel)) diffs.push(`余分   ${rel}`);
+  }
   if (diffs.length) {
     console.error(`skills_in_sync: NG(${diffs.length} 件)— 生成物が正本(${VERSION})と一致しません。`);
     for (const d of diffs) console.error('  ' + d);
     console.error('正本(procedure/)を直してから、node tools/build-skills/build-skills.mjs で再生成してください。生成物は直接編集しないでください。');
     report(1, true);
   }
-  console.log(`skills_in_sync: OK — ${managedDirs.length} 個の skill が正本(${VERSION})と一致しています。`);
+  console.log(`skills_in_sync: OK — ${managedDirs.length} 個の skill と ${[...output.keys()].filter((k) => managedAgents.some((a) => k.startsWith(`${a.dir}/${a.prefix}`))).length} 個のエージェントが正本(${VERSION})と一致しています。`);
   report(0, true);
 } else {
   for (const dir of managedDirs) fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
+  for (const { dir, prefix } of managedAgents) {
+    const abs = path.join(ROOT, dir);
+    if (fs.existsSync(abs)) for (const f of fs.readdirSync(abs).filter((x) => x.startsWith(prefix))) fs.rmSync(path.join(abs, f), { force: true });
+  }
   for (const [rel, content] of output) {
     const p = path.join(ROOT, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, content, 'utf8');
   }
-  console.log(`生成しました — 手順版 ${VERSION} / ${managedDirs.length} 個の skill`);
+  console.log(`生成しました — 手順版 ${VERSION} / ${managedDirs.length} 個の skill / エージェント ${managedAgents.length ? Object.keys(agentsDef.kinds).length * managedAgents.length : 0} 個`);
   for (const line of sizeReport) console.log('  ' + line);
   report(0);
 }
@@ -292,6 +313,59 @@ function generatedNotice(source) {
 
 function versionFile(source) {
   return `procedure_version: ${VERSION}\ngenerated_from: ${source}\ngenerator: tools/build-skills/build-skills.mjs\n`;
+}
+
+// ════════════════════════════════════════════════════════
+// カードの種類ごとのエージェント
+// ════════════════════════════════════════════════════════
+
+function loadAgents() {
+  const a = config.agents;
+  if (!a) return null;
+  const rel = a.source;
+  let def;
+  try { def = parseYaml(readText(path.join(ROOT, rel))); } catch (e) { errors.push(`${rel} を読めません — ${e.message}`); return null; }
+  if (!def || typeof def !== 'object' || !def.kinds || typeof def.instruction !== 'string') { errors.push(`${rel} に instruction と kinds がありません`); return null; }
+  // kinds は vocab.pms_card_kind と過不足なく一致する
+  const vocabKinds = [...vocabBlock('pms_card_kind').matchAll(/^ {2}([A-Za-z0-9_.-]+):/gm)].map((m) => m[1]);
+  const kinds = Object.keys(def.kinds);
+  for (const k of vocabKinds) if (!kinds.includes(k)) errors.push(`${rel} の kinds に vocab.pms_card_kind の ${k} がありません`);
+  for (const k of kinds) if (!vocabKinds.includes(k)) errors.push(`${rel} の kinds の ${k} は vocab.pms_card_kind にありません`);
+  for (const [k, v] of Object.entries(def.kinds)) {
+    if (!v || typeof v.description !== 'string' || !v.description) errors.push(`${rel} の kinds.${k} に description がありません`);
+    if (!Array.isArray(v?.model) || !v.model.length) errors.push(`${rel} の kinds.${k} に model(候補の配列)がありません`);
+  }
+  return { ...def, rel, prefix: a.prefix ?? 'pms-card-' };
+}
+
+function buildAgents(target) {
+  const dir = target.agents_dir;
+  if (!dir) return;
+  managedAgents.push({ dir, prefix: agentsDef.prefix });
+  const instruction = agentsDef.instruction.replace(/\n+$/, '') + '\n';
+  for (const [kind, k] of Object.entries(agentsDef.kinds)) {
+    const name = `${agentsDef.prefix}${kind.replace(/[._]/g, '-')}`;
+    checkName(name, k.description);
+    if (target.frontmatter === 'copilot') {
+      const fm = ['---', `name: ${name}`, `description: ${yamlString(k.description)}`, `model: ${yamlString(String(k.model[0]))}`,
+        `tools: [${(agentsDef.tools_copilot ?? []).map((t) => yamlString(String(t))).join(', ')}]`, '---', ''].join('\n');
+      const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
+      put(`${dir}/${name}.agent.md`, fm + notice + instruction);
+    } else {
+      const deny = (cap, list) => (list && list.length ? [{ capability: cap, match: list, effect: 'deny' }] : []);
+      const shell = [...(agentsDef.deny_shell ?? []), ...(k.deny_shell_extra ?? [])];
+      const json = {
+        name,
+        description: `${k.description}(手順版 ${VERSION}。正本 ${agentsDef.rel} から生成。直接編集しない)`,
+        prompt: instruction,
+        tools: ['*'],
+        ...(k.kiro_model ? { model: k.kiro_model } : {}),
+        permissions: { rules: [...deny('shell', shell), ...deny('fs_write', agentsDef.deny_write ?? [])] },
+        toolsSettings: { shell: { deniedCommands: shell } },
+      };
+      put(`${dir}/${name}.json`, JSON.stringify(json, null, 2) + '\n');
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════

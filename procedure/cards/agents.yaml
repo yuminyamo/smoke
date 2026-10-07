@@ -1,0 +1,62 @@
+# カードの種類ごとのエージェントの正本(00_common.md ■進行役と記録の道具)
+#
+# tools/build-skills/build-skills.mjs が、ここから次を生成する(生成物を直接編集しない。lint skills_in_sync):
+#   .github/agents/pms-card-<種類>.agent.md   GitHub Copilot(Copilot CLI の --agent・VS Code のカスタムエージェント)
+#   .kiro/agents/pms-card-<種類>.json         Kiro(Kiro CLI の --agent)
+# <種類> は vocab.pms_card_kind の値の「.」と「_」を「-」にしたもの(例 setup.build → pms-card-setup-build)。
+# kinds のキーは vocab.pms_card_kind と過不足なく一致させる(生成スクリプトが照合する)。
+#
+# エージェントの本文はどの種類も同じ短い指示(instruction)にする。カードごとの指示・規則はカードの本文にある。
+# model は候補を優先順に並べる(Copilot のエージェントの定義には先頭の1つを書く。pms run は config/pms.json の
+# cardTypes.<種類>.model があればそちらを使う)。Kiro はモデルの名前が違うため kiro_model に書く(なければ書かない)。
+# 使用禁止(Kiro のエージェントの permissions に書く。Copilot は config/pms.json の runner.copilot.deny で CLI に渡す):
+#   deny_shell: すべての種類に共通のシェルのパターン / deny_write: 書き込みを禁止するパス
+#   kinds.<種類>.deny_shell_extra: その種類だけに足すパターン
+
+instruction: |
+  あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
+
+  1. 依頼文が示すカードのファイル(work/_flows/F-<番号>/cards/C-<番号>.md)を読む。依頼文にカードがなければ `node tools/pms/pms.mjs next --flow <フローID>` が出したカードを読む
+  2. カードの指示どおりに行う。画面操作はカードが示す `pms act` だけで行い、playwright-cli を直接呼ばない
+  3. カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)で提出する
+  4. 提出が不合格なら、返された理由のところだけを直して再提出する。合格したら終わる
+  5. カードの外の作業をしない(次のカードを取りに行かない・記録や台帳・手順書を直接書き換えない)。カードの範囲で判断できないときは、出力の result を cannot_proceed にして理由を書き、提出する
+
+tools_copilot: [read, edit, search, execute]
+
+deny_shell:
+  - "playwright-cli *"
+  - "npx playwright-cli *"
+  - "npx @playwright/cli *"
+  - "node tools/env/env.mjs get *--reveal*"
+deny_write:
+  - "procedure/**"
+  - ".github/skills/**"
+  - ".github/agents/**"
+  - ".kiro/skills/**"
+  - ".kiro/agents/**"
+
+kinds:
+  setup.build:
+    description: "作業10フェーズA: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめて提出する"
+    model: [gpt-6-luna]
+    deny_shell_extra: ["npx *"]
+  setup.code:
+    description: "作業10フェーズA: 合格した操作列をシナリオ部品と fixture のコードにし、2回実行して提出する"
+    model: [gpt-6-luna]
+  setup.reuse:
+    description: "作業10フェーズA: 過去のフローの fixture を1回実行し、状態が成立するかを提出する"
+    model: [gpt-6-luna]
+  explore.step:
+    description: "作業10パートC: シナリオの1ステップを pms act で探索し、期待結果を満たすかを判定して提出する"
+    model: [gpt-6-luna]
+    deny_shell_extra: ["npx *"]
+  explore.close:
+    description: "作業10パートC: シナリオ末尾の DB不変条件を検査し、確立した操作の反映先を決めて提出する"
+    model: [gpt-6-luna]
+  explore.session_close:
+    description: "作業10パートC: 探索セッションの終わりに DB不変条件の全体検査を1回行って提出する"
+    model: [gpt-6-luna]
+  report.findings:
+    description: "作業10: pms が記録から作った報告書の下書きを読み、所見の欄だけを書いて提出する"
+    model: [gpt-6-luna]

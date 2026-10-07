@@ -73,7 +73,7 @@ test('act: 1操作1行の記録(連番・時刻・ロケータの区分・now/ne
   assert.equal(log[4].url_before, log[3].url_after);
   // 出力に now と next
   const j = res[1].json;
-  assert.deepEqual(Object.keys(j.now).sort(), ['card', 'flow', 'kind', 'state_id', 'todo']);
+  assert.deepEqual(Object.keys(j.now).sort(), ['card', 'flow', 'kind', 'state_id', 'target', 'todo']);
   assert.match(j.next, /pms\.mjs act --flow F-003 --card C-0001 snapshot/);
   assert.match(res[5].json.next, /pms\.mjs submit --flow F-003 --card C-0001 --file work\/_flows\/F-003\/out\/C-0001\.json/);
   // snapshot は画面の内容のあとに now/next
@@ -452,7 +452,7 @@ test('next: 提出されないまま呼ばれたら同じカードを出し直�
   const n2 = pms(root, ['next', '--flow', 'F-003']);
   assert.equal(n2.json.card, 'C-0001');
   assert.equal(n2.json.issued_count, 2);
-  assert.match(n2.json.body, /前回は提出されなかった.2 回目.。\*\* このカードで記録済みの操作: 1.open./);
+  assert.match(n2.json.body, /このカードを出すのは 2 回目である。\*\* 前回は合格する提出がないまま終わった。 このカードで記録済みの操作: 1.open./);
   pms(root, ['next', '--flow', 'F-003']); // 3 回目
   const stop = pms(root, ['next', '--flow', 'F-003']);
   assert.equal(stop.code, 3);

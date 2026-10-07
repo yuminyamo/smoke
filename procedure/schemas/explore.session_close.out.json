@@ -1,0 +1,20 @@
+{
+  "$comment": "カード explore.session_close の出力(stages.md §10 パートC)。違反があれば pms が status.yaml の invariant_violation を found にする",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "invariants", "violations", "notes"],
+  "properties": {
+    "result": { "enum": ["checked", "cannot_proceed"], "description": "checked = 全体検査をした / cannot_proceed = カードの範囲で判断できない(理由を notes に)" },
+    "invariants": { "type": "object", "description": "DB 全体の不変条件の結果。vocab.invariant の全キーに pass / fail / 未実施(理由)" },
+    "violations": {
+      "type": "array", "description": "違反(なければ [])",
+      "items": { "type": "object", "additionalProperties": false, "required": ["inv", "detail"], "properties": {
+        "inv": { "type": "string", "pattern": "^INV-\\d{3}$", "description": "INV のID" },
+        "detail": { "type": "string", "minLength": 10, "maxLength": 300, "description": "違反した行の要点" } } }
+    },
+    "notes": { "type": ["string", "null"], "maxLength": 300, "description": "補足(なければ null)。cannot_proceed のときは理由(必須)" }
+  },
+  "allOf": [
+    { "if": { "properties": { "result": { "const": "cannot_proceed" } } }, "then": { "properties": { "notes": { "type": "string", "minLength": 10 } } } }
+  ]
+}

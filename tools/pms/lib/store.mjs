@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import { load as loadEnv, valuesOfKind, EnvError } from '../../env/lib/environments.mjs';
 import { readJson, writeJson, readJsonl, appendLine, UsageError, FLOW_RE, CARD_RE } from './util.mjs';
 
-export const CARD_STATUS = ['pending', 'issued', 'passed', 'stopped']; // vocab.pms_card_status と同じ(起動時に照合する)
+export const CARD_STATUS = ['pending', 'issued', 'passed', 'stopped', 'skipped'];
+// 終わったカード(合格・STOP・pms が記録だけを書いたもの)
+export const DONE_STATUS = ['passed', 'stopped', 'skipped']; // vocab.pms_card_status と同じ(起動時に照合する)
 
 export class Store {
   constructor(paths) { this.paths = paths; }
@@ -15,7 +17,7 @@ export class Store {
     if (!FLOW_RE.test(flow)) throw new UsageError(`--flow は F-<3桁> で指定してください: ${flow}`);
     const rel = this.paths.queue(flow);
     if (!fs.existsSync(this.paths.abs(rel))) {
-      throw new UsageError(`${rel} がありません。先に node tools/pms/pms.mjs queue build --flow ${flow} --phase A を実行する`);
+      throw new UsageError(`${rel} がありません。先に node tools/pms/pms.mjs queue build --flow ${flow} --phase A を実行する(パートCまで作るときは --phase all)`);
     }
     const q = readJson(this.paths.abs(rel), rel);
     if (!Array.isArray(q.cards)) throw new UsageError(`${rel} に cards がありません`);

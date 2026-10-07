@@ -95,9 +95,25 @@ export class Procedure {
 
   template(kind) { return this.read(`procedure/cards/${kind}.md`); }
 
-  schema(kind) {
-    const rel = `procedure/schemas/${kind}.out.json`;
-    return this.memo(`schema:${kind}`, () => readJson(path.join(this.root, rel), rel));
+  schema(kind) { return this.schemaFile(`${kind}.out.json`); }
+
+  /** procedure/schemas/ の schema(カードの出力以外: stage10-context.json など) */
+  schemaFile(name) {
+    const rel = `procedure/schemas/${name}`;
+    return this.memo(`schema:${name}`, () => {
+      if (!fs.existsSync(path.join(this.root, rel))) throw new UsageError(`${rel} がありません`);
+      return readJson(path.join(this.root, rel), rel);
+    });
+  }
+
+  /** カードの種類ごとのエージェントの正本(procedure/cards/agents.yaml) */
+  get agents() {
+    return this.memo('agents', () => {
+      try { return parseYaml(this.read('procedure/cards/agents.yaml')); } catch (e) {
+        if (e instanceof UsageError) throw e;
+        throw new UsageError(`procedure/cards/agents.yaml を読めません — ${e.message}`);
+      }
+    });
   }
 
   /**

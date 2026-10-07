@@ -29,6 +29,14 @@ switch (cmd) {
     save();
     console.log(`### Ran Playwright code\n\`\`\`js\nawait page.goto('${rest[0]}');\n\`\`\`\n${state()}`);
     break;
+  case 'screenshot': {
+    const f = rest.find((a) => a.startsWith('--filename='));
+    if (!f) { console.error('no --filename'); process.exit(2); }
+    fs.mkdirSync(path.dirname(f.slice(11)), { recursive: true });
+    fs.writeFileSync(f.slice(11), 'PNG');
+    console.log(`### Result\nScreenshot saved to ${f.slice(11)}\n${state()}`);
+    break;
+  }
   case 'snapshot':
     console.log(`${state()}### Snapshot\n- textbox "ユーザーID" [ref=e3]: ${page.typed ?? ''}\n- button "ログイン" [ref=e7]`);
     break;

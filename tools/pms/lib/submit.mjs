@@ -6,7 +6,8 @@ import { validate } from './schema.mjs';
 import { FIX, stringFields, vagueWords, normLocator, codeGroup, lintEntry, leakedSecrets } from './checks.mjs';
 import { readAllEntries, findEntry } from './setup-log.mjs';
 import { appendHandoff, peekHandoffId, recordExtDemand, markStateProvisioned, stateDemandRow } from './ledgers.mjs';
-import { PMS, writeSetup, stopCard, fixtureFile, LOGIN_STATES, READINESS_TEST, submitCommand } from './queue.mjs';
+import { PMS, writeSetup, stopCard, chainStop, fixtureFile, LOGIN_STATES, READINESS_TEST, submitCommand, targetOf } from './queue.mjs';
+import { checkStep, checkClose, checkSessionClose, checkFindings } from './explore.mjs';
 import { secretsToMask } from './store.mjs';
 import { readText, timestamp, today, UsageError, TIMESTAMP_RE, blank } from './util.mjs';
 
@@ -33,7 +34,8 @@ export function establishedCheckOf(rec) {
   return a.condition === 'text' ? `${rec.locator} に「${a.text}」が表示される` : `${rec.locator} ${COND[a.condition] ?? ''}`.trim();
 }
 
-const SKIP_STRINGS = new Set(['command', 'flow', 'fixture', 'started_at', 'ended_at']);
+// あいまい語を見ない欄(コマンド・所在・時刻・SQL・観測した値そのもの)
+export const SKIP_STRINGS = new Set(['command', 'flow', 'fixture', 'started_at', 'ended_at', 'observed_at', 'query', 'result', 'path', 'location', 'value', 'carried_data', 'catalog_id', 'condition']);
 
 /**
  * @returns {{ code: number, out: object }} 0 = 合格(cannot_proceed の受け付けを含む)/ 1 = 不合格
@@ -69,7 +71,10 @@ export function submit(ctx, opt) {
         const hits = vagueWords(s.value, words);
         if (hits.length) fail('red_flag', `${s.path} にあいまいな語(${hits.join('・')})があります: 「${s.value.slice(0, 80)}」`);
       }
-      const check = { 'setup.build': checkBuild, 'setup.reuse': checkReuse, 'setup.code': checkCode }[c.kind];
+      const check = {
+        'setup.build': checkBuild, 'setup.reuse': checkReuse, 'setup.code': checkCode,
+        'explore.step': checkStep, 'explore.close': checkClose, 'explore.session_close': checkSessionClose, 'report.findings': checkFindings,
+      }[c.kind];
       plan = check(ctx, q, c, out, fail, failures);
     }
   }
@@ -77,15 +82,16 @@ export function submit(ctx, opt) {
   c.submits = (c.submits ?? 0) + 1;
   const ok = failures.length === 0;
   store.appendSubmit(q.flow_id, {
-    at: timestamp(), card: c.id, kind: c.kind, state_id: c.state_id, attempt: c.submits, issued_count: c.issued_count,
-    ok, result: out?.result ?? null, categories: [...new Set(failures.map((f) => f.category))],
+    at: timestamp(), card: c.id, kind: c.kind, state_id: c.state_id ?? null, target: targetOf(c), attempt: c.submits, issued_count: c.issued_count,
+    ok, result: out?.result ?? null, categories: [...new Set(failures.map((f) => f.category))], runner: process.env.PMS_RUNNER || 'b1',
   });
 
   if (!ok) {
     c.rejections = (c.rejections ?? 0) + 1;
     let stopped = false;
     if (c.rejections >= cfg.max_rejections) {
-      stopCard(q, c, `提出の不合格が上限(${cfg.max_rejections} 回。config/pms.json の max_rejections)に達した。最後の不合格: ${failures.map((f) => f.category).join(', ')}`);
+      stopCard(q, c, `提出の不合格が上限(${cfg.max_rejections} 回。config/pms.json の max_rejections)に達した。最後の不合格: ${failures.map((f) => f.category).join(', ')}`, 'reject_limit');
+      chainStop(q, c);
       stopped = true;
     }
     store.saveQueue(q);
@@ -122,7 +128,7 @@ export function submit(ctx, opt) {
 // ════════════════════════════════════════════════════════
 function checkBuild(ctx, q, c, out, fail, failures) {
   const { root, paths, store, proc } = ctx;
-  if (out.result === 'cannot_proceed') return () => { stopCard(q, c, `cannot_proceed: ${out.notes}`); return []; };
+  if (out.result === 'cannot_proceed') return () => { stopCard(q, c, `cannot_proceed: ${out.notes}`, 'cannot_proceed'); return []; };
 
   if (out.result === 'blocked') {
     const b = out.blocked;
@@ -198,7 +204,7 @@ function checkBuild(ctx, q, c, out, fail, failures) {
   return () => {
     writeSetup(ctx, c.feature, q.flow_id, entry);
     // 続く setup.code のカード
-    const code = { id: store.nextCardId(q), kind: 'setup.code', state_id: c.state_id, feature: c.feature, scenarios: c.scenarios, status: 'pending', issued_count: 0, rejections: 0, created_at: timestamp(), build_card: c.id };
+    const code = { id: store.nextCardId(q), phase: 'A', kind: 'setup.code', state_id: c.state_id, feature: c.feature, scenarios: c.scenarios, status: 'pending', issued_count: 0, rejections: 0, created_at: timestamp(), build_card: c.id };
     if (c.rebuild) code.rebuild = c.rebuild;
     q.cards.push(code);
     return [rel, `${paths.queue(q.flow_id)}(${code.id} setup.code を追加)`];
@@ -233,6 +239,8 @@ function writeBlocked(ctx, q, c, b) {
   if (b.reason === '禁止操作') blockedBy.prohibition = b.ref;
   else if (!ext && !blank(b.ref)) blockedBy.ref = b.ref;
   wrote.push(writeSetup(ctx, c.feature, q.flow_id, { state_id: c.state_id, classification: 'blocked', blocked_by: blockedBy, notes: b.detail }));
+  // pms report が status.yaml の ext_demand_added・ext_demand_appended に数える
+  c.track = { handoffs: [id], signals: [], discrepancies: [], ext_added: ext && !ext.appended ? [ext.id] : [], ext_appended: ext?.appended ? [ext.id] : [], ops_registered: [] };
   return wrote;
 }
 
@@ -250,7 +258,7 @@ function checkRuns(c, out, n, fail) {
 
 function checkReuse(ctx, q, c, out, fail) {
   const { root, paths, store } = ctx;
-  if (out.result === 'cannot_proceed') return () => { stopCard(q, c, `cannot_proceed: ${out.notes}`); return []; };
+  if (out.result === 'cannot_proceed') return () => { stopCard(q, c, `cannot_proceed: ${out.notes}`, 'cannot_proceed'); return []; };
   const src = c.reuse;
   const entry = findEntry(paths.abs(src.setup_log), src.setup_log, src.flow_id, c.state_id);
   if (!entry) fail('reuse_source', `流用元 ${src.flow_id} の ${c.state_id} のエントリが ${src.setup_log} にありません`);
@@ -265,7 +273,7 @@ function checkReuse(ctx, q, c, out, fail) {
   if (out.result === 'broken') {
     return () => {
       const b = {
-        id: store.nextCardId(q), kind: 'setup.build', state_id: c.state_id, feature: c.feature, scenarios: c.scenarios,
+        id: store.nextCardId(q), phase: 'A', kind: 'setup.build', state_id: c.state_id, feature: c.feature, scenarios: c.scenarios,
         status: 'pending', issued_count: 0, rejections: 0, created_at: timestamp(),
         rebuild: { reason: 'broken', flow_id: src.flow_id, fixture: entry.fixture ?? null, flow: entry.flow ?? null, reuse_card: c.id },
       };
@@ -282,7 +290,7 @@ function checkReuse(ctx, q, c, out, fail) {
     };
     const wrote = [writeSetup(ctx, c.feature, q.flow_id, e)];
     const sd = markStateProvisioned(root, c.state_id, entry.fixture);
-    if (sd) wrote.push(`${paths.stateDemand()}(${sd} を 整備済)`);
+    if (sd) { c.provisioned = sd; wrote.push(`${paths.stateDemand()}(${sd} を 整備済)`); }
     return wrote;
   };
 }
@@ -292,7 +300,7 @@ function checkReuse(ctx, q, c, out, fail) {
 // ════════════════════════════════════════════════════════
 function checkCode(ctx, q, c, out, fail) {
   const { root, paths, store } = ctx;
-  if (out.result === 'cannot_proceed') return () => { stopCard(q, c, `cannot_proceed: ${out.notes}`); return []; };
+  if (out.result === 'cannot_proceed') return () => { stopCard(q, c, `cannot_proceed: ${out.notes}`, 'cannot_proceed'); return []; };
   const rel = paths.setupLog(c.feature);
   const entry = findEntry(paths.abs(rel), rel, q.flow_id, c.state_id);
   if (!entry) { fail('code_mismatch', `${rel} に ${q.flow_id} の ${c.state_id} のエントリがありません`); return null; }
@@ -338,7 +346,7 @@ function checkCode(ctx, q, c, out, fail) {
     const wrote = [writeSetup(ctx, c.feature, q.flow_id, e)];
     if (verified) {
       const sd = markStateProvisioned(root, c.state_id, out.fixture);
-      if (sd) wrote.push(`${paths.stateDemand()}(${sd} を 整備済)`);
+      if (sd) { c.provisioned = sd; wrote.push(`${paths.stateDemand()}(${sd} を 整備済)`); }
     } else if (stateDemandRow(root, c.state_id)) {
       wrote.push(`${paths.stateDemand()}(確認できなかったため 採用 のまま)`);
     }

@@ -238,6 +238,44 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 
 # 改訂履歴
 
+## 28. 2026-10-08 改訂(低価格モデル対応 段2 スクリプト実行)— 手順版 proc-v018
+
+**人間の指示による改訂である。** 人間の指示の原文は「docs/94_改訂指示/02_スクリプト実行.md に従って改訂して」。`docs/94 低価格モデル対応 検討.md` の4段の改訂のうち段2である。段1(proc-v017)は、作業10のフェーズAをカードにし、記録を進行役 pms が書く形にしたが、カードは作業10と同じ長い会話の中で行っていた。本改訂は、主な実行形態を B2(スクリプト実行)にし、進行役 `pms run` がカードを1枚ずつ新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせる形にした。あわせて、作業10のパートC(探索的実行)をカードにし、探索記録・台帳の行・報告書の数値・status.yaml を記録から pms が作るようにした。AIの「できました」ではなくキューの提出の記録で終わりを決めるので、AIが途中で終わってもループは止まらず、カードごとに会話を捨てるので会話の継続確認とコンパクションが起きない(調査票001の H6 の型を構造で防ぐ)。
+
+人間の決定(2026-10-07):
+
+> - docs/94 の提案(`pms act`・タスクキュー・カード・提出時の検査・記録からの生成)で手順書を改訂する
+> - 実行形態は、スクリプト実行(B2: 進行役 `pms run` がカードごとにセッションを起こす)を主な経路とし、IDE 内のループ(B1)を副経路とする
+> - フックは必須にしない。記録の正しさは `pms act`・キュー・`pms submit` で担保する。フックは、段3の計測でやり直しが目立った場合だけ入れる
+> - 導入は4段に分け、段ごとに手順版を上げる
+> - 主な実行形態を B2 にする。B2 では、ループ(次のカードを取る・やらせる・終わったかを確かめる)をプログラムが持ち、AIはループの1回分だけを行う(段2の決定)
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 28.1 | **`pms run` を新設した。** カードを1枚ずつ、カードの種類ごとのエージェントとモデルで新しいセッションを起こして行わせ、終わったらキューで合格したかを確かめる。合格していなければ同じカードを出し直し(段1の出し直し・不合格の上限のまま)、上限を超えたら STOP(終了コード 3)。1枚ごとに上限時間を設け、超えたら未提出として扱う。カードの本文はファイルのパスで渡す(コマンドラインの長さに頼らない)。セッションの出力(JSONL)を、秘密情報の値を伏せて `runs/C-<番号>-<回>.jsonl` に保存する。環境変数 `PMS_RUNNER=b2` を付けて起こし、提出の記録に実行形態を残す。全部終われば `pms report` と完了前の lint を行い、ERROR が残れば「lint 止まり」で止まる(lint の指摘を直すカードは作らない)。**CLI の呼び出しは `config/pms.json` の `runner` に書き、コードに CLI のフラグを書かない。** Copilot CLI と Kiro CLI の雛形を、公式のドキュメントで確かめたフラグで `config/pms.sample.json` に書いた。終了コード 0 / 3 / 1 / 2 と、`--max-cards` で止めたときの 4 | tools/pms / config/pms.sample.json |
+| 28.2 | **パートCをカードにした。** `explore.step`(シナリオの1ステップ。`pms act` で操作し、期待結果を満たすかを判定する)・`explore.close`(シナリオ末尾の DB不変条件と、確立した操作の反映先)・`explore.session_close`(DB 全体の検査)・`report.findings`(報告書の所見の欄だけ)。pms が対象シナリオのステップの表から機械的にキューを作り、前提状態が blocked のシナリオ・blocked のあとのステップは記録だけを書いて AI に出さない(`skipped`)。前のステップまでの様子は、AIの要約ではなく記録の抜粋をカードに載せる。パートPは同じフローのキューに新しいラウンドを足す | stages §10 / procedure/cards / schemas / vocab |
+| 28.3 | **提出の検査を4区分足した。** `expected_changed`(scenarios.md のステップの行がキューを作ったときから変わった・出力が期待結果を変えたと述べる)・`verdict_evidence`(failed / human-check に証跡がない)・`health_time`(健全性シグナルの時刻が操作の範囲の外)・`blocked_refs`(blocked の参照が台帳・禁止操作リストにない、理由コードが語彙にない)。ほかに、検証手段と画面・DB の確認の対応、SELECT 以外の禁止、連番と記録の突き合わせ、安定ロケータ | tools/pms / vocab.pms_reject_kind |
+| 28.4 | **探索記録・台帳の行を pms が書くようにした。** exploration-log の `actions`・`started_at`・`ended_at`・`verified_by.screen`・`evidence` は `pms act` の記録から作り、記録との対応 `act` を書く。シナリオの判定はステップの判定から機械的に決める。DISC(00 ■不整合レポートの書式)・申し送り・外部操作需要・手順改善シグナル(テンプレート94)の行は、カードの出力から pms が採番して書く。証跡は `pms act screenshot` が保存する | tools/pms / stages 付録A |
+| 28.5 | **`pms report` を新設した。** 作業10の報告書(00 の共通骨格と §10 の固有セクション)の数値・一覧と status.yaml(§10 の8章。キーと値の契約は変えない)を記録から作る。工程0〜パートBの事実(環境ID・復元・開始前シナリオ・禁止操作リスト・台帳に書いたID)は、チャットの作業10がキューを作る前に `stage10-context.json`(書式 `procedure/schemas/stage10-context.json`)に写し、pms がそこから status.yaml に写す。所見の欄は `report.findings` の出力から | tools/pms / stages §10 |
+| 28.6 | **`pms stats` を新設した。** カードの種類・実行形態(`b1` / `b2`)ごとの枚数・初回合格率・平均の提出回数・不合格の区分・出し直し・STOP と、setup-log・exploration-log の必須欄の充足率 | tools/pms |
+| 28.7 | **§10 を書き換えた。** 作業10の流れ(工程0〜パートBはチャット、終わったら stage10-context.json を書き `queue build --phase all`、flow.md のメモ欄に「pms run 待ち」と書いて止まる。利用者が端末で `pms run`)、CLI が使えない環境の代わり(チャットで `pms next` のカードを順に行ってよい)、探索のキューの作り方、pms とAIの分担の表。探索の規則を規則ID の行(R-EXP-1〜19、R-RPT-1〜5)にし、カードに差し込む形にした(保護ブロック `EXPECTED_IMMUTABLE` は位置も文言も変えていない)。禁止事項(パートCで playwright-cli を直接呼ばない・記録を直接編集しない・カードの外の作業をしない)、出力、DoD(この skill が確かめるもの / pms が検査するもの / カードの出力欄で確かめるもの)、完了前の lint(pms run が行う。lint の指摘による差し戻しのあとは `pms report` で作り直す)、スロット8(pms report が作る) | stages §10 |
+| 28.8 | **00 ■進行役と記録の道具を広げた。** 対象をパートCに広げ、原則 P2・P7、`pms run`・`pms report`・`pms stats`、記録の置き場所、R-PMS-5(カードの外の作業をしない)、実行形態(B2 を主、B1 を副)、セッションで使用禁止にするもの(playwright-cli の直接の呼び出し・秘密情報の値の取り出し・手順書と skills への書き込み)を書いた。R-LOC-4 をパートCに広げた。探索のカードが引用する規則に規則IDを付けた(R-JDG・R-HLT・R-INV・R-WAIT・R-DISC・R-HO・R-SIG。文言は変えていない)。■ディレクトリ構成に、セッションの出力・stage10-context.json・エージェントの生成物を加えた | 00 |
+| 28.9 | **カードの種類ごとのエージェントを生成するようにした。** 正本 `procedure/cards/agents.yaml`(種類・説明・モデルの候補・使用禁止)から、`build-skills.mjs` が Copilot 用 `.github/agents/pms-card-<種類>.agent.md` と Kiro 用 `.kiro/agents/pms-card-<種類>.json`(使用禁止を `permissions` に)を生成する。本文はどの種類も同じ短い指示。`skills_in_sync`(`--check`)の対象に含めた。種類は `vocab.pms_card_kind` と照合する | procedure/cards/agents.yaml / skills.config.json / tools/build-skills |
+| 28.10 | **lint に `explore_act_linked`(ERROR)を加え、`phase_a_queue_complete` を広げた**(どちらも proc-v018 以降のフロー)。`explore_act_linked`: 探索記録の実行したステップの `act` が操作の記録にあり、`actions`・`screen_seqs`・`evidence_seqs` が記録と一致する(作業15の `health_fix` の記録を除く)。`phase_a_queue_complete`: パートCのカードも合格・STOP・skipped のいずれか。実装済みは42規則のうち20規則 | 00 ■lint / tools/lint |
+| 28.11 | **vocab に語彙を加えた。** `pms_card_kind` に4種類、`pms_card_status` に `skipped`、`pms_reject_kind` に4区分、`pms_act_action` に `screenshot`、`pms_runner`・`pms_stop_reason`・`discrepancy_kind`・`discrepancy_assessment`・`reflection_target`。手順版を `proc-v018` に更新 | vocab |
+| 28.12 | **入口 skill に「pms run 待ち」を加えた。** 続きの判定: メモ欄に「pms run 待ち」があり、キューにカードが残っていれば止まって `pms run` の実行を伝える(人間の確認待ちのカードがあれば、その理由をそのまま伝える)。キューが終わっていれば lint を実行し、通れば T3・T4 をチェックして作業10の完了として止まる。通らなければ作業10へ差し戻す(1回まで。その後は lint 止まり)。止まったときの伝え方に2行。要許可操作・DB不変条件の違反は、pms report が作った status.yaml の値で既存の「管理者の判断を受けて進める」に合流させる | router/SKILL.md |
+| 28.13 | flow.md の記入用テンプレートのメモ欄の例と記入規約13(「pms run 待ち」)を加えた。利用説明書に、`pms run` の流れ・STOP と lint 止まりの扱い・AI の CLI の導入(8. の11)・既知の制約を加えた | templates/92 / docs/skills版_利用説明書.md |
+
+### 変更していないもの・後の段で行うもの
+
+- 保護ブロック・`pipeline.dot` の構造と停止点は変更していない(保護ブロックはカードに文言を変えずに引用するだけ)。報告書の骨格と status.yaml のキーと値の契約は変えていない(作り手が pms に変わっただけ)
+- 作業10の工程0・パートA・パートB・パートR・パートP、作業15・20・30は変えていない。lint の指摘を直すカードは作っていない(現行の「lint の指摘による差し戻し」の経路で、チャットの作業10が直す)
+- IDE 内のループ(B1。入口 skill を `pms next` のループに置き換え、カードを subagent で行う)は段3、フックは段4(任意)。この版の B1 は、`pms run` を実行できない環境でチャットの作業10が同じ会話の中で `pms next` のカードを順に行う形である
+- Copilot CLI・Kiro CLI の実物での確認はしていない。使用禁止のパターン(空白を含むコマンド・`**`)が効くか、`--allow-all-tools` と `--deny-tool` の優先、Kiro の `permissions` と旧形式 `toolsSettings` の併記は、人間が確かめる(`tools/pms/README.md` 13章)。playwright-cli の `screenshot --filename` も同じ(8章)
+- 環境情報が足りないときの問い合わせ・要許可操作の許可は、B2 のセッションの中では人間に聞けないため、カードを `cannot_proceed`(STOP)にして人間に回す
+- すでに作業場所で flow.md を持つフロー(proc-v017 以前で始めたもの)は、旧版のまま完了させる。新しい lint 規則と広げた部分は、proc-v018 以降で始めたフローにだけ当てる
+- 手順改善台帳(作業場所の `work/_common/procedure-improvement.md`)の改訂表への `指示適用` の記録は、本改訂を作業場所に取り込むときに行う
+
 ## 27. 2026-10-07 改訂(低価格モデル対応 段1 共通の土台)— 手順版 proc-v017
 
 **人間の指示による改訂である。** 人間の指示の原文は「docs/94_改訂指示/01_共通の土台.md に従って改訂して」。作業10を最後まで実施したのに、setup-log の `steps` と安定ロケータが抜けていた(`investigations/001_setup-log記録抜け.md`)。proc-v016 は記録の時機の規則と lint を足したが、記録はまだAIが書いており、低価格のモデルは長い会話の途中でこの義務を落とす。`docs/94 低価格モデル対応 検討.md` は、手順の正しさを「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らない形に変える方針を立て、4段の改訂指示(`docs/94_改訂指示/`)に分けた。本改訂はその段1であり、進行役 `tools/pms/` の `pms act`(操作と記録の一体化)・タスクキュー・カード・提出の検査を作り、作業10のフェーズA(初期状態の準備)をカードで行うようにした。**この段では、カードは作業10と同じ会話の中で順に行う**(サブエージェントやスクリプト実行は段2・段3)。

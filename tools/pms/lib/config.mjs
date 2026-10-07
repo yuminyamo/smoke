@@ -39,6 +39,19 @@ export const DEFAULTS = {
   max_rejections: 3,
   // 操作ごとの呼び出し(DEFAULT_OPS を上書きする)
   ops: {},
+  // pms act screenshot の呼び出し({file} は保存先の絶対パス、{ref} は要素参照。ref がなければ {ref} の要素を外す)
+  screenshot_args: ['screenshot', '{ref}', '--filename={file}'],
+  // pms run がカードごとにセッションを起こす AI の CLI(名前 → 呼び出しの雛形)。CLI のフラグはコードに書かず、ここに書く
+  //   command: コマンドの配列。{prompt} {agent} {model} {card_file} {flow} {card} を置き換え、要素 "{deny}" は deny の各パターンを deny_arg の形に広げる
+  //   deny_arg: 使用禁止の1つ分の引数({pattern} を置き換える)/ deny: すべてのカードに共通の使用禁止のパターン
+  //   stdin: "prompt" なら依頼文を標準入力で渡す(null なら渡さない)/ timeoutSec: 1枚の上限時間(秒)
+  // 見本は config/pms.sample.json。runner がなければ pms run は使えない(終了コード 2)
+  runner: null,
+  // pms run の既定の CLI(--runner を省いたとき)
+  default_runner: 'copilot',
+  // カードの種類ごとのエージェントとモデル・追加の使用禁止({"explore.step": {"agent": "...", "model": ["..."], "deny": ["..."]}})。
+  // 書かなかった種類は procedure/cards/agents.yaml の値を使う
+  cardTypes: {},
 };
 
 /**
@@ -64,6 +77,20 @@ export function loadConfig(root) {
   }
   if (typeof cfg.ops !== 'object' || Array.isArray(cfg.ops)) throw new UsageError(`${CONFIG_FILE} の ops はオブジェクトでなければなりません`);
   cfg.ops = { ...DEFAULT_OPS, ...cfg.ops };
+  if (!Array.isArray(cfg.screenshot_args) || !cfg.screenshot_args.every((x) => typeof x === 'string')) throw new UsageError(`${CONFIG_FILE} の screenshot_args は文字列の配列でなければなりません`);
+  if (cfg.runner !== null) {
+    if (typeof cfg.runner !== 'object' || Array.isArray(cfg.runner)) throw new UsageError(`${CONFIG_FILE} の runner はオブジェクト(CLI の名前 → 呼び出しの雛形)でなければなりません`);
+    for (const [name, r] of Object.entries(cfg.runner)) {
+      if (name.startsWith('_')) continue;
+      if (!r || typeof r !== 'object' || !isCmd(r.command)) throw new UsageError(`${CONFIG_FILE} の runner.${name}.command はコマンドの配列でなければなりません`);
+      if (r.timeoutSec != null && (!Number.isInteger(r.timeoutSec) || r.timeoutSec < 1)) throw new UsageError(`${CONFIG_FILE} の runner.${name}.timeoutSec は1以上の整数でなければなりません`);
+      if (r.deny != null && (!Array.isArray(r.deny) || !r.deny.every((x) => typeof x === 'string'))) throw new UsageError(`${CONFIG_FILE} の runner.${name}.deny は文字列の配列でなければなりません`);
+      if (r.deny_arg != null && !(Array.isArray(r.deny_arg) && r.deny_arg.every((x) => typeof x === 'string'))) throw new UsageError(`${CONFIG_FILE} の runner.${name}.deny_arg は文字列の配列でなければなりません`);
+      if (r.stdin != null && r.stdin !== 'prompt') throw new UsageError(`${CONFIG_FILE} の runner.${name}.stdin は "prompt" か null でなければなりません`);
+    }
+  }
+  if (typeof cfg.default_runner !== 'string') throw new UsageError(`${CONFIG_FILE} の default_runner は文字列でなければなりません`);
+  if (!cfg.cardTypes || typeof cfg.cardTypes !== 'object' || Array.isArray(cfg.cardTypes)) throw new UsageError(`${CONFIG_FILE} の cardTypes はオブジェクトでなければなりません`);
   for (const [name, op] of Object.entries(cfg.ops)) {
     if (!op || typeof op !== 'object' || (!isCmd(op.cli) && typeof op.run_code !== 'string')) {
       throw new UsageError(`${CONFIG_FILE} の ops.${name} には cli(引数の配列)か run_code(Playwright のメソッド呼び出し)が要ります`);

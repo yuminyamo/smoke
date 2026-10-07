@@ -1,0 +1,30 @@
+{
+  "$comment": "work/_flows/F-<番号>/stage10-context.json の形(stages.md §10 パートC)。チャットの作業10が、工程0〜パートB(R・P)の結果を道具の出力とメモ欄・台帳から写して書く(推測しない)。pms queue build --phase C / all が検査し、pms report が status.yaml の最上位の項目とこれらのキーに使う",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["environment", "env_restore", "pre_stage", "prohibited_ops", "flow_kind", "flow_seq", "scenario_source", "env_keys_added", "kb_t05_registered", "kb_t05_reused", "ext_demand_added", "ext_demand_appended", "ext_demand_established", "ext_demand_unresolved", "state_demand_added", "state_demand_appended", "signals_recorded", "recheck_of", "reexplore_of"],
+  "properties": {
+    "environment": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$", "description": "使った検証環境の環境ID(env.mjs require の出力の env)" },
+    "env_restore": { "type": "object", "additionalProperties": false, "required": ["restore_id", "purpose", "readiness"], "description": "工程0の復元(復元の実行体の出力とメモ欄から)",
+      "properties": { "restore_id": { "type": "string", "minLength": 4 }, "purpose": { "const": "work10" }, "readiness": { "enum": ["auto", "human"] } } },
+    "pre_stage": { "type": "object", "additionalProperties": false, "required": ["state", "run_id"], "description": "工程0の開始前シナリオ(実行体の出力の JSON から)",
+      "properties": { "state": { "type": "string", "x-vocab": "pre_stage_state" }, "run_id": { "type": "string", "pattern": "^PRE-\\d{8}-\\d{6}-[0-9a-f]{4}$" } } },
+    "prohibited_ops": { "type": "object", "additionalProperties": false, "required": ["state", "digest"], "description": "工程0のあとの禁止操作リスト(照合スクリプトの出力から)",
+      "properties": { "state": { "type": "string", "x-vocab": "prohibited_ops_state" }, "digest": { "type": "string", "minLength": 4 } } },
+    "flow_kind": { "type": "string", "x-vocab": "flow_kind", "description": "フロー種別" },
+    "flow_seq": { "type": "string", "x-vocab": "context_key.flow_seq", "description": "first / subsequent" },
+    "scenario_source": { "type": "string", "x-vocab": "context_key.scenario_source", "description": "flow.md の scenario_source(再探索フローは none)" },
+    "env_keys_added": { "type": "array", "items": { "type": "string" }, "description": "人間に聞いて新たに保存した環境情報のキー" },
+    "kb_t05_registered": { "type": "array", "items": { "type": "string", "pattern": "^OP-[A-Z0-9]+-\\d{3}$" }, "description": "パートA・B・Rで KB T05 に新規登録した操作ID(パートCの分は pms が足す)" },
+    "kb_t05_reused": { "type": "array", "items": { "type": "string", "pattern": "^OP-[A-Z0-9]+-\\d{3}$" }, "description": "流用を計画した操作ID(パートCで使った分は pms が足す)" },
+    "ext_demand_added": { "type": "array", "items": { "type": "string", "pattern": "^EXT-\\d{3}$" }, "description": "パートBで外部操作需要リストに新規追加した需要ID" },
+    "ext_demand_appended": { "type": "array", "items": { "type": "string", "pattern": "^EXT-\\d{3}$" }, "description": "パートBで要求元を追記した需要ID" },
+    "ext_demand_established": { "type": "array", "items": { "type": "string", "pattern": "^EXT-\\d{3}$" }, "description": "パートRで確立済にした需要ID" },
+    "ext_demand_unresolved": { "type": "array", "items": { "type": "string", "pattern": "^EXT-\\d{3}$" }, "description": "パートRで未整備に戻した需要ID" },
+    "state_demand_added": { "type": "array", "items": { "type": "string", "pattern": "^SD-\\d{3}$" }, "description": "パートBで状態需要リストに提案した需要ID" },
+    "state_demand_appended": { "type": "array", "items": { "type": "string", "pattern": "^SD-\\d{3}$" }, "description": "パートBで要求元を追記した需要ID" },
+    "signals_recorded": { "type": "array", "items": { "type": "string", "pattern": "^SIG-\\d{4}$" }, "description": "工程0〜パートBで記録した手順改善シグナル(パートCの分は pms が足す)" },
+    "recheck_of": { "type": ["string", "null"], "description": "パートPのとき、前回の prohibited_ops.digest(それ以外は null)" },
+    "reexplore_of": { "type": ["string", "null"], "pattern": "^F-\\d{3}$", "description": "再探索フローのとき、旧フローID(それ以外は null)" }
+  }
+}

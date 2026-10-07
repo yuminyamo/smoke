@@ -85,13 +85,25 @@ export class Paths {
   card(flow, card) { return `${this.flowDir(flow)}/cards/${card}.md`; }
   out(flow, card) { return `${this.flowDir(flow)}/out/${card}.json`; }
   submitLog(flow) { return `${this.flowDir(flow)}/submit-log.jsonl`; }
+  run(flow, card, n) { return `${this.flowDir(flow)}/runs/${card}-${n}.jsonl`; }
+  context(flow) { return `${this.flowDir(flow)}/stage10-context.json`; }
+  draft(flow, feature) { return `${this.flowDir(flow)}/report-draft-${feature}.md`; }
+  flowMd(flow) { return `${this.flowDir(flow)}/flow.md`; }
   actLog(feature) { return `work/${feature}/exploration/act-log.jsonl`; }
   setupLog(feature) { return `work/${feature}/exploration/setup-log.yaml`; }
+  explorationLog(feature) { return `work/${feature}/exploration/exploration-log.yaml`; }
+  evidenceDir(feature) { return `work/${feature}/exploration/evidence`; }
+  report(feature) { return `work/${feature}/exploration/report.md`; }
+  status(feature) { return `work/${feature}/exploration/status.yaml`; }
   scenarios(feature) { return `work/${feature}/scenarios.md`; }
   handoff() { return 'work/_common/handoff-register.md'; }
   extDemand() { return 'work/_common/external-op-demand.md'; }
   stateDemand() { return 'work/_common/state-demand.md'; }
   testidRequests() { return 'work/_common/testid-requests.md'; }
+  discrepancies() { return 'work/_common/discrepancies.md'; }
+  signals() { return 'work/_common/procedure-improvement.md'; }
+  prohibitedOps() { return 'work/_common/prohibited-operations.md'; }
+  ndCatalog() { return 'work/_common/nondeterministic-catalog.md'; }
 }
 
 /** 手順版の番号(proc-v017 → 17) */

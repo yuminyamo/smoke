@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-07 / 版: v21(低価格モデル対応 段1 共通の土台: ■進行役と記録の道具(pms)を新設した。■ロケータ規約にフェーズAのロケータは `pms act` が取ることを加え、カードが使う規則に規則IDを付けた。■lint に `act_log_linked`・`phase_a_queue_complete` を加え、`setup_steps_recorded` を `provided` に広げた(proc-v017 以降のフロー)。前版 v20 は 2026-10-06 の setup-log の記録の強化)
+改訂: 2026-10-08 / 版: v22(低価格モデル対応 段2 スクリプト実行: ■進行役と記録の道具に `pms run`(カードごとにAIのセッションを起こす。実行形態 B2 を主、B1 を副)・セッションで使用禁止にするもの・`pms report`・`pms stats` を加え、対象を作業10のパートCに広げた。探索のカードが引用する規則に規則IDを付けた(R-JDG・R-HLT・R-INV・R-WAIT・R-DISC・R-HO・R-SIG)。■ロケータ規約の R-LOC-4 をパートCに広げた。■lint に `explore_act_linked` を加えた(proc-v018 以降のフロー)。前版 v21 は 2026-10-07 の段1 共通の土台(pms act・キュー・カード・提出の検査))
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -63,37 +63,59 @@
 
 ## ■ 進行役と記録の道具(pms)
 
-手順の正しさを、「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らないために、**進行役 `tools/pms/pms.mjs`(以下 pms)が、順序・記録・完了判定を受け持つ。** AIは、pms が出すカードの判断だけを行う。この版では、作業10のフェーズA(初期状態の準備。`stages.md` §10)に使う。
+手順の正しさを、「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らないために、**進行役 `tools/pms/pms.mjs`(以下 pms)が、順序・記録・集計・完了判定を受け持つ。** AIは、pms が出すカードの判断だけを行う。この版では、作業10のフェーズA(初期状態の準備)とパートC(探索的実行・報告の所見。`stages.md` §10)に使う。工程0・パートA・パートB・パートR・パートP、作業15・20・30はこれまでどおりチャットの skill が行う。
 
 この道具が拠る原則(`docs/94 低価格モデル対応 検討.md` §3 のうち、この版で効くもの):
 
 | # | 原則 | この版での形 |
 |---|---|---|
-| P1 | AIは判断だけをする。順序・記録・集計・完了判定はプログラムが行う | どの状態を整備するかは、pms がシナリオの `requires` から機械的にカードにする。setup-log と台帳の行は pms が書く |
+| P1 | AIは判断だけをする。順序・記録・集計・完了判定はプログラムが行う | どの状態を整備するか・どのステップを探索するかは、pms がシナリオの `requires` とステップの表から機械的にカードにする。setup-log・探索記録・台帳の行・報告書の数値と status.yaml は pms が書く |
+| P2 | 1枚のカードで1つの判断をする。カードが終われば会話を捨ててよい形にする(状態はすべてファイルに置く) | `pms run` がカードごとに新しいセッションを起こし、終わったら捨てる。前のステップの様子は、AIの要約ではなく記録の抜粋をカードに載せる |
 | P5 | 出力は提出の瞬間に検査し、通らなければ理由を返して差し戻す | `pms submit` が出力を検査し、不合格なら区分(`vocab.pms_reject_kind`)と直し方を返す。同じカードの不合格・出し直しが上限を超えたら人間の確認待ち(STOP)にする |
-| P6 | AIが書かなくても残る記録を優先する。道具の実行がそのまま記録になる | 画面操作は `pms act` が実行し、操作のたびに時刻・ロケータ・操作を記録する。setup-log の操作列はこの記録から作る |
+| P6 | AIが書かなくても残る記録を優先する。道具の実行がそのまま記録になる | 画面操作は `pms act` が実行し、操作のたびに時刻・ロケータ・操作を記録する。setup-log の操作列と探索記録の `actions`・時刻・証跡はこの記録から作る |
+| P7 | モデルの既定の振る舞いに逆らう規則は、文章で頼まず検査で止める | `pms run` が起こすセッションでは、playwright-cli の直接の呼び出し・秘密情報の値の取り出し・手順書と skills への書き込みを使用禁止にする。期待結果の書き換えは提出の検査で止める(`expected_changed`) |
 
 | 道具 | 役割 |
 |---|---|
 | `pms act` | 画面操作を1回ずつ playwright-cli で実行し、操作の記録に1行書く(操作は `vocab.pms_act_action`)。要素の操作の前に `generate-locator` でロケータを取り、区分(`vocab.locator_class`)と一意性を記録する。環境情報の参照 `<env:キー>` は自分で値を取り出して使い、標準出力と記録では値を伏せる |
-| `pms queue build` / `pms next` | 対象シナリオの `requires` からカードを作り(タスクキュー)、1枚ずつ出す。出したカードが提出されないまま `next` が呼ばれたら、同じカードを出し直す。全部終われば `done`、人間の判断が要れば `STOP` を返す |
+| `pms queue build` / `pms next` | 対象シナリオの `requires`(フェーズA)とステップの表(パートC)からカードを作り(タスクキュー)、1枚ずつ出す。出したカードが提出されないまま `next` が呼ばれたら、同じカードを出し直す。全部終われば `done`、人間の判断が要れば `STOP` を返す |
+| `pms run` | **実行形態 B2(主な経路)。** カードを1枚ずつ、新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせる。セッションには、カードの種類ごとのエージェントとモデルを指定し、カードのファイルのパスを渡す。終わったら、キューで合格したかを確かめる(AIの「できました」ではなく提出の記録で決める)。合格していなければ同じカードを出し直し、上限を超えたら STOP。1枚ごとに上限時間を設け、セッションの出力を保存する(秘密情報の値は伏せる)。全部終われば `pms report` と完了前の lint を行う。CLI の呼び出し方は `config/pms.json` の `runner` に書く(コードに CLI のフラグを書かない) |
+| `pms report` | 作業10の報告書の数値・一覧と status.yaml を記録から作る。所見の欄だけを、カード `report.findings` の出力から写す |
+| `pms stats` | カードの種類・実行形態(`vocab.pms_runner`)ごとの初回合格率・提出の回数・不合格の区分・出し直し・STOP と、記録の必須欄の充足率 |
 | カード | 1枚1判断の依頼文(やること・入力・規則・出力・合格した記入例・終わったら)。種類は `vocab.pms_card_kind`。テンプレートは `procedure/cards/<種類>.md`、出力の schema は `procedure/schemas/<種類>.out.json`(手順書の一部として版の管理を受ける)。**規則は、本書と `stages.md` の規則IDの付いた行(書式 `vocab.id_format.rule`)から pms が差し込む。** テンプレートに規則の文章を書き写さない。保護ブロックは、ブロックごと文言を変えずに差し込む |
-| `pms submit` | カードの出力を schema・操作の記録・lint の規則で検査し、合格なら記録(setup-log・申し送り台帳・外部操作需要リスト・状態需要リスト)を書く |
+| `pms submit` | カードの出力を schema・操作の記録・lint の規則で検査し、合格なら記録(setup-log・探索記録・申し送り台帳・外部操作需要リスト・状態需要リスト・DISC・手順改善シグナル)を書く |
 | `pms status` | 現在のカード・残りの枚数・止まっている理由 |
 
 | 記録 | 所在 | 書く者 |
 |---|---|---|
 | 操作の記録 | `work/<feature_code>/exploration/act-log.jsonl`(1操作1行) | `pms act` |
 | タスクキュー・出したカード・提出の検査の結果 | `work/_flows/F-<番号>/queue.json`・`cards/C-<番号>.md`・`submit-log.jsonl` | pms |
+| セッションの出力 | `work/_flows/F-<番号>/runs/C-<番号>-<回>.jsonl`(秘密情報の値は伏せる) | `pms run` |
+| 証跡 | `work/<feature_code>/exploration/evidence/<ステップID>_<連番>.png` | `pms act screenshot` |
+| 作業10の開始時の事実 | `work/_flows/F-<番号>/stage10-context.json`(工程0〜パートBの結果。書式 `procedure/schemas/stage10-context.json`) | チャットの作業10 |
 | カードの出力 | `work/_flows/F-<番号>/out/C-<番号>.json` | AI |
 | pms の設定 | `config/pms.json`(各自。git に入れない。見本 `config/pms.sample.json`) | 人間 |
 
 - **[R-PMS-1]** 画面操作は必ず `pms act` で行う。playwright-cli を直接呼ばない(直接呼んだ操作は記録に残らず、その操作を含む提出は不合格になる)
-- **[R-PMS-2]** 記録(setup-log・申し送り台帳・外部操作需要リスト・状態需要リスト)を書かない。pms が提出の合格時に書く。AIが書くのは、カードが指定するファイルへの出力の JSON だけである
+- **[R-PMS-2]** 記録(setup-log・探索記録・申し送り台帳・外部操作需要リスト・状態需要リスト・DISC・手順改善台帳・報告書・status.yaml)を書かない。pms が提出の合格時に書く。AIが記録として書くのは、カードが指定するファイルへの出力の JSON だけである(KB・テストコードはカードの指示どおりに書く)
 - **[R-PMS-3]** `pms submit` が不合格を返したら、返された理由のところだけを直して再提出する。記録や出力を削って通さない。カードの範囲で判断できないときは `cannot_proceed` で提出する
 - **[R-PMS-4]** 道具の出力の `now`(現在のカードと、やること1行)と `next`(次に実行すべきコマンド)に従う。会話が長くなった・要約されたあとは、`node tools/pms/pms.mjs status --flow <フローID>` で現在地を確かめてから続ける
 
+- **[R-PMS-5]** カードの外の作業をしない。1枚のカードで行うのは、そのカードの判断だけである(次のステップを先に探索しない・記録を先回りして書かない)
+
 `pms act` と `pms next` の出力に毎回 `now` と `next` を付けるのは、会話が長くなったり要約されたりしても、AIが道具の出力から現在地を取り戻せるようにするためである(`docs/004_フック処理_図解.html` 7章)。コマンドの細部・データの形・終了コードは `tools/pms/README.md` を参照する。
+
+**実行形態**(2026-10-07 の人間の決定): **スクリプト実行(B2: `pms run` がカードごとにセッションを起こす)を主な経路とし、IDE 内のループ(B1)を副経路とする。** B2 では、ループ(次のカードを取る・やらせる・終わったかを確かめる)をプログラムが持ち、AIはループの1回分だけを行う。AIが途中で終わってもループは止まらず、カードごとに会話を捨てるので、会話の継続確認とコンパクションが起きない。B1 は、この版では、`pms run` を実行できない環境でチャットの作業10が同じ会話の中で `pms next` のカードを順に行う形である(後の版で IDE 内のループに置き換える)。提出の記録には実行形態(環境変数 `PMS_RUNNER`。`vocab.pms_runner`)が残り、`pms stats` で分けて数える。
+
+**`pms run` が起こすセッションで使用禁止にするもの**(`config/pms.json` の `runner` の使用禁止のパターンと、生成したエージェントの定義で止める):
+
+| 使用禁止 | 理由 |
+|---|---|
+| playwright-cli の直接の呼び出し(`npx` 経由を含む) | 記録(`pms act`)を通らない操作をそもそも実行できないようにする |
+| `node tools/env/env.mjs get … --reveal` | 秘密情報の値をAIが取り出せないようにする(値は `pms act` が `<env:キー>` から取り出して使う) |
+| 手順書(`procedure/`)・skills・エージェントの定義への書き込み | 実行中に手順を書き換えない(■手順改善シグナル) |
+
+カードの種類ごとのエージェント(Copilot は `.github/agents/pms-card-<種類>.agent.md`、Kiro は `.kiro/agents/pms-card-<種類>.json`)は、正本 `procedure/cards/agents.yaml` から skills と同じく生成する(直接編集しない。lint `skills_in_sync`)。エージェントの本文はどの種類も同じ短い指示(カードを読み、指示どおりに行い、`pms submit` で提出する。不合格なら理由だけを直して再提出する。カードの外の作業をしない)である。
 
 ---
 
@@ -350,10 +372,10 @@ KB(T09 環境・構成知見)に書くのは環境の構成についての知見
 
 判定区分の値と意味は `vocab.verdict`、検証手段は `vocab.verification` を参照する。
 
-- `failed` と `human-check` の項目は、必ず証跡(スクリーンショット)と、該当する場合は DISC への参照を持つ
-- 正否を断定できないものを、無理に `passed` / `failed` にしない
-- **画面での結果確認を主とし、可能な限りDBでの二重確認を併用する**(`両方`)。同じ操作でUI層と永続化層の双方を検証でき、追加コストが小さい
-- **`DB` 単独で判定した場合は、理由を簡潔に1文で併記する。** ステップ3で検証手段を見直す際の入口になる
+- **[R-JDG-1]** `failed` と `human-check` の項目は、必ず証跡(スクリーンショット)と、該当する場合は DISC への参照を持つ
+- **[R-JDG-2]** 正否を断定できないものを、無理に `passed` / `failed` にしない
+- **[R-JDG-3]** **画面での結果確認を主とし、可能な限りDBでの二重確認を併用する**(`両方`)。同じ操作でUI層と永続化層の双方を検証でき、追加コストが小さい
+- **[R-JDG-4]** **`DB` 単独で判定した場合は、理由を簡潔に1文で併記する。** ステップ3で検証手段を見直す際の入口になる
   - 記述例: `DB(理由: 内部処理の完了状態は画面に露出しないため)`
   - 理由は成果物(exploration-log、テストコードのコメント、報告書)のいずれにも残す
 
@@ -363,9 +385,9 @@ KB(T09 環境・構成知見)に書くのは環境の構成についての知見
 
 | 項目 | 規約 |
 |---|---|
-| 定義 | 自テストが作成・操作したデータや操作そのものに現れた、正常でない兆候。種類は `vocab.health_signal_kind`。**自データに関するものだけを数える**(他のデータのエラーは数えない) |
+| **[R-HLT-1]** 定義 | 自テストが作成・操作したデータや操作そのものに現れた、正常でない兆候。種類は `vocab.health_signal_kind`。**自データに関するものだけを数える**(他のデータのエラーは数えない) |
 | 確かめる時機 | 作業10(と作業15の探索し直し)で、ステップごとに期待結果とは別に確かめる |
-| 出たとき | そのステップを `passed` にせず `human-check` とし、`health_signal` と証跡を記録する(`stages.md` 付録A)。操作はいったん採用して探索を続けてよい。**是正は作業15が行う** |
+| **[R-HLT-2]** 出たとき | そのステップを `passed` にせず `human-check` とし、`health_signal` と証跡を記録する(`stages.md` 付録A)。操作はいったん採用して探索を続けてよい。**是正は作業15が行う** |
 | 作業15 | 自己診断のあと、問い合わせ skill に再現手順と解決してほしいことを(ログ収集 skill があればサーバーのログを添えて。下の「ログの添付」)渡し、回答を踏まえて操作を編み出し直す。解消しなければ記録だけを残して作業20へ進む(`stages.md` §15。分岐は `pipeline.dot` 注記11) |
 
 **問い合わせ skill** は、別の問い合わせ対応エージェントを呼ぶ skill である。skills の機構で確認する(別の一覧を持たない)。次の条件を満たすものだけを使う。
@@ -408,10 +430,10 @@ KB(T09 環境・構成知見)に書くのは環境の構成についての知見
 | **シナリオ末尾検査** | 各シナリオの末尾(作業20では `afterEach`) | **当該シナリオが作成・変更したデータに限定**する。検査前に、当該シナリオの非同期書き込みの完了をポーリング契約で待つ |
 | **全体検査** | スイート終端(作業20では `globalTeardown`)、全シナリオ完了・静穏化後に1回 | DB全体 |
 
-- グローバルなDBスキャンをシナリオ末尾で行ってはならない。並列実行中の別シナリオの過渡状態を拾い、flaky な偽陽性になる
-- 検査は `SELECT` のみで実装し、`tests/helpers/invariants.ts` に集約する
-- 違反を検出した場合、そのシナリオの判定とは別に**違反として独立に報告する**(シナリオ自体は `passed` でも表面化させる)
-- 課金機能を使わないシナリオでも INV-003〜005 は適用する
+- **[R-INV-1]** グローバルなDBスキャンをシナリオ末尾で行ってはならない。並列実行中の別シナリオの過渡状態を拾い、flaky な偽陽性になる
+- **[R-INV-2]** 検査は `SELECT` のみで実装し、`tests/helpers/invariants.ts` に集約する
+- **[R-INV-3]** 違反を検出した場合、そのシナリオの判定とは別に**違反として独立に報告する**(シナリオ自体は `passed` でも表面化させる)
+- **[R-INV-4]** 課金機能を使わないシナリオでも INV-003〜005 は適用する
 - SQLはAI起草のまま使用してよい(`SELECT` のみで副作用がないため、人間の承認が必要な例外に当たらない)。ただし誤ったINVは偽の失敗を全シナリオに撒くため、**優先レビュー推奨リストに必ず挙げる**
 
 <!-- protected:INV_NO_RETRY -->
@@ -432,7 +454,7 @@ KB(T09 環境・構成知見)に書くのは環境の構成についての知見
 
 ## ■ 非同期完了の待機(ポーリング契約)
 
-**固定待機(`page.waitForTimeout()` 等)を使ってはならない。** 遅いと不安定になり、短いと偽陰性を生む。共通ヘルパー `tests/helpers/waitFor.ts` のポーリング関数を必ず使う。
+**[R-WAIT-1]** **固定待機(`page.waitForTimeout()` 等)を使ってはならない。** 遅いと不安定になり、短いと偽陰性を生む。共通ヘルパー `tests/helpers/waitFor.ts` のポーリング関数を必ず使う。
 
 ```
 waitUntil(condition, options)
@@ -442,11 +464,11 @@ waitUntil(condition, options)
   onTimeout : タイムアウト時は必ず失敗させる。黙って先へ進まない
 ```
 
-- **待機条件は「操作が完了した」ではなく「目的の状態が成立した」で書く**
-- UI側とDB側の双方に条件を書ける場合、**DB側を待機条件にする方が安定する**(画面の更新タイミングに依存しないため)。ただし判定自体は画面でも行う
+- **[R-WAIT-2]** **待機条件は「操作が完了した」ではなく「目的の状態が成立した」で書く**
+- **[R-WAIT-3]** UI側とDB側の双方に条件を書ける場合、**DB側を待機条件にする方が安定する**(画面の更新タイミングに依存しないため)。ただし判定自体は画面でも行う
 - Playwright の `expect.poll()` / web-first assertion の自動リトライは、この契約を満たす実装形態として使用してよい。契約を満たさない自作ループを書かない
-- **タイムアウト値をAIが場当たりに調整してはならない。** 既定値で不足する場合は、その事実を報告し人間の判断を仰ぐ
-- 待機が必要だった箇所は「どの条件で何秒待ったか」を実測値付きで残す
+- **[R-WAIT-4]** **タイムアウト値をAIが場当たりに調整してはならない。** 既定値で不足する場合は、その事実を報告し人間の判断を仰ぐ
+- **[R-WAIT-5]** 待機が必要だった箇所は「どの条件で何秒待ったか」を実測値付きで残す
 
 ## ■ 外部操作(skills前提・禁止操作リスト方式)
 
@@ -731,7 +753,7 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 - **[R-LOC-1]** 採用したロケータは**その画面状態で一意に1要素へ解決されること**を確認してから記録する
 - **[R-LOC-2]** **動的に変わる文字列をロケータの name に含めない。** 含めざるを得ない場合は正規表現化する(`パターン一致` 対象がここに該当)
 - **[R-LOC-3]** 1〜5で取れない要素はCSSで暫定記録した上で `work/_common/testid-requests.md` に画面名・要素の役割・暫定セレクタを記載する。**この依頼は開発側で処理される。** 反映されたら暫定CSSを `getByTestId()` に置換し `// FRAGILE:` を除去する
-- **[R-LOC-4]** 作業10のフェーズAでは、ロケータは `pms act` が操作の前に `generate-locator` で取り、区分(`vocab.locator_class`)と一意性を記録する。**AIはロケータを手で書かない。** 安定でない・一意でないと警告されたら、別の要素で操作し直すか、6のとおり CSS を暫定で使い、カードの出力の `fragile` に挙げて `testid-requests.md` に記載する(■進行役と記録の道具)
+- **[R-LOC-4]** 作業10のフェーズAとパートCでは、ロケータは `pms act` が操作の前に `generate-locator` で取り、区分(`vocab.locator_class`)と一意性を記録する。**AIはロケータを手で書かない。** 安定でない・一意でないと警告されたら、別の要素で操作し直すか、6のとおり CSS を暫定で使い、カードの出力の `fragile` に挙げて `testid-requests.md` に記載する(■進行役と記録の道具)
 - 特殊な操作で発見したコツは、KBの該当画面カタログまたは `kb/gotchas/` に記録する
 
 ## ■ ページオブジェクト規約
@@ -760,13 +782,14 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 - **備考**: (再現手順の要点、発生条件など)
 ```
 
-- 各ソースの記載は**文書名+章番号+記載内容の要旨**まで書く。「仕様書と違う」だけの記録は不可
-- 実画面の挙動には必ずスクリーンショットを添付する
-- 判定 `failed` / `human-check` の根拠となった不整合は、exploration-log 側から DISC ID で相互参照する
+- **[R-DISC-1]** 各ソースの記載は**文書名+章番号+記載内容の要旨**まで書く。「仕様書と違う」だけの記録は不可
+- **[R-DISC-2]** 実画面の挙動には必ずスクリーンショットを添付する
+- **[R-DISC-3]** 判定 `failed` / `human-check` の根拠となった不整合は、exploration-log 側から DISC ID で相互参照する
+- 種別と分類(AIの見立て)の値は `vocab.discrepancy_kind`・`vocab.discrepancy_assessment`。proc-v018 以降の作業10のパートCでは、DISC の行は pms が探索のカードの出力から書き、ID を採番する
 
 ## ■ 申し送り台帳
 
-**ステップ1で意図的に扱わなかった対象を、その場で `work/_common/handoff-register.md` に記録する。** 理由コードと引き継ぎ先は `vocab.reason_code` を正とする(**自由記述禁止**)。判別に迷ったら `vocab.discrimination` を見る。
+**[R-HO-2]** **ステップ1で意図的に扱わなかった対象を、その場で `work/_common/handoff-register.md` に記録する。** 理由コードと引き継ぎ先は `vocab.reason_code` を正とする(**自由記述禁止**)。判別に迷ったら `vocab.discrimination` を見る。
 
 記録する列: ID / 対象(1文で具体的に) / 理由コード / 引き継ぎ先 / 想定手段(なければ空欄。埋めるために推測しない) / 発生元(フローID・作業・項目ID) / 起票日 / 状態。
 
@@ -774,7 +797,7 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 
 **理由コード `初期状態外` の行で状態需要リストに提案・追記した場合は、想定手段欄にその需要ID(`SD-...`)を書く**(■状態(前提条件)の扱い)。採用された状態でシナリオを作ったら状態を `done` にする。
 
-**AIは気づきを項目化してはならない。記録するだけにとどめる。**
+**[R-HO-1]** **AIは気づきを項目化してはならない。記録するだけにとどめる。**
 
 **理由コード別に集計すると、ステップ2・3でどの投資が効くかが自動的に見える。** 記録を省略しないこと。
 
@@ -787,8 +810,8 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 | 項目 | 規約 |
 |---|---|
 | 記録のタイミング | 判断したその場で記録する(申し送り台帳と同じく、最も安いタイミング) |
-| 書くこと | 事実(何が起きたか)・影響(やり直し・調査の回数等)・採った対応や解釈。種別は `vocab.signal_type`、出所は `vocab.signal_source` |
-| 手順箇所 | どの手順についてかを `vocab.procedure_location` の書式で書く。**ファイル名ではなく論理的な位置**(節・スロット・パート・■見出し・語彙のキー)で指す |
+| **[R-SIG-1]** 書くこと | 事実(何が起きたか)・影響(やり直し・調査の回数等)・採った対応や解釈。種別は `vocab.signal_type`、出所は `vocab.signal_source` |
+| **[R-SIG-2]** 手順箇所 | どの手順についてかを `vocab.procedure_location` の書式で書く。**ファイル名ではなく論理的な位置**(節・スロット・パート・■見出し・語彙のキー)で指す |
 | 改善案 | 任意。書く場合は1〜2文 |
 | 振り分け | 書かない(作業40が行う) |
 | 手順版 | `vocab.meta.procedure_version` をそのまま転記する |
@@ -803,7 +826,7 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 
 lint の違反・人間の指摘・回帰実行の切り分けに由来するシグナルは、作業40が起こす(実行AIは記録しない)。
 
-**手順書を実行中に書き換えない。** 手順の問題はシグナルとして記録するだけにとどめる。
+**[R-SIG-3]** **手順書を実行中に書き換えない。** 手順の問題はシグナルとして記録するだけにとどめる。
 
 ## ■ 手順書の版と配備
 
@@ -923,8 +946,8 @@ procedure/                            # 手順書の正本(版は vocab.meta.pro
   00_common.md / vocab.yaml / pipeline.dot / stages.md
   methods/                            # シナリオ策定方式の方式ファイル(1方式1ファイル。■シナリオ策定方式)
   templates/                          # 記入用テンプレート 90〜95 の原本(記入済みの台帳は work/_common/ 側)
-  cards/                              # カードのテンプレート(vocab.pms_card_kind ごとに1つ。■進行役と記録の道具)
-  schemas/                            # カードの出力の schema(<種類>.out.json)
+  cards/                              # カードのテンプレート(vocab.pms_card_kind ごとに1つ)と、カードの種類ごとのエージェントの正本 agents.yaml(■進行役と記録の道具)
+  schemas/                            # カードの出力の schema(<種類>.out.json)と stage10-context.json の schema
   router/SKILL.md                     # 入口 skill(pms-regression)の原稿。唯一の手書き skill
   skills.config.json                  # skill の生成設定(skill名・説明・生成先)
   docs/                               # 人間向け(000_overview.md 等)。生成の対象外
@@ -934,11 +957,13 @@ tools/pre-stage/run-scenarios.mjs     # 開始前シナリオの実行(作業10�
 tools/env/env.mjs                     # 検証環境の情報の読み書き(■検証環境の情報。require / get / set / list / envs / use)
 tools/remote/pms-remote.ps1           # リモートコマンドの CLI 本体(skill・テストコードはこれだけを呼ぶ。docs/003)
 remote/                               # リモートコマンドのリモート側の一式(モジュール PmsRemote・共通インストーラ・接続先ごとの設定の原本 targets/。導入手順は remote/README.md)
-tools/pms/pms.mjs                     # 進行役(■進行役と記録の道具。queue build / next / act / submit / status / reopen。仕様は tools/pms/README.md)
+tools/pms/pms.mjs                     # 進行役(■進行役と記録の道具。queue build / next / act / submit / run / report / stats / status / reopen。仕様は tools/pms/README.md)
 tools/lint/lint.mjs                   # lint のランナー(実装済みの規則を1コマンドで実行する。規則の一覧は ■lint の表)
 tools/git-hooks/pre-commit            # コミットの前の lint(skills_in_sync)。git config core.hooksPath tools/git-hooks で有効にする
 .github/skills/pms-*/                 # 生成物(GitHub Copilot 用)。直接編集しない
 .kiro/skills/pms-*/                   # 生成物(Kiro 用)。直接編集しない
+.github/agents/pms-card-*.agent.md    # 生成物(カードの種類ごとのエージェント。Copilot 用。正本 procedure/cards/agents.yaml)。直接編集しない
+.kiro/agents/pms-card-*.json          # 生成物(同上。Kiro 用)。直接編集しない
 .github/skills/restore-golden-image/  # 外部操作 skill(ゴールデンイメージ復元。人間が整備。生成の対象外)
 .kiro/skills/restore-golden-image/    # 同上(Kiro 用)
 .github/skills/collect-server-logs/   # 外部操作 skill(ログ収集。人間が整備。生成の対象外)
@@ -966,6 +991,7 @@ work/
     00_フロー台帳.md
     F-001/flow.md
     F-001/queue.json / cards/ / out/ / submit-log.jsonl   # 進行役のタスクキュー・出したカード・カードの出力・提出の検査の結果(■進行役と記録の道具)
+    F-001/runs/ / stage10-context.json / report-draft-<機能>.md  # pms run のセッションの出力・作業10の開始時の事実・所見のカードに載せた報告書の下書き
   _common/                            # 機能横断の資産(フロー横断で累積)
     nondeterministic-catalog.md       # 非決定値カタログ(作業02)
     prohibited-operations.md          # 禁止操作リスト(人間が記入。テンプレート90。未記入のものを初期配置)
@@ -986,7 +1012,7 @@ work/
       exploration-log.yaml
       setup-log.yaml
       act-log.jsonl                   # pms act の操作の記録(1操作1行)
-      evidence/
+      evidence/                       # 証跡(proc-v018 以降の作業10は pms act screenshot が保存する)
       report.md
       status.yaml                     # 機械可読な段階間契約(後述)
     health/                           # 作業15(健全性の是正)の成果物。健全性シグナルが出たフローのみ
@@ -1136,7 +1162,8 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `requires_covered` | ERROR | 作業10: 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある。作業20: コード化した全シナリオの `requires` の全状態に、established check を持つ fixture がある(`S-CLEAN-ENV` は復元そのものなので除く)。実装: `tools/lint/lint.mjs` |
 | `setup_steps_recorded` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象がある(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)。proc-v016 以降のフロー(作業10の status.yaml の `procedure_version` で判定する)。proc-v017 以降のフローでは `classification: provided` のエントリにも当て、流用元(`reused_from.flow_id`)があることも見る(工程0の復元そのものである `S-CLEAN-ENV` を除く)。実装: `tools/lint/lint.mjs` |
 | `act_log_linked` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `act`(カード・連番 `seqs`・`established_check_seq`)があり、各連番が操作の記録(`act-log.jsonl`)に同じフロー・同じカードの成功した操作としてあり、`steps` の各 step と記録の操作・対象・値が順に一致する。`established_check_seq` は同じカードの成功した `assert` である。proc-v017 以降のフロー。実装: `tools/lint/lint.mjs` |
-| `phase_a_queue_complete` | ERROR | 作業10のフェーズAのタスクキュー(`work/_flows/F-<番号>/queue.json`)があり、カードがすべて合格(`passed`)か STOP(`stopped`)として記録されている。proc-v017 以降のフロー。実装: `tools/lint/lint.mjs` |
+| `phase_a_queue_complete` | ERROR | 作業10のフェーズAのタスクキュー(`work/_flows/F-<番号>/queue.json`)があり、フェーズAのカードがすべて合格(`passed`)か STOP(`stopped`)として記録されている(proc-v018 以降はパートCのカードも、合格・STOP・`skipped` のいずれか)。proc-v017 以降のフロー。実装: `tools/lint/lint.mjs` |
+| `explore_act_linked` | ERROR | 探索記録の、実行したステップ(`blocked` で操作のないもの・作業15の `health_fix` の記録を除く)に `act`(カード・連番 `seqs`)があり、各連番が操作の記録(`act-log.jsonl`)に同じフロー・同じカードの成功した操作としてあり、`actions` の各操作と記録の操作・対象・値が順に一致する。`screen_seqs` は同じカードの成功した `assert`、`evidence_seqs` は同じカードの成功した `screenshot` で、`evidence` のファイルと一致する。proc-v018 以降のフロー。実装: `tools/lint/lint.mjs` |
 | `blocked_recorded` | ERROR | `blocked` の全ステップに `blocked_by`(理由・参照・`resume_from`)があり、blocked のステップより前のステップが判定付きで記録されている。`禁止操作` の blocked は禁止IDまたは包括原則の番号を参照し、status.yaml の `blocked_by_prohibition` に含まれる。実装: `tools/lint/lint.mjs` |
 | `health_recorded` | ERROR | 探索記録(シナリオごとの最新の記録)で `health_signal` のあるステップ・シナリオの判定が `passed` でない。`health_fix` の付いた記録に `health_signal` がない。作業10の status.yaml の `health_signal`・`health_signal_items` が探索記録と一致する(proc-v007 以降のフロー)。作業15の status.yaml の `codeable_items` の各シナリオの最新の記録が `health_fix` 付きの `passed` である。proc-v014 以降のフローでは、`health_signal` のあるステップに `started_at` と `health_signal.observed_at`(`vocab.timestamp_format`)がある(作業15がログを集める時間範囲に使う)。実装: `tools/lint/lint.mjs` |
 | `db_only_has_reason` | WARNING | `verification: DB` に理由が併記されている |

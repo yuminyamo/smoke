@@ -397,7 +397,7 @@ context_updates:
 | 1回の実行範囲 | **1フロー分のみ。** 全機能の網羅は目的ではない |
 | パートB→C | 停止せず連続実行してよい(レビューは非ブロッキング) |
 | 環境 | **開始時に1回、ゴールデンイメージを復元し、開始前シナリオを実行する**(工程0。禁止操作の再判定、lint の指摘による差し戻しを含む)。中断からの再開、許可待ち・起動確認待ちからの再開では復元しない |
-| 退出 | **作業20と連続実行しない。** 完了報告と status.yaml を出力し、完了前の lint を行って停止する。健全性シグナルが出たシナリオの是正は作業15が行う(本作業では問い合わせない) |
+| 退出 | **作業20と連続実行しない。** 完了報告と status.yaml を出力し、完了前の lint を行って停止する。proc-v018 以降のフローでは、パートCのキューを作って「pms run 待ち」で止まり、`pms run` が報告書・status.yaml・lint まで行う。健全性シグナルが出たシナリオの是正は作業15が行う(本作業では問い合わせない) |
 
 ## 3. 入力
 
@@ -421,7 +421,8 @@ context_updates:
 | 開始前シナリオ | `tools/pre-stage/run-scenarios.mjs --hook work10`(設定 `config/pre-stage-scenarios.json`。00 ■回帰実行の環境前提 開始前シナリオ) |
 | 前回の status.yaml | パートPのとき: 当該フローの作業10の status.yaml(`blocked_by_prohibition` と `prohibited_ops`) |
 | lint | `tools/lint/lint.mjs`(完了前の lint)。lint の指摘による差し戻しのときは、入口 skill から渡された指摘 |
-| 進行役 | `node tools/pms/pms.mjs`(フェーズAのキュー・カード・操作の記録 `pms act`・提出の検査。設定 `config/pms.json`。00 ■進行役と記録の道具) |
+| 進行役 | `node tools/pms/pms.mjs`(キュー・カード・操作の記録 `pms act`・提出の検査・`pms run`(カードごとにAIのセッションを起こす)・`pms report`(報告書と status.yaml)。設定 `config/pms.json`。00 ■進行役と記録の道具) |
+| 作業10の開始時の事実 | `work/_flows/F-<番号>/stage10-context.json`(パートCのキューを作る前にこの skill が書く。書式 `procedure/schemas/stage10-context.json`) |
 
 ## 4. 固有手順
 
@@ -555,13 +556,25 @@ context_updates:
 
 ### パートC: 探索的実行
 
+パートCは、進行役 `pms`(00 ■進行役と記録の道具)が出すカードで行う。**主な実行形態は B2 である**: 進行役 `pms run` が、カードを1枚ずつ新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせ、提出が合格したかをキューの記録で確かめて次へ進む。**どのカードを行うか・記録・集計・完了の判定は pms が行い、AIはカードの判断だけを行う。**
+
+**作業10の流れ(proc-v018 以降)**
+
+1. 工程0・パートA・パートB(再探索フローはパートR、禁止操作の再判定はパートP)は、この skill(チャットの作業10)が行う
+2. 終わったら、工程0〜パートB(R・P)の結果を `work/_flows/F-<番号>/stage10-context.json` に書く(書式は `procedure/schemas/stage10-context.json`。環境ID・`env_restore`・`pre_stage`・`prohibited_ops` は道具の出力とメモ欄から、台帳の需要ID・操作ID・SIG-ID はパートA・B・R・Pで書いたものを写す。推測しない)。`pms report` が status.yaml の最上位の項目とこれらのキーに使う
+3. `node tools/pms/pms.mjs queue build --flow <フローID> --phase all` を実行する(再探索フロー・パートPは `--scenarios <シナリオID,...>` で対象を渡す)。フェーズAとパートCのカードがキューに入る
+4. flow.md のメモ欄に「pms run 待ち」と書き、利用者に端末で `node tools/pms/pms.mjs run --flow <フローID>` を実行するよう伝えて止まる(伝え方は入口 skill)。status.yaml は出力しない
+5. `pms run` が、フェーズA → パートCの探索 → 報告の所見の順にカードを行わせ、終わったら報告書と status.yaml を記録から作り(`pms report`)、完了前の lint を実行する。人間の判断が要るカード(STOP)があれば、理由を出して止まる
+
+**CLI が使えない環境の代わり**: `pms run` を実行できない場合(Copilot CLI・Kiro CLI を導入できない・組織の設定で許可されていない等)は、この skill が同じ会話の中で、`pms next` のカードを順に行ってよい(下のフェーズAの2〜4と同じやり方。`next` が `done` を返したら `node tools/pms/pms.mjs report --flow <フローID>` を実行し、完了前の lint へ進む)。この形は後の版で IDE 内のループに置き換える。
+
 **フェーズA: 初期状態の準備**
 
-フェーズAは、進行役 `pms`(00 ■進行役と記録の道具)が出すカードで行う。**どの状態を整備するかを決めるのも、setup-log・台帳に記録するのも pms である。** AIはカードの判断だけを行う。
+フェーズAのカードは、どの状態を整備するかも pms が決め、setup-log・台帳への記録も pms が書く。AIはカードの判断だけを行う。
 
-1. `node tools/pms/pms.mjs queue build --flow <フローID> --phase A` を実行する。pms が、対象シナリオ(このフローで作ったシナリオ。再探索フロー・パートPでは `--scenarios <シナリオID,...>` で対象を渡す)の `requires` の状態IDを重複排除して列挙し、状態ごとにカードを作る
-2. `node tools/pms/pms.mjs next --flow <フローID>` を実行し、出力の `body`(カード)の指示どおりに行う。カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)を実行する。不合格なら、返された理由だけを直して再提出する。**`next` が `done` を返すまで、1と2のあとは2を繰り返す**
-3. `next` が `STOP` を返したら、出力の `message` を利用者に伝えて指示を待つ。利用者が続けてよいと答えたら、`pms next` から続ける(STOP のカードは人間の確認待ちとして残り、報告書の固有セクション1に書く)
+1. キューは上の3で作る(フェーズAだけを先に作るときは `--phase A`)。pms が、対象シナリオ(このフローで作ったシナリオ。再探索フロー・パートPでは `--scenarios`)の `requires` の状態IDを重複排除して列挙し、状態ごとにカードを作る
+2. (CLI が使えない環境の代わりのとき)`node tools/pms/pms.mjs next --flow <フローID>` を実行し、出力の `body`(カード)の指示どおりに行う。カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)を実行する。不合格なら、返された理由だけを直して再提出する。**`next` が `done` を返すまで2を繰り返す**
+3. `next` が `STOP` を返したら、出力の `message` を利用者に伝えて指示を待つ。利用者が続けてよいと答えたら、`pms next` から続ける(STOP のカードは人間の確認待ちとして残り、報告書の固有セクション1に載る)
 4. 中断・会話の要約のあとは、`node tools/pms/pms.mjs status --flow <フローID>` で現在のカードを確かめ、`pms next` から続ける(提出していないカードは、`next` が同じカードを出し直す)
 
 **pms がカードにする規則**(AIは選ばない):
@@ -586,43 +599,42 @@ context_updates:
 
 **記録**: setup-log(付録B)・申し送り台帳・外部操作需要リスト・状態需要リストへのフェーズAの記録は、すべて pms が提出の合格時に書く(`built-by-ui` の `steps` は `pms act` の記録から作る)。**AIは setup-log と台帳をフェーズAで直接編集しない。** 状態を1つ整備するたびに AI が setup-log に記録する規定(proc-v016)は、pms が書くため廃した。fixture・シナリオ部品のコードに書いたことは、記録の代わりにならない(付録B)
 
-**フェーズAの画面操作は `pms act` で行う**(00 ■進行役と記録の道具)。playwright-cli を直接使わない。直接呼んだ操作は記録に残らず、その操作を含む提出は不合格になる。ロケータは `pms act` が操作の前に取って区分と一意性を記録する(00 ■ロケータ規約)。パートCの探索(フェーズA以外)は、この版では playwright-cli を直接使う(探索のカードは後の版で加える)
+**フェーズAとパートCの画面操作は `pms act` で行う**(00 ■進行役と記録の道具)。playwright-cli を直接使わない。直接呼んだ操作は記録に残らず、その操作を含む提出は不合格になる。ロケータは `pms act` が操作の前に取って区分と一意性を記録する(00 ■ロケータ規約)。証跡のスクリーンショットも `pms act screenshot` で撮る
 
-**探索の進め方**
+**探索のキューの作り方**(pms がカードにする。AIは選ばない)
 
-- シナリオの根拠列が指す文書を読み、操作手順の**仮説**を立てる(マニュアルに手順記載がなければその旨を記録する。それ自体がドキュメントギャップ情報)
-- playwright-cli の snapshot で画面構造を把握しながら操作する。文書と実画面が食い違ったら**実画面を優先して続行し、DISCとして記録する**
-- 外部操作は00の ■外部操作 に従い、skill を介してのみ行う。**実行前に必ず禁止操作リストを参照し、迷ったら実行しない**(リストが `unfilled` / `absent` のときは、包括原則に照らして判断する)
-- **skill を使って新たに確立した外部操作は、シナリオのステップとして使う前に KB T05 へ登録する。** 手順:
-  1. KB T05 の索引を確認し、**同等の操作が登録済みでないかを先に見る**(登録済みなら再探索せずそのまま使う)
-  2. 禁止操作リストとの適合を確認する(該当行IDまたは「該当なし」を記録)
-  3. skills の機構で使える skill を確認し、**コードから呼べる実行体が同梱されていることを確認する**。skill がない・実行体がない場合は確立を試みず、外部操作需要リスト(不足の区分 `skillなし` / `実行体なし`)と申し送り台帳(`操作手段なし`)に記録し、当該ステップ以降を `blocked` とする(パートBで記録済みなら重複して記録しない)
-  4. skill を使って操作を確立する(引数・前提条件・完了判定・所要時間の実測)。**実行体の呼び出しだけで操作が完結すること**を確かめる(AIの対話的な介入が要る手順は回帰テストで再現できない)。`vocab.default.investigation_limit` 回試しても確立できなければ、3と同様に記録する(不足の区分 `確立不可`)
-  5. KB T05 へ登録する(操作IDを採番。skill名(参考)・実行体の呼び出し方・需要ID(あれば)を含める)
-  6. `tests/external/` にラッパを実装する(操作IDと1対1。skill 同梱の実行体を呼ぶ)
-  7. その操作をシナリオのステップとして使う。需要リストに対応する行があれば `確立済` にし、操作IDを記入する
-- 詰まったらまずKB(該当画面・`kb/gotchas/`)を参照する。自力で見つけた攻略法はその場でKBへ反映。KBに無く自分で調べた事項は発見ログへ記録する
-- 探索の途中で新たに環境情報が要ると分かったら、その場で `require --keys` で確かめ、足りなければ人間に聞く(まとめられるものはまとめる)。探索記録・KB・テストコードには値ではなく `<env:キー>` を書く(00 ■検証環境の情報)
-- 作成データは00の一意化規約に従う。実値は `carried_data` に記録する。**探索時から一意化しておくことで、作業20のコードがそのまま再実行耐性を持つ**
-- 試行錯誤は許容されるが、**最終的に成功した最短の操作列**だけを `steps` に残す(失敗試行は `notes` に要点のみ)
+- シナリオごとに、scenarios.md のステップの表の行ごとに `explore.step` を1枚(順序の列の順)、そのシナリオの最後に `explore.close` を1枚作る。対象シナリオのあとに `explore.session_close` を1枚、最後に `report.findings` を1枚作る
+- **フェーズAのカードを先に出し、パートCのカードはそのあとに出す**(前提状態を整備してから探索する)。カードは作った順に1枚ずつ出す
+- シナリオの最初のステップのカードを出す前に、pms が setup-log で前提状態を確かめる。`blocked` の状態があれば、全ステップを `blocked` と記録し(最初のステップの `blocked_by` は setup-log の理由と参照、`resume_from` は最初のステップ)、そのシナリオのカードをAIに出さない(`skipped`)。整備の記録がない状態(フェーズAのカードが人間の確認待ち)があれば、そのシナリオのステップを STOP にする
+- ステップを `blocked` で提出したら、同じシナリオの後続のステップは pms が `{ reason: 前ステップが blocked }` と記録し、AIに出さない
+- キューを作るときに、各ステップの確認内容・期待結果を控える。提出のときに scenarios.md の行が変わっていたら不合格にする(`expected_changed`)
+- パートPで探索し直すときは、同じフローのキューに新しいラウンドを足す(stage10-context.json の `recheck_of` を書き直し、`queue build --phase C --scenarios <シナリオID,...>`)。前のラウンドの記録は残る。再探索フローは stage10-context.json の `reexplore_of` に旧フローIDを書く。どちらも pms が探索記録に `recheck_of`・`reexplore_of` を付ける
 
-**blocked にするときに残すもの**(`blocked` は後で解ける前提で記録する)
+**分担**(pms が書くもの・AIが書くもの)
 
-- `blocked` にするのは、実行できないステップ**以降**に限る。**それより前のステップは探索し、判定・`actions`・`assertion_hint` を記録する**
-- `blocked` の各ステップの `blocked_by` に、理由(`vocab.reason_code`)・参照(`禁止操作` なら禁止IDまたは包括原則の番号と申し送りID / `操作手段なし` なら需要IDと申し送りID)・再開するステップ(`resume_from`)を書く(付録A)
-- **探索中に確立した操作は、シナリオが `blocked` でも捨てない。** 前提データの作り方や、blocked のステップの準備に要る操作を確立したら、前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオで使う操作列はシナリオ部品へ、それ以外は KB(該当画面・T05・`kb/gotchas/`)へ、**完了報告の前に**反映する。反映先を報告書の固有セクション1に書く
-- `禁止操作` で `blocked` にしたステップは、status.yaml の `blocked_by_prohibition` に列挙する(作業20の開始前の照合に使う)
+| 記録 | pms が書く | AIが書く(カードの出力・作業場所のファイル) |
+|---|---|---|
+| exploration-log(付録A) | シナリオ・ステップの記録の全部。`actions`・`started_at`・`ended_at`・`verified_by.screen`・`evidence`・`act` は `pms act` の記録から作る。シナリオの判定はステップの判定から(failed があれば failed、なければ blocked があれば blocked、なければ human-check があれば human-check、どれもなければ passed)。`requires_setup` は setup-log から | `explore.step` の出力: 判定・DB の確認(SELECT と結果の要点)・観測・`assertion_hint`・持ち回るデータ・非決定値・待機の実測・健全性シグナル・blocked の理由。`explore.close` の出力: DB不変条件の結果・確立した操作の反映先・`manual_gap` |
+| DISC・申し送り台帳・外部操作需要リスト・手順改善シグナル | 行を足し、IDを採番する(blocked の申し送りと需要の行を含む) | 内容(カードの出力の `discrepancies`・`handoffs`・`blocked_by`・`procedure_signals`) |
+| KB・fixture・シナリオ部品・ページオブジェクト・`tests/external/` | — | 書く(カードの規則のとおり。反映先を `explore.close` の出力に書く) |
+| DB不変条件 | 違反の有無を集計する(`invariant_violation`) | SELECT の実行と結果(`explore.close`・`explore.session_close`) |
+| 報告書・status.yaml | 数値・一覧と status.yaml の全部(`pms report`) | 所見の欄だけ(`report.findings`) |
 
-**安定ロケータの解決(操作と同時に行う。最重要)**
+**AIは、パートCで exploration-log・DISC・申し送り台帳・外部操作需要リスト・手順改善台帳・報告書・status.yaml を直接編集しない。** pms が提出の合格時に書く。
 
-- **操作成功直後にその場で**00の優先順位に従い安定ロケータを解決し、一意に解決されることを確認して記録する
-- 解決したロケータはページオブジェクト(`tests/pages/`)へ反映する。**同じ操作列が2つ以上のシナリオ(過去フロー含む)に現れたら部品化する**
-- 取れない要素はCSS暫定 + `testid-requests.md` へ追記する
+**カードの規則**(カードの依頼文に規則IDで差し込まれる。00 ■進行役と記録の道具):
 
-**検証と判定**
+ステップの探索(`explore.step`)
 
-- 指定された検証手段で確認する。`両方` は画面・DB両方を必ず実施
-- `画面`→DB追加は可(記録に追記)。`両方`→画面に露出しないと判明したら `DB` に変更し理由を記録、DISC候補とする
+- **[R-EXP-1]** シナリオの根拠列が指す文書を読み、操作手順の**仮説**を立てる。マニュアルに手順の記載がなければ `notes` にその旨を書く(それ自体がドキュメントギャップ情報)
+- **[R-EXP-2]** 画面の構造は `pms act snapshot` で把握しながら操作する。文書と実画面が食い違ったら**実画面を優先して続行し、DISC として出力の `discrepancies` に書く**(各ソースの記載と実画面の挙動。証跡は `pms act screenshot`)
+- **[R-EXP-3]** 試行錯誤してよいが、**最終的に成功した最短の操作列**だけを `seqs` に `pms act` の連番で示す(失敗した試行は `notes` に要点だけ書く)
+- **[R-EXP-4]** 外部操作は 00 ■外部操作 に従い、skill の実行体を `pms act ext` で呼ぶ。**実行前に必ず禁止操作リストを参照し、迷ったら実行しない**(リストが `unfilled` / `absent` のときは、包括原則に照らして判断する)
+- **[R-EXP-5]** skill を使って新たに確立した外部操作は、ステップとして使う前に KB T05 へ登録する(KB T05 の索引で同等の操作を先に探す → 禁止操作リストとの適合を確かめる → コードから呼べる実行体が同梱されていることを確かめる → 引数・前提条件・完了判定・所要時間を確立する(`vocab.default.investigation_limit` 回まで)→ KB T05 に登録する → `tests/external/` にラッパを書く → 需要リストの行を `確立済` にする。00 ■外部操作 操作の資産化)。登録した操作IDを `ops_registered` に書く。skill がない・実行体がない・確立できないときは、確立を試みず `blocked`(`操作手段なし`)で提出する
+- **[R-EXP-6]** 詰まったらまず KB(該当画面・`kb/gotchas/`)を参照する。自力で見つけた攻略法はその場で KB へ反映し、KB に無く自分で調べた事項は発見ログへ記録する
+- **[R-EXP-7]** 新たに環境情報が要ると分かったら `node tools/env/env.mjs require --keys <キー>:<種類>` で確かめる。足りなければ値を推測せず、`cannot_proceed` で提出して、足りないキーを `notes` に書く(人間に聞くのは pms の STOP から)。出力・KB・テストコードには値ではなく `<env:キー>` を書く
+- **[R-EXP-8]** 作成データは 00 の一意化規約に従う。実値を `carried_data` に書く(探索時から一意化しておくことで、作業20のコードがそのまま再実行耐性を持つ)
+- **[R-EXP-9]** 指定された検証手段で確認する。`両方` は画面(`pms act assert`)と DB(SELECT)の両方を必ず実施する。`画面` に DB を足すのはよい。`両方` で画面に露出しないと判明したら `DB` に変え、理由を `verification.reason` に書き、DISC の候補とする
 
 <!-- protected:EXPECTED_IMMUTABLE -->
 
@@ -630,25 +642,43 @@ context_updates:
 
 <!-- /protected:EXPECTED_IMMUTABLE -->
 
-- 値の比較は `nd-catalog` の強度に従う。**未登録の値は推測で強度を決めず、追加候補として記録する**
-- `failed` / `human-check` は証跡必須。`passed` も結果画面1枚を推奨
-- **健全性シグナル**(00 ■健全性シグナルと問い合わせ)を、ステップごとに期待結果とは別に確かめる。期待結果を満たしていても、自データのジョブがエラーになっている等のシグナルが出たら、**そのステップを `passed` にせず `human-check` とし、`health_signal`(付録A。観測した時刻 `observed_at` を含む)と証跡を記録する。** 探索中に自分で解消できればそれでよい。解消できなければ、その操作をいったん採用して探索を続けてよい(是正は作業15が行う。本作業では問い合わせない)
-- `操作手段なし` で `blocked` にしたステップには、需要IDと申し送りIDを記録する(付録A)
+- **[R-EXP-10]** 値の比較は `nd-catalog` の強度に従う。**カタログに未登録の値は推測で強度を決めず、`catalog_id` を `未登録` にして追加候補とする**
+- **[R-EXP-11]** `failed` / `human-check` は証跡必須(`pms act screenshot` の連番を `evidence` に書く)。`passed` も結果画面1枚を推奨する
+- **[R-EXP-12]** 健全性シグナル(00 ■健全性シグナルと問い合わせ)を、期待結果とは別に確かめる。期待結果を満たしていても、自データのジョブがエラーになっている等のシグナルが出たら、**`passed` にせず `human-check` とし、`health_signal`(観測した時刻 `observed_at` は、観測した `pms act` の操作の時刻)と証跡を書く。** 自分で解消できればそれでよい。解消できなければ、その操作をいったん採用して続けてよい(是正は作業15が行う。本作業では問い合わせない)
+- **[R-EXP-13]** `blocked` にするのは実行できないステップ**以降**に限る(このカードのステップより前は探索済み)。`blocked_by` に理由(`vocab.reason_code`)・参照(`禁止操作` は禁止IDか包括原則の番号、`操作手段なし` は既存の需要ID か外部操作需要リストに書く項目。パートBで記録済みの申し送りがあれば `handoff` に)・再開するステップ(`resume_from`)を書く。後続のステップは pms が記録する
+- **[R-EXP-14]** `assertion_hint` は必ず書く(`blocked` を除く)。作業20への引き継ぎとして、決定的に検証できる形で、**自シナリオのデータにスコープして**書く(環境全体の件数を基準にしない)。決定的な手段がなければ「決定的な検証手段が見つからない」と正直に書く
+- **[R-EXP-15]** 非同期待機を行ったら、`wait` に待機条件・実測秒数・使ったタイムアウトを書く
 
-**DB不変条件** — シナリオ末尾で00の2段構えに従い実行する。探索セッションの終わりに全体検査を1回。違反はシナリオ判定と**独立に**報告し、`context.invariant_violation=found` を status.yaml に出力する。
+シナリオの終わり(`explore.close`)
 
-**記録** — exploration-log.yaml(付録A)に追記、各ステップの開始・終了時刻(`started_at`・`ended_at`。`vocab.timestamp_format`)をその場で記録する(作業15がサーバーのログを集める時間範囲に使う)、不整合は DISC 採番、気づきはその場で申し送り台帳へ(発生元にフローIDを含める)。手順について迷った・矛盾を見つけた・手順と違う方法で実施した場合は、その場で手順改善シグナルを記録する(00 ■手順改善シグナル)。
+- **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く
+- **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(該当画面・T05・`kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
+- **[R-EXP-18]** マニュアルに、このシナリオの操作手順の記載がなかったら `manual_gap` を true にする
+
+探索セッションの終わり(`explore.session_close`)
+
+- **[R-EXP-19]** 全シナリオのあとに、DB 全体の不変条件の検査を1回行う(00 ■DB不変条件 の全体検査)。違反は `violations` に書く。pms が `context.invariant_violation=found` として人間の判断へ回す
+
+報告の所見(`report.findings`)
+
+- **[R-RPT-1]** 書くのは所見の欄だけである。数値・一覧は pms が記録から作った下書きのとおりであり、出力に数値を書き直さない。下書きと記録が食い違うと思ったら `open_questions` に書く
+- **[R-RPT-2]** 判断に迷った点・仕様の矛盾・前段の成果物への疑義は、書き換えずに `open_questions` に列挙する。確信のない断定をしない
+- **[R-RPT-3]** 優先レビュー推奨は上位5件程度とし、それぞれ理由を1文で書く。DB不変条件の SQL を実行したなら、それを必ず挙げる(誤った INV は偽の失敗を全シナリオに撒くため)
+- **[R-RPT-4]** 禁止操作リストへの追記提案は、包括原則でエスカレーションした操作のうち、恒久的に禁止・許可のいずれかに定めるべきものだけを書く(リストは人間が書く)
+- **[R-RPT-5]** 調査が大規模で KB が足りないと判断したら `knowledge_gap.needed` を true に、非決定値カタログの未登録値が多く作業02の増分実施を勧めるなら `nd_increment.needed` を true にし、理由を1文で書く
 
 ### 完了前の lint(全パート共通)
 
 報告書と status.yaml を出力したあと、**完了報告(停止)の前に** `node tools/lint/lint.mjs --flow <フローID> --stage 10 --skip skills_in_sync` を実行する(00 ■lint 実行の契機)。
 
+**`pms run` は、報告書と status.yaml を作ったあと(`pms report`)にこの lint を自分で実行する。** ERROR がなければ終わり(終了コード 0)、ERROR が残れば「lint 止まり」として止まる(STOP。終了コード 3)。**pms run は lint の指摘を直すカードを作らない。** 指摘は、入口 skill が次の「続き」で、下の「lint の指摘による差し戻し」の経路でこの skill に渡す。この skill が直したら、`node tools/pms/pms.mjs report --flow <フローID>` で報告書と status.yaml を作り直してから lint を再実行する(proc-v018 以降のフローでは、報告書の数値と status.yaml を手で書き換えない)。
+
 - **ERROR があれば、指摘された成果物を直して再実行する。** ERROR が0件になるまで繰り返す
 - 直すのは、記録の漏れ・誤り(例: `blocked_by` の参照、blocked の手前のステップの記録、status.yaml のキー)と、足りない整備(例: setup-log にない `requires` の状態)である。整備が要るものは、フェーズAと探索の規約どおりに画面・外部操作で整備する
 - **指摘を消すために、記録を削る・判定や期待結果を変える・blocked を外すことをしない**
-- 直せない ERROR が残る場合は、その指摘と理由を報告書 §6 に書き、手順改善シグナル(種別 `検査不能` または `実行不能`)を記録し、DoD の該当項目を未チェックのまま `outcome: partial_success` とする
+- 直せない ERROR が残る場合は、その指摘と理由を報告書 §6 に書き、手順改善シグナル(種別 `検査不能` または `実行不能`)を記録し、DoD の該当項目を未チェックのまま `outcome: partial_success` とする(proc-v018 以降のフローでは `pms report --flow <フローID> --dod-unmet "<指摘と理由>"` で作り直す。§6 と outcome は pms が書く)
 - 「未実行」の規則(PowerShell がなく `env_restored` を実行できない等)は ERROR ではない
-- 直したら、報告書の該当箇所と status.yaml を出し直してから lint を再実行する
+- 直したら、報告書の該当箇所と status.yaml を出し直してから lint を再実行する(proc-v018 以降のフローは `pms report` で作り直す)
 
 **lint の指摘による差し戻し**(`context.lint_error=yes`。作業20の開始前の lint で ERROR が出た)で起動したときは、工程0のあと、パートA・B・R・Pを行わず、入口 skill から渡された指摘を上の規約どおりに直し、この lint を実行する。報告書は直した箇所を更新し、本作業の §8 と固有セクション1に修正の内容を書く。status.yaml は出し直す(`env_restore` は今回の復元)。
 
@@ -660,9 +690,11 @@ context_updates:
 - **使える skill がない外部操作を、独自の手段で実行しない。skill を作成・改変しない**
 - **禁止操作リストが未記入・存在しないことを理由に、シナリオやステップを `blocked` にしない**
 - **`blocked` を理由に、`requires` の整備と、blocked のステップより前の探索・記録を省略しない。** 探索中に確立した操作を、blocked を理由に捨てない
-- **フェーズAで playwright-cli を直接呼ばない**(画面操作は `pms act` で行う)
+- **フェーズAとパートCで playwright-cli を直接呼ばない**(画面操作・スクリーンショットは `pms act` で行う)
 - **`pms submit` の不合格を、記録やカードの出力を削って通さない**(返された理由のところを直す。直せなければ `cannot_proceed` で提出する)
 - **setup-log・申し送り台帳・外部操作需要リスト・状態需要リストを、フェーズAで直接編集しない**(pms が書く)
+- **パートCのカードを行う間、exploration-log・DISC・申し送り台帳・外部操作需要リスト・手順改善台帳を直接編集しない**(pms が提出の合格時に書く)。**proc-v018 以降のフローでは、報告書の数値・一覧と status.yaml を手で書かない**(`pms report` が作る)
+- **カードの外の作業をしない**(1枚のカードで行うのは、そのカードの判断だけである。次のカードの作業を先にしない)
 
 <!-- protected:EXPECTED_IMMUTABLE -->
 
@@ -687,7 +719,9 @@ context_updates:
 | `exploration-log` | `work/<feature_code>/exploration/exploration-log.yaml` | 付録A |
 | `setup-log` | `work/<feature_code>/exploration/setup-log.yaml` | 付録B(フェーズAは pms が書く) |
 | 操作の記録 | `work/<feature_code>/exploration/act-log.jsonl` | `pms act` が書く(1操作1行。00 ■進行役と記録の道具) |
-| フェーズAのキュー・カード・提出の記録 | `work/_flows/F-<番号>/queue.json`・`cards/`・`submit-log.jsonl`(pms が書く)/ `out/`(カードの出力。AIが書く) | 00 ■進行役と記録の道具 |
+| キュー・カード・提出の記録 | `work/_flows/F-<番号>/queue.json`・`cards/`・`submit-log.jsonl`・`runs/`(`pms run` が保存したセッションの出力)・`report-draft-<機能コード>.md`(所見のカードに載せた下書き)(pms が書く)/ `out/`(カードの出力。AIが書く) | 00 ■進行役と記録の道具 |
+| 作業10の開始時の事実 | `work/_flows/F-<番号>/stage10-context.json`(工程0〜パートBの結果。この skill が書く) | `procedure/schemas/stage10-context.json` |
+| 証跡 | `work/<feature_code>/exploration/evidence/`(`pms act screenshot` が保存する) | 00 ■進行役と記録の道具 |
 | ページオブジェクト・部品 | `tests/pages/`, `tests/flows/`, `tests/external/`, `tests/fixtures/` | 00 |
 | 起動確認テスト | `tests/readiness/server-ready.setup.ts`(ログイン fixture を初めて整備した場合のみ) | 00 ■回帰実行の環境前提 |
 | DISC | `work/_common/discrepancies.md` | 00 |
@@ -696,10 +730,10 @@ context_updates:
 | 状態需要リスト | `work/_common/state-demand.md` | 00 ■状態(前提条件)の扱い / テンプレート96 |
 | 手順改善シグナル | `work/_common/procedure-improvement.md` | 00 ■手順改善シグナル / テンプレート94 |
 | KB反映 | `kb/` 配下 | 付録E |
-| 報告書 | `work/<feature_code>/exploration/report.md` | 00の共通骨格 + 下記 |
-| status.yaml | `work/<feature_code>/exploration/status.yaml` | スロット8 |
+| 報告書 | `work/<feature_code>/exploration/report.md` | 00の共通骨格 + 下記(proc-v018 以降は `pms report` が数値・一覧を作り、所見の欄は `report.findings` の出力) |
+| status.yaml | `work/<feature_code>/exploration/status.yaml` | スロット8(proc-v018 以降は `pms report` が作る) |
 
-報告書の固有セクション(生成と探索をまとめた1つの報告とする):
+報告書の固有セクション(生成と探索をまとめた1つの報告とする。見出しは「固有1」〜「固有12」):
 
 1. **初期状態セットアップ結果と blocked の一覧**(`vocab.setup_classification` 別。`verified` の有無。フェーズAで STOP(人間の確認待ち)になったカードと理由、作り直した fixture。`blocked` のシナリオの `requires` を含む。blocked にしたシナリオ・ステップごとの理由・参照・再開するステップ。禁止操作リストの記入状態と版。blocked のシナリオの探索で確立した操作とその反映先)
 2. **DB不変条件の結果**(**違反が1件でもあれば最優先で記載**)
@@ -714,7 +748,7 @@ context_updates:
 11. **外部操作需要リスト・状態需要リストへの記録**(外部操作需要リスト: 新規追加・要求元の追記・状態を更新した需要IDと不足の区分。整備記録と skills の機構の食い違いがあれば併記。状態需要リスト: 提案・要求元を追記した需要IDと状態ID案、`整備済` にした需要ID、採用された状態で見直した申し送りと、シナリオにしなかった理由)
 12. **再探索・再判定の結果**(再探索フロー・パートPのみ): 再探索フローは需要IDごとの 確立済 / 未確立と理由、再探索したシナリオの判定、対象外にした要求元。パートPは照合の結果(旧版・新版)、実行できるようになったステップと判定し直したシナリオの判定、まだ blocked のステップ、対象外にした申し送り
 
-報告出力後、完了前の lint を行い、flow.md のタスクをチェックし、フロー台帳の状態を更新して**停止する**。
+報告出力後、完了前の lint を行い、flow.md のタスクをチェックし、フロー台帳の状態を更新して**停止する**。`pms run` で行ったフローでは、入口 skill が次の「続き」で lint を確かめてから、flow.md の T3・T4 をチェックする。
 
 ## 7. 完了条件(DoD)
 
@@ -736,45 +770,53 @@ context_updates:
 - [ ] 未登録の外部操作を使うステップについて、使える skill の有無を確認した。ない場合は外部操作需要リストと申し送り台帳(`操作手段なし`、想定手段に需要ID)に記録した
 - [ ] 扱わないと判断した対象を全件、申し送り台帳に記録した
 
-**パートC**
+**パートC — この skill が確かめるもの**(チャットの作業10。工程0〜パートBとキューを作るまで)
 
-- [ ] 工程0の前に `node tools/env/env.mjs require` で環境情報が揃っていることを確かめ、status.yaml の `environment` に環境IDを記録した
-- [ ] シナリオの実行に要る環境情報を `require --keys` で確かめた。人間に聞いて保存したキーを status.yaml の `env_keys_added` に書いた(なければ [])
-- [ ] 成果物(探索記録・セットアップ記録・シナリオ・KB・報告書・台帳・flow.md・テストコード)に秘密情報の値を書いていない(lint `env_value_leak`)
-- [ ] 工程0で環境を復元し、status.yaml の `env_restore` に restore_id・purpose(`work10`)・readiness を記録した(lint `env_restored`)
-- [ ] 工程0の起動完了の確認のあとに開始前シナリオを実行し、status.yaml の `pre_stage` に state と run_id を記録した(設定がなければ `skipped`)
-- [ ] 工程0のあとに禁止操作リストの記入状態と版を照合スクリプトで取得し、status.yaml の `prohibited_ops` に記録した
-- [ ] 禁止操作リストが `unfilled` / `absent` のとき、リストを理由に `blocked` にしたステップがない
-- [ ] ログイン状態の fixture を本フローで初めて整備した場合、同じシナリオ部品を使う起動確認テスト `tests/readiness/server-ready.setup.ts` を作った
-- [ ] 当該フローの対象シナリオIDが、当該フローIDの記録として exploration-log に1件ずつ存在する(過不足なし。パートPで探索し直したシナリオは `recheck_of` の、作業15で解消したシナリオは `health_fix` の付いた最新の記録を数える)
+- [ ] 工程0の前に `node tools/env/env.mjs require` で環境情報が揃っていることを確かめ、環境IDを stage10-context.json の `environment` に書いた(pms が status.yaml の `environment` に写す)
+- [ ] シナリオの実行に要る環境情報を `require --keys` で確かめた。人間に聞いて保存したキーを stage10-context.json の `env_keys_added` に書いた(なければ [])
+- [ ] 工程0で環境を復元し、restore_id・purpose(`work10`)・readiness を stage10-context.json の `env_restore` に書いた(lint `env_restored`)
+- [ ] 工程0の起動完了の確認のあとに開始前シナリオを実行し、state と run_id を stage10-context.json の `pre_stage` に書いた(設定がなければ `skipped`)
+- [ ] 工程0のあとに禁止操作リストの記入状態と版を照合スクリプトで取得し、stage10-context.json の `prohibited_ops` に書いた
+- [ ] パートA・B(R・P)で台帳に書いたID(需要ID・SD-ID・操作ID・SIG-ID)を stage10-context.json に書き、`node tools/pms/pms.mjs queue build --flow <フローID> --phase all` が終了コード 0 で終わった(stage10-context.json は schema で検査される)
+- [ ] flow.md のメモ欄に「pms run 待ち」と書き、利用者に `pms run` の実行を伝えて止まった(CLI が使えない環境の代わりのときは、`pms next` が `done` を返すまでカードを行い、`pms report` を実行した)
+
+**パートC — pms が検査するもの**(`pms submit`・`pms report`・lint。AIの自己点検に頼らない。proc-v018 以降のフロー)
+
+- [ ] パートCのキューのカードがすべて合格・skipped か、STOP として人間に回っている(`node tools/pms/pms.mjs status --flow <フローID>`)。STOP のカードは報告書の固有セクション1・§6 に載る
+- [ ] 当該フローの対象シナリオが、当該フローIDの記録として exploration-log に1件ずつ存在する(pms がカードごとに書く。パートPで探索し直したシナリオは `recheck_of` の、作業15で解消したシナリオは `health_fix` の付いた最新の記録を数える)
+- [ ] 探索記録の各ステップの `actions` が `pms act` の記録と一致する(lint `explore_act_linked`)。`actions[].locator` に snapshot の一時IDがない(lint `no_temp_locator`)
 - [ ] 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある(lint `requires_covered`)
-- [ ] 全シナリオ・全ステップの判定が `vocab.verdict` のいずれか
-- [ ] `blocked` の全ステップに `blocked_by`(理由・参照・`resume_from`)があり、blocked のステップより前のステップが判定付きで記録されている(lint `blocked_recorded`)
-- [ ] `禁止操作` で `blocked` にした全ステップが、status.yaml の `blocked_by_prohibition` にある
-- [ ] `blocked` のシナリオの探索で確立した操作を、fixture・シナリオ部品・KB のいずれかに反映し、反映先を報告書の固有セクション1に書いた(なければ「なし」)
-- [ ] `failed` / `human-check` の全件に `evidence` パスがある
-- [ ] 健全性シグナルが出た全ステップに `health_signal`(種類は `vocab.health_signal_kind`)があり、判定が `passed` でない(lint `health_recorded`)
-- [ ] 探索した全ステップに `started_at`・`ended_at` があり、健全性シグナルには `observed_at` がある(`vocab.timestamp_format`。健全性シグナルのあるステップは lint `health_recorded`)
-- [ ] status.yaml の `health_signal` と `health_signal_items` が、探索記録(シナリオごとの最新の記録)の `health_signal` と一致する(lint `health_recorded`)
-- [ ] `verification: 両方` の全ステップに `verified_by.screen` と `verified_by.db` の双方がある
-- [ ] 非同期待機を行った全ステップに `wait.measured_seconds` と `wait.timeout_used` がある
-- [ ] 全ステップに `assertion_hint` がある(決定的手段がない場合はその旨を明記。`blocked` のステップを除く)
-- [ ] `assertion_hint` が自データスコープで書かれている(環境全体の件数・状態を判定基準にしていない)
-- [ ] `actions[].locator` に snapshot の一時IDが1件も含まれていない
-- [ ] 使用した全 `operation_id` が KB T05 に登録済みで、禁止操作リストの `禁止`/`要許可` に該当しない
-- [ ] 使用した全 `operation_id` の KB T05 エントリに、skill名(参考)と実行体の呼び出し方がある
-- [ ] `操作手段なし` で `blocked` にした全ステップが、需要IDと申し送りIDを参照している
-- [ ] 全シナリオに `carried_data` がある(データを作成していない場合は空で明示)
+- [ ] 全シナリオ・全ステップの判定が `vocab.verdict` のいずれか(schema・lint `verdict_enum`)
+- [ ] `blocked` の全ステップに `blocked_by`(理由・参照・`resume_from`)があり、blocked のステップより前のステップが判定付きで記録されている(lint `blocked_recorded`。参照の実在は `pms submit` の `blocked_refs`)。`禁止操作` で `blocked` にした全ステップが status.yaml の `blocked_by_prohibition` にある(`pms report`)
+- [ ] `操作手段なし` で `blocked` にした全ステップが、需要IDと申し送りIDを参照している(pms が書く。lint `ext_demand_linked`)
+- [ ] `failed` / `human-check` の全件に `evidence` がある(`pms submit` の `verdict_evidence`)
+- [ ] 健全性シグナルが出た全ステップに `health_signal`(種類は `vocab.health_signal_kind`)があり、判定が `passed` でなく、`observed_at` がそのカードの操作の時刻の範囲にある(`pms submit` の `health_time`・lint `health_recorded`)
+- [ ] 探索した全ステップに `started_at`・`ended_at` がある(pms が `pms act` の記録から書く)
+- [ ] status.yaml の `health_signal` と `health_signal_items` が、探索記録(シナリオごとの最新の記録)の `health_signal` と一致する(`pms report`・lint `health_recorded`)
+- [ ] `verification: 両方` の全ステップに `verified_by.screen` と `verified_by.db` の双方があり、`DB` 単独には理由がある(`pms submit`)
+- [ ] 全ステップに `assertion_hint` がある(`blocked` のステップを除く。`pms submit`)
+- [ ] 期待結果・判定基準を1件も書き換えていない(`pms submit` の `expected_changed`)
+- [ ] 使用した全 `operation_id` が KB T05 に登録済みで、禁止操作リストの `禁止`/`要許可` に該当しない(lint `operation_registered`)
+- [ ] 全シナリオに `carried_data` がある(データを作成していない場合は空で明示。pms が書く)
+- [ ] 成果物に秘密情報の値を書いていない(`pms submit`・lint `env_value_leak`)
+- [ ] ログイン状態の fixture を本フローで初めて整備した場合、同じシナリオ部品を使う起動確認テスト `tests/readiness/server-ready.setup.ts` を作った(`pms submit` の `code_mismatch`)
 - [ ] `setup-log` の全エントリに `established_check` がある(`classification: blocked` を除く)
 - [ ] `setup-log` の `classification: built-by-ui` と `provided` の全エントリに `steps` があり、各 step に操作の対象(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)がある。`provided` には流用元(`reused_from`)がある(lint `setup_steps_recorded`)
 - [ ] `setup-log` の `classification: built-by-ui` の全エントリに `act`(カードと記録の連番)があり、steps が `pms act` の記録と一致する(lint `act_log_linked`)
-- [ ] フェーズAのキューのカードがすべて合格か、STOP として人間に回っている(`node tools/pms/pms.mjs status --flow <フローID>`。lint `phase_a_queue_complete`)。STOP のカードを報告書の固有セクション1に書いた
-- [ ] INV の結果が全シナリオに記録されている(未実施の場合は理由を記載)
-- [ ] 期待結果・判定基準を1件も書き換えていない
-- [ ] 報告書に00の共通骨格と固有セクション1〜11がある(再探索フロー・パートPは1〜12)
-- [ ] 報告書 §8 に、本作業で記録した手順改善シグナルのID(なければ「なし」)を列挙した
-- [ ] status.yaml を出力した
-- [ ] status.yaml の出力後に `node tools/lint/lint.mjs --flow <フローID> --stage 10 --skip skills_in_sync` を実行し、ERROR が0件である(直せない ERROR は報告書 §6 に理由を書き、手順改善シグナルを記録した)
+- [ ] フェーズAのキューのカードがすべて合格か、STOP として人間に回っている(lint `phase_a_queue_complete`)。STOP のカードを報告書の固有セクション1に書いた(`pms report`)
+- [ ] INV の結果が全シナリオに記録されている(`explore.close` の出力が `vocab.invariant` の全キーを持つ。前提状態が blocked のシナリオは pms が `未実施(理由)` と書く)
+- [ ] 報告書に00の共通骨格と固有セクション1〜11がある(再探索フロー・パートPは1〜12)。§8 に手順改善シグナルのID(なければ「なし」)がある(`pms report`)
+- [ ] status.yaml を出力した(`pms report`)
+- [ ] status.yaml の出力後に `node tools/lint/lint.mjs --flow <フローID> --stage 10 --skip skills_in_sync` を実行し、ERROR が0件である(`pms run`。直せない ERROR は報告書 §6 に理由を書き、手順改善シグナルを記録した)
+
+**パートC — カードの出力欄で確かめるもの**(AIの判断。カードの規則と出力の欄が求め、pms は形だけを検査する)
+
+- [ ] 禁止操作リストが `unfilled` / `absent` のとき、リストを理由に `blocked` にしたステップがない(R-EXP-4)
+- [ ] `assertion_hint` が自データスコープで書かれている(環境全体の件数・状態を判定基準にしていない。R-EXP-14)
+- [ ] 非同期待機を行った全ステップに `wait`(条件・実測秒数・タイムアウト)がある(R-EXP-15)
+- [ ] 新たに確立した操作の KB T05 エントリに、skill名(参考)と実行体の呼び出し方がある(R-EXP-5。`ops_registered` の実在は pms が見る)
+- [ ] `blocked` のシナリオの探索で確立した操作を、fixture・シナリオ部品・KB のいずれかに反映し、反映先を `explore.close` の `reflections` に書いた(報告書の固有セクション1に pms が載せる。R-EXP-17)
+- [ ] 所見(`report.findings`)の優先レビュー推奨に、実行した DB不変条件の SQL がある(R-RPT-3。pms が検査する)
 
 **パートR(再探索フローのみ)**
 
@@ -800,6 +842,8 @@ context_updates:
 - [ ] 直した内容を報告書 §8 と固有セクション1に書き、status.yaml を出し直した
 
 ## 8. status.yaml 契約
+
+**proc-v018 以降のフローでは、status.yaml は `pms report` が記録から作る**(探索記録・setup-log・キュー・台帳と、stage10-context.json の工程0〜パートBの事実)。キーと値の契約は変えない。`escalation` は、`禁止操作` で blocked にしたステップの参照が `要許可` の禁止ID か包括原則なら `permission_required`、所見のカードが KB 不足と判断したら `knowledge_gap`。`outcome` は 00 ■status.yaml 契約の規約3(blocked・human-check・人間の確認待ちのカード・`--dod-unmet` があれば `partial_success`)。
 
 ```yaml
 stage: "10"
@@ -1846,6 +1890,11 @@ scenarios:
           - { value: ジョブID, catalog_id: ND-UI-001, strength: パターン一致 }
         observed: 受付完了が表示され、ジョブIDが採番された
         evidence: [evidence/SC-PRT-01-S1_01.png]
+        act:                    # 記録との対応(pms が書く。proc-v018 以降)。actions は pms act の記録のこの連番から作った
+          card: C-0007
+          seqs: [21, 23]        # actions の元の操作
+          screen_seqs: [24]     # verified_by.screen の元の assert
+          evidence_seqs: [25]   # evidence の元の screenshot
       - step_id: SC-PRT-01-S3
         verdict: passed
         actions:
@@ -1951,6 +2000,7 @@ scenarios:
 - 再探索フローの記録は、当該シナリオの記録に新しい `flow_id` と `reexplore_of: <旧フローID>` を付けて追記する。パートPの記録は `recheck_of: <前回の prohibited_ops.digest>` を付けて追記する。いずれも旧記録は削除しない
 - 健全性シグナルが出たステップには `health_signal`(種類 `kind` は `vocab.health_signal_kind`、要点 `detail`、観測した時刻 `observed_at`)を書き、判定を `passed` にしない(lint `health_recorded`)
 - 探索したステップには `started_at`・`ended_at`(`vocab.timestamp_format`。AI実行マシンの時計)を書く。ステップの最初の操作の直前と、判定に使った観測の直後の時刻とする(待機を含む)。`blocked` で実行しなかったステップには書かない。作業15がサーバーのログを集める時間範囲に使う(00 ■健全性シグナルと問い合わせ ログの添付)。健全性シグナルのあるステップの `started_at` と `observed_at` は lint `health_recorded` が検査する(proc-v014 以降のフロー)
+- **proc-v018 以降のフローでは、探索記録は進行役 pms が書く**(§10 パートC)。`explore.step` のカードの提出が合格したときに、`actions`・`started_at`・`ended_at`(そのカードの `pms act` の記録の最初と最後の時刻)・`verified_by.screen`(assert の記録)・`evidence`(`pms act screenshot` が `evidence/<ステップID>_<連番>.png` に保存したもの)・`act`(カードと連番)を記録から作り、判定・`verified_by.db`・`assertion_hint`・`observed`・`nondeterministic`・`wait`・`health_signal`・`blocked_by`・`carried_data` をカードの出力から写す。検証手段を変えた理由は `verification_note` に、`DB` 単独の理由は `verification` に `DB(理由: …)` の形で書く。シナリオの判定・`requires_setup`・`invariants`・`discrepancies`・`manual_gap` も pms が書く。`act` の連番と `actions` が記録と一致することを lint `explore_act_linked` が検査する(作業15の `health_fix` の記録を除く)
 - 作業15で解消した記録は、同じ `flow_id` と `health_fix`(問い合わせの回数・原因・変えた操作・問い合わせの記録のパス・確認済みのログID)を付けて追記する。作業10の記録は削除しない。`health_fix` の付いた記録のどのステップにも `health_signal` があってはならない
 
 # 付録B: setup-log.yaml

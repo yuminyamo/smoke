@@ -6,13 +6,15 @@
       "id": "copilot",
       "label": "GitHub Copilot",
       "dir": ".github/skills",
-      "frontmatter": "copilot"
+      "frontmatter": "copilot",
+      "agents_dir": ".github/agents"
     },
     {
       "id": "kiro",
       "label": "Kiro",
       "dir": ".kiro/skills",
-      "frontmatter": "kiro"
+      "frontmatter": "kiro",
+      "agents_dir": ".kiro/agents"
     }
   ],
 
@@ -23,6 +25,12 @@
     "stages": "procedure/stages.md",
     "templates_dir": "procedure/templates",
     "methods_dir": "procedure/methods"
+  },
+
+  "agents": {
+    "_comment": "カードの種類ごとのエージェント(00_common.md ■進行役と記録の道具)。正本 source から、各ターゲットの agents_dir に <prefix><種類(. と _ を - に)> の名前で生成する。agents_dir の中の <prefix>* だけを作り直し、ほかのエージェントには触れない",
+    "source": "procedure/cards/agents.yaml",
+    "prefix": "pms-card-"
   },
 
   "router": {
@@ -52,7 +60,7 @@
       "section": "10",
       "title": "シナリオ生成と探索",
       "include_methods": true,
-      "description": "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、playwright-cli で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。",
+      "description": "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、進行役 pms のカード(pms run がカードごとにAIのセッションを起こす)で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。",
       "invocation": "auto"
     },
     {

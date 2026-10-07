@@ -34,6 +34,11 @@ scenarios:
           - { value: ジョブID, catalog_id: ND-UI-001, strength: パターン一致 }
         observed: 受付完了が表示され、ジョブIDが採番された
         evidence: [evidence/SC-PRT-01-S1_01.png]
+        act:                    # 記録との対応(pms が書く。proc-v018 以降)。actions は pms act の記録のこの連番から作った
+          card: C-0007
+          seqs: [21, 23]        # actions の元の操作
+          screen_seqs: [24]     # verified_by.screen の元の assert
+          evidence_seqs: [25]   # evidence の元の screenshot
       - step_id: SC-PRT-01-S3
         verdict: passed
         actions:
@@ -139,4 +144,5 @@ scenarios:
 - 再探索フローの記録は、当該シナリオの記録に新しい `flow_id` と `reexplore_of: <旧フローID>` を付けて追記する。パートPの記録は `recheck_of: <前回の prohibited_ops.digest>` を付けて追記する。いずれも旧記録は削除しない
 - 健全性シグナルが出たステップには `health_signal`(種類 `kind` は `vocab.health_signal_kind`、要点 `detail`、観測した時刻 `observed_at`)を書き、判定を `passed` にしない(lint `health_recorded`)
 - 探索したステップには `started_at`・`ended_at`(`vocab.timestamp_format`。AI実行マシンの時計)を書く。ステップの最初の操作の直前と、判定に使った観測の直後の時刻とする(待機を含む)。`blocked` で実行しなかったステップには書かない。作業15がサーバーのログを集める時間範囲に使う(00 ■健全性シグナルと問い合わせ ログの添付)。健全性シグナルのあるステップの `started_at` と `observed_at` は lint `health_recorded` が検査する(proc-v014 以降のフロー)
+- **proc-v018 以降のフローでは、探索記録は進行役 pms が書く**(§10 パートC)。`explore.step` のカードの提出が合格したときに、`actions`・`started_at`・`ended_at`(そのカードの `pms act` の記録の最初と最後の時刻)・`verified_by.screen`(assert の記録)・`evidence`(`pms act screenshot` が `evidence/<ステップID>_<連番>.png` に保存したもの)・`act`(カードと連番)を記録から作り、判定・`verified_by.db`・`assertion_hint`・`observed`・`nondeterministic`・`wait`・`health_signal`・`blocked_by`・`carried_data` をカードの出力から写す。検証手段を変えた理由は `verification_note` に、`DB` 単独の理由は `verification` に `DB(理由: …)` の形で書く。シナリオの判定・`requires_setup`・`invariants`・`discrepancies`・`manual_gap` も pms が書く。`act` の連番と `actions` が記録と一致することを lint `explore_act_linked` が検査する(作業15の `health_fix` の記録を除く)
 - 作業15で解消した記録は、同じ `flow_id` と `health_fix`(問い合わせの回数・原因・変えた操作・問い合わせの記録のパス・確認済みのログID)を付けて追記する。作業10の記録は削除しない。`health_fix` の付いた記録のどのステップにも `health_signal` があってはならない

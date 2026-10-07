@@ -1,0 +1,28 @@
+{
+  "$comment": "カード report.findings の出力(stages.md §10 6章)。数値・一覧は pms report が記録から作る。AIが書くのはこの所見だけ",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "headline", "inputs_note", "open_questions", "priority_review", "prohibition_proposals", "knowledge_gap", "nd_increment", "notes"],
+  "properties": {
+    "result": { "enum": ["written", "cannot_proceed"], "description": "written = 所見を書いた / cannot_proceed = カードの範囲で判断できない(理由を notes に)" },
+    "headline": { "type": ["string", "null"], "minLength": 10, "maxLength": 150, "description": "要約の「最も重要な1件」(1文。後段のAIと人間がここだけ読んで判断できること)" },
+    "inputs_note": { "type": ["string", "null"], "maxLength": 300, "description": "参照した前段成果物・KB についての補足(未レビューで問題の原因候補になるもの。なければ null)" },
+    "open_questions": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 10, "maxLength": 300 }, "description": "未確認・要確認事項と前段成果物への疑義(書き換えずに列挙。なければ [])" },
+    "priority_review": {
+      "type": "array", "maxItems": 7, "description": "優先レビュー推奨(上位5件程度。DB不変条件を実行したならその SQL を必ず含める)",
+      "items": { "type": "object", "additionalProperties": false, "required": ["item", "reason"], "properties": {
+        "item": { "type": "string", "minLength": 4, "maxLength": 120, "description": "対象(成果物・ID)" },
+        "reason": { "type": "string", "minLength": 10, "maxLength": 200, "description": "理由(1文)" } } }
+    },
+    "prohibition_proposals": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 10, "maxLength": 300 }, "description": "禁止操作リストへの追記提案(包括原則でエスカレーションした操作のうち、恒久的に定めるべきもの。なければ [])" },
+    "knowledge_gap": { "type": "object", "additionalProperties": false, "required": ["needed", "reason"], "description": "KB が足りず作業01を提案するか",
+      "properties": { "needed": { "type": "boolean" }, "reason": { "type": ["string", "null"], "maxLength": 200 } } },
+    "nd_increment": { "type": "object", "additionalProperties": false, "required": ["needed", "reason"], "description": "非決定値カタログの増分実施(作業02)を勧めるか",
+      "properties": { "needed": { "type": "boolean" }, "reason": { "type": ["string", "null"], "maxLength": 200 } } },
+    "notes": { "type": ["string", "null"], "maxLength": 300, "description": "補足(なければ null)。cannot_proceed のときは理由(必須)" }
+  },
+  "allOf": [
+    { "if": { "properties": { "result": { "const": "cannot_proceed" } } }, "then": { "properties": { "notes": { "type": "string", "minLength": 10 } } } },
+    { "if": { "properties": { "result": { "const": "written" } } }, "then": { "properties": { "headline": { "type": "string" } } } }
+  ]
+}

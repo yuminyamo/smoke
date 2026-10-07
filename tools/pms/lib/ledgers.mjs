@@ -3,7 +3,8 @@
 // 段1(フェーズA)では pms submit と pms queue build が使う。段2以降のカードも同じ部品で書く。
 // 表の形は記入用テンプレート(procedure/templates/91・93・96)の「## 台帳」の表に合わせる。
 // 台帳のファイルがなければ、テンプレートを写して作る(テンプレートの空の行は、最初の行を足すときに外す)。
-// 書くのは事実だけである(00 ■申し送り台帳・■外部操作 外部操作需要リスト・■状態(前提条件)の扱い)。
+// 書くのは事実だけである(00 ■申し送り台帳・■外部操作 外部操作需要リスト・■状態(前提条件)の扱い・■手順改善シグナル)。
+// 段2で手順改善シグナル(テンプレート94の「1. シグナル」の表)と不整合レポート(DISC。00 ■不整合レポート(DISC)規約の書式)を加えた。
 // 優先度・採否など人間が書く欄には書かない。
 
 import fs from 'node:fs';
@@ -15,6 +16,7 @@ const LEDGERS = {
   handoff: { rel: 'work/_common/handoff-register.md', template: '91_', idCol: 'ID', content: ['対象', '理由コード'] },
   extDemand: { rel: 'work/_common/external-op-demand.md', template: '93_', idCol: '需要ID', content: ['外部操作(業務語)', '操作対象'] },
   stateDemand: { rel: 'work/_common/state-demand.md', template: '96_', idCol: '需要ID', content: ['状態ID', '定義(業務語)'] },
+  signals: { rel: 'work/_common/procedure-improvement.md', template: '94_', idCol: 'SIG-ID', content: ['事象(事実)', '手順箇所'], section: /^1\.\s*シグナル/ },
 };
 
 function cell(v) {
@@ -40,8 +42,8 @@ class Ledger {
       this.created = false;
     }
     this.lines = this.text.split('\n');
-    this.table = tableInSection(this.text, '台帳', this.def.idCol);
-    if (!this.table) throw new UsageError(`${this.def.rel} の「## 台帳」に列 ${this.def.idCol} の表がありません`);
+    this.table = tableInSection(this.text, this.def.section ?? '台帳', this.def.idCol);
+    if (!this.table) throw new UsageError(`${this.def.rel} の「## ${this.def.section ? 'シグナル' : '台帳'}」に列 ${this.def.idCol} の表がありません`);
     return this;
   }
 
@@ -73,7 +75,7 @@ class Ledger {
 
   reparse() {
     this.text = this.lines.join('\n');
-    this.table = tableInSection(this.text, '台帳', this.def.idCol);
+    this.table = tableInSection(this.text, this.def.section ?? '台帳', this.def.idCol);
   }
 
   save() { writeText(this.abs, this.text); }
@@ -171,4 +173,80 @@ export function markStateProvisioned(root, stateId, fixture) {
   l.update(row, { 状態: '整備済', fixture });
   l.save();
   return String(row.obj['需要ID']).trim();
+}
+
+/**
+ * 手順改善シグナルを1行足す(テンプレート94の「1. シグナル」の表。振り分け・IMP は作業40が書く)。
+ * @returns {string} 採番した SIG-ID(SIG-<4桁>)
+ */
+export function appendSignal(root, { origin, location, type, source = '自己申告', event, impact, response, proposal = '', version, date }) {
+  const l = new Ledger(root, 'signals').load();
+  const n = maxNumber(l.rows, 'SIG-ID', /^SIG-(\d+)$/) + 1;
+  const id = `SIG-${String(n).padStart(4, '0')}`;
+  l.append({
+    'SIG-ID': id, '発生(フロー/作業/項目)': origin, 手順箇所: location, 種別: type, 出所: source, '事象(事実)': event,
+    影響: impact, '採った対応・解釈': response, '改善案(任意)': proposal ?? '', 手順版: version, 振り分け: '', IMP: '', 状態: '未処理', 記録日: date,
+  });
+  l.save();
+  return id;
+}
+
+const DISC_FILE = 'work/_common/discrepancies.md';
+
+/** DISC の既存のID(全機能) */
+export function discrepancyIds(root) {
+  const abs = path.join(root, DISC_FILE);
+  if (!fs.existsSync(abs)) return [];
+  return [...readText(abs).matchAll(/^##\s+(DISC-[A-Za-z0-9]+-\d+)\s*$/gm)].map((m) => m[1]);
+}
+
+/**
+ * 不整合を1件記録する(00 ■不整合レポート(DISC)規約の書式。ファイルがなければレビューヘッダ付きで作る)。
+ * @returns {string} 採番した DISC-ID(DISC-<機能コード>-<3桁>)
+ */
+export function appendDiscrepancy(root, { feature, kind, related, spec, manual, existing, actual, evidence, assessment, notes }) {
+  const abs = path.join(root, DISC_FILE);
+  const text = fs.existsSync(abs) ? readText(abs) : '---\nreview_status: unreviewed\n---\n\n# 不整合レポート(DISC)\n';
+  let max = 0;
+  for (const id of discrepancyIds(root)) {
+    const m = id.match(new RegExp(`^DISC-${feature}-(\\d+)$`));
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  const id = `DISC-${feature}-${String(max + 1).padStart(3, '0')}`;
+  const line = (k, v) => `- **${k}**: ${String(v ?? '').replace(/\r?\n/g, ' ').trim() || '記載なし'}`;
+  const block = [
+    `## ${id}`, '',
+    line('種別', kind), line('関連項目', related), line('仕様書の記載', spec), line('マニュアルの記載', manual),
+    ...(existing ? [line('既存テストの記載', existing)] : []),
+    line('実画面の挙動', actual), line('証跡', evidence), line('分類(AIの見立て)', assessment), line('備考', notes || 'pms が探索のカードの出力から記録した'),
+  ].join('\n');
+  writeText(abs, `${text.replace(/\n*$/, '\n')}\n${block}\n`);
+  return id;
+}
+
+/** 禁止操作リストの禁止IDと禁止レベル(ファイルがない・表がなければ空の Map) */
+export function prohibitionLevels(root) {
+  const abs = path.join(root, 'work/_common/prohibited-operations.md');
+  if (!fs.existsSync(abs)) return new Map();
+  const t = tableInSection(readText(abs), '禁止操作表', '禁止ID');
+  const out = new Map();
+  for (const r of t?.rows ?? []) {
+    const id = String(r.obj['禁止ID'] ?? '').replace(/`/g, '').trim();
+    if (/^PROH-\d{3}$/.test(id) && !isBlank(r.obj['操作'])) out.set(id, String(r.obj['禁止レベル'] ?? '').replace(/`/g, '').trim());
+  }
+  return out;
+}
+
+/** 台帳の行のID(申し送り・外部操作需要) */
+export function ledgerIds(root, kind) {
+  if (!fs.existsSync(path.join(root, LEDGERS[kind].rel))) return new Set();
+  const l = new Ledger(root, kind).load();
+  return new Set(l.rows.map((r) => String(r.obj[LEDGERS[kind].idCol] ?? '').trim()).filter(Boolean));
+}
+
+/** 申し送り台帳の、発生元にフローIDを含む行({ID, 理由コード, 対象, 発生元}) */
+export function handoffsOfFlow(root, flow) {
+  if (!fs.existsSync(path.join(root, LEDGERS.handoff.rel))) return [];
+  const l = new Ledger(root, 'handoff').load();
+  return l.rows.filter((r) => new RegExp(`\\b${flow}\\b`).test(r.obj['発生元'] ?? '')).map((r) => ({ ...r.obj }));
 }

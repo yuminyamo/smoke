@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-07 / 版: v19(低価格モデル対応 段1 共通の土台: 手順版を proc-v017 に更新、pms_card_kind・pms_card_status・pms_reject_kind・pms_act_action・locator_class・pms_vague_words・id_format.card・id_format.rule を追加)
+# 改訂: 2026-10-08 / 版: v20(低価格モデル対応 段2 スクリプト実行: 手順版を proc-v018 に更新、pms_card_kind に explore.step・explore.close・explore.session_close・report.findings、pms_card_status に skipped、pms_reject_kind に expected_changed・verdict_evidence・health_time・blocked_refs、pms_act_action に screenshot、pms_runner・pms_stop_reason・discrepancy_kind・discrepancy_assessment・reflection_target を追加)
+#       2026-10-07 / 版: v19(低価格モデル対応 段1 共通の土台: 手順版を proc-v017 に更新、pms_card_kind・pms_card_status・pms_reject_kind・pms_act_action・locator_class・pms_vague_words・id_format.card・id_format.rule を追加)
 #       2026-10-06 / 版: v18(setup-log の記録の強化: 手順版を proc-v016 に更新)
 #       2026-10-04 / 版: v17(リモートコマンドの整備: 手順版を proc-v015 に更新)
 #       2026-10-03 / 版: v16(ログ収集と時刻: 手順版を proc-v014 に更新、kb_category に T12 ログID知見、default.log_window_margin_sec、pre_stage_entry_kind・timestamp_format を追加、golden_image と pre_stage_state を外部操作エントリに合わせた)
@@ -34,8 +35,8 @@
 
 meta:
   step: 1                       # 本語彙が対象とするステップ
-  revision: "2026-10-07"
-  procedure_version: proc-v017  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  revision: "2026-10-08"
+  procedure_version: proc-v018  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -479,12 +480,17 @@ pms_card_kind:                  # カードの種類(1枚1判断。テンプレ�
   setup.build: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめる(作業10フェーズA)
   setup.code: 合格した setup.build の操作列を、シナリオ部品と fixture のコードにし、2回実行して確かめる(作業10フェーズA)
   setup.reuse: 過去のフローの fixture を1回実行し、状態が成立するかを確かめる。再整備・再探索はしない(作業10フェーズA)
+  explore.step: シナリオの1ステップを pms act で探索し、期待結果を満たすかを判定する(作業10パートC)
+  explore.close: シナリオ1つの終わりの処理。シナリオ末尾の DB不変条件の検査と、確立した操作の反映先の決定と反映(作業10パートC)
+  explore.session_close: 探索セッションの終わりの処理。DB不変条件の全体検査を1回行う(作業10パートC)
+  report.findings: 作業10の報告書のうち、所見の欄(人間に伝えたいこと)だけを書く。数値と一覧は pms report が記録から作る(作業10)
 
 pms_card_status:                # キューの中のカードの状態(work/_flows/F-<番号>/queue.json)
   pending: キューにあり、まだ出していない
   issued: pms next で出した。合格する提出を待っている(提出されないまま pms next が呼ばれたら同じカードを出し直す)
   passed: 提出が検査に合格した(記録は pms が書いた)
   stopped: 人間の確認待ち(STOP)。出した回数・不合格の回数が上限(config/pms.json)に達した、または cannot_proceed で提出された
+  skipped: pms が記録だけを書き、AIに出さなかった(前のステップが blocked のときの後続のステップ、前提状態が blocked のシナリオのステップと終わりの処理)
 
 pms_reject_kind:                # pms submit の不合格の区分(submit-log.jsonl に残す)
   schema: 出力が schema を満たさない(ファイルがない・JSON でない・必須の欄・許される値)
@@ -494,7 +500,11 @@ pms_reject_kind:                # pms submit の不合格の区分(submit-log.js
   code_mismatch: 部品・fixture のファイルと名前がない、記録の各操作・established check のロケータがコードにない、起動確認テストがない
   runs: 実行の記録の回数・終了コード・時刻の形が違う
   reuse_source: 流用元のエントリまたは fixture のファイルがない
-  lint: setup-log に書く予定のエントリが lint(setup_steps_recorded・no_temp_locator・env_value_leak)に違反する
+  lint: 書く予定の記録(setup-log のエントリ・探索記録のステップ)が lint(setup_steps_recorded・no_temp_locator・env_value_leak)に違反する
+  expected_changed: 期待結果・判定基準を書き換えた(scenarios.md のステップの行が、キューを作ったときから変わった。出力が期待結果・判定基準を変えたと述べている)
+  verdict_evidence: failed / human-check なのに証跡(pms act screenshot の連番)がない
+  health_time: 健全性シグナルの observed_at が、そのカードの操作の時刻の範囲に入らない
+  blocked_refs: blocked の参照が台帳・禁止操作リストに実在しない、または理由コードが vocab.reason_code にない
 
 pms_act_action:                 # pms act の操作。step = setup-log の steps[].action(付録B)。step のない操作は記録に残すが steps にしない
   open:
@@ -540,12 +550,35 @@ pms_act_action:                 # pms act の操作。step = setup-log の steps
   ext:
     step: external
     meaning: 外部操作 skill の実行体を呼ぶ(KB T05 の操作IDを付ける)
+  screenshot:
+    meaning: 画面のスクリーンショットを証跡として保存する(work/<機能コード>/exploration/evidence/。探索の evidence に連番で示す)
 
 locator_class:                  # pms act が generate-locator で取ったロケータの区分(00 ■ロケータ規約)
   stable: 00 ■ロケータ規約の1〜5(getByRole・getByLabel・getByPlaceholder・getByText・getByTestId)だけをつないだもの
   css: それ以外(locator(…) の CSS・構造セレクタ、nth・first など位置に頼るもの)。00 ■ロケータ規約の6
 
 pms_vague_words: [適宜, など, 必要に応じて, 等]   # pms submit が red_flag として検出するあいまいな語(「等」は「〜等」の形)
+
+pms_runner:                     # カードを行った実行形態(環境変数 PMS_RUNNER。submit-log.jsonl に残し、pms stats で分ける。未設定は b1)
+  b1: IDE のチャットの中でカードを順に行う(チャットの作業10。段3で IDE 内のループに置き換える)
+  b2: 進行役 pms run がカードごとに新しいAIのセッション(Copilot CLI / Kiro CLI)を起こす(主な経路)
+
+pms_stop_reason:                # STOP(人間の確認待ち)の理由の区分(queue.json のカードの stop.code、pms run の出力の code)
+  issue_limit: 出した回数が上限(max_issues)に達したが、合格した提出がない
+  reject_limit: 提出の不合格が上限(max_rejections)に達した
+  cannot_proceed: AIがカードの範囲で判断できないとして提出した
+  setup_unready: シナリオの前提状態が整備されていない(フェーズAのカードが人間の確認待ち)
+  lint_error: pms run が報告書を作ったあとの lint に ERROR が残った(lint 止まり。チャットの作業10が直す)
+
+discrepancy_kind: [実画面≠仕様書, 実画面≠マニュアル, 仕様書≠マニュアル, 実画面≠既存テスト, 三者不一致]   # 不整合(DISC)の種別(00 ■不整合レポート(DISC)規約)
+discrepancy_assessment: [製品不具合疑い, ドキュメント不備疑い, 判断不能]   # DISC の分類(AIの見立て)
+
+reflection_target:              # 探索で確立した操作の反映先(explore.close。§10 パートC blocked にするときに残すもの)
+  fixture: 前提状態を作る操作 → fixture とシナリオ部品(tests/fixtures/・tests/flows/)
+  flow: 2つ以上のシナリオで使う操作列 → シナリオ部品(tests/flows/)
+  page: ロケータ → ページオブジェクト(tests/pages/)
+  kb: それ以外 → KB(該当画面・T05・kb/gotchas/)
+  none: 反映するものがない
 
 # ── pipeline.dot が参照するコンテキストキー ──────────────────
 # 各段階は status.yaml の context_updates にこれらを出力する(00の status.yaml 契約)

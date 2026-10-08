@@ -16,8 +16,9 @@ if (args[0] === '--version') { console.log('0.1.22'); process.exit(0); }
 const pageFile = path.join(dir, 'page.json');
 const page = JSON.parse(fs.readFileSync(pageFile, 'utf8'));
 fs.appendFileSync(path.join(dir, 'calls.jsonl'), JSON.stringify(args) + '\n');
-const [session, cmd, ...rest] = args;
-if (!/^-s=F-\d{3}$/.test(session)) { console.error(`bad session ${session}`); process.exit(2); }
+// セッションは pms act なら -s=<フローID>、pms pwcli なら -s=<名前> か指定なし(既定のセッション)
+const [session, cmd, ...rest] = args[0]?.startsWith('-s=') ? args : [null, ...args];
+if (session !== null && !/^-s=[A-Za-z0-9][A-Za-z0-9_-]*$/.test(session)) { console.error(`bad session ${session}`); process.exit(2); }
 const save = () => fs.writeFileSync(pageFile, JSON.stringify(page));
 const state = () => `### Page state\n- Page URL: ${page.url}\n`;
 const ref = (r) => page.refs?.[r];

@@ -19,7 +19,7 @@
       "deny": [
         "shell(playwright-cli)", "shell(playwright-cli:*)",
         "shell(npx playwright-cli:*)", "shell(npx @playwright/cli:*)",
-        "shell(node tools/env/env.mjs get:*)",
+        "shell(node tools/env/env.mjs get:*)", "shell(node tools/pms/pms.mjs pwcli:*)",
         "write(procedure/**)", "write(.github/skills/**)", "write(.github/agents/**)", "write(.kiro/skills/**)", "write(.kiro/agents/**)"
       ],
       "stdin": null,

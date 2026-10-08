@@ -1,9 +1,10 @@
-// cli.mjs — playwright-cli と環境情報の実行体の呼び出し(pms act だけが playwright-cli を呼ぶ)
+// cli.mjs — playwright-cli と環境情報の実行体の呼び出し(playwright-cli を呼ぶのは pms act と pms pwcli だけ)
 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UsageError } from './util.mjs';
+import { MIN_MASK_LENGTH } from './store.mjs';
 
 // tools/env/env.mjs(pms と同じ tools/ の下にあるもの。--root で対象のリポジトリを渡す)
 export const ENV_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'env', 'env.mjs');
@@ -31,6 +32,12 @@ export class PlaywrightCli {
     this.calls++;
     const sessionArg = this.cfg.session_arg.replace('{session}', this.session);
     return run(this.cfg.playwright_cli, [sessionArg, ...args], { cwd: this.cwd });
+  }
+
+  /** playwright-cli <args...>(セッションを指定しない。pms pwcli で --session がないとき) */
+  callDefault(args) {
+    this.calls++;
+    return run(this.cfg.playwright_cli, args, { cwd: this.cwd });
   }
 
   version() {
@@ -108,6 +115,24 @@ export function envGet(cfg, root, key) {
   const r = run(cmd, ['get', key, '--reveal'], { cwd: root });
   if (r.code !== 0) return { ok: false, message: `環境情報 ${key} を取り出せません(env.mjs の終了コード ${r.code})。node tools/env/env.mjs require --keys ${key} で確かめ、足りなければ人間に聞いて set で保存する` };
   return { ok: true, value: r.stdout.replace(/\r?\n$/, '') };
+}
+
+/** 環境情報の参照(引数全体が <env:キー> のもの) */
+export const ENV_REF = /^<env:([a-z][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)*)>$/;
+
+/**
+ * 引数が <env:キー> だけなら値に置き換える(pms act と pms pwcli で共通)。
+ * 置き換えた値は masks に足し(出力・記録で伏せるため)、短くて伏せられない値は warnings に警告を足す。
+ * @returns {{ actual: string, recorded: string } | { error: string }} actual は playwright-cli に渡す値、recorded は記録・出力に書く形
+ */
+export function resolveEnvArg(cfg, root, v, masks, warnings) {
+  const m = String(v).match(ENV_REF);
+  if (!m) return { actual: v, recorded: v };
+  const r = envGet(cfg, root, m[1]);
+  if (!r.ok) return { error: r.message };
+  masks.push({ key: m[1], value: r.value });
+  if (r.value.length < MIN_MASK_LENGTH) warnings.push(`<env:${m[1]}> の値は ${MIN_MASK_LENGTH} 文字未満のため、出力で伏せられない`);
+  return { actual: r.value, recorded: v };
 }
 
 /** 外部操作の実行体を呼ぶ(pms act ext) */

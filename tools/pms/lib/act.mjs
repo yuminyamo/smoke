@@ -1,12 +1,11 @@
 // act.mjs — pms act: 画面操作を1回ずつ実行し、そのたびに操作の記録(act-log.jsonl)に1行書く
 
 import fs from 'node:fs';
-import { PlaywrightCli, classifyLocator, envGet, parsePageUrl, parseRanCode, runExternal } from './cli.mjs';
-import { secretsToMask, mask, maskDeep, MIN_MASK_LENGTH } from './store.mjs';
+import { PlaywrightCli, classifyLocator, resolveEnvArg, parsePageUrl, parseRanCode, runExternal } from './cli.mjs';
+import { secretsToMask, mask, maskDeep } from './store.mjs';
 import { PMS, todoOf, submitCommand, ACT_KINDS, targetOf } from './queue.mjs';
 import { timestamp, UsageError } from './util.mjs';
 
-const ENV_REF = /^<env:([a-z][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)*)>$/;
 const EXT_OP = /^OP-[A-Z0-9]+-\d{3}$/;
 
 /** JavaScript の文字列リテラル(単一引用符) */
@@ -51,13 +50,9 @@ export function act(ctx, opt, args) {
     started_at: timestamp(), ended_at: null, ok: false, error: null,
   };
   const resolve = (v) => {
-    const m = String(v).match(ENV_REF);
-    if (!m) return { actual: v, recorded: v };
-    const r = envGet(cfg, root, m[1]);
-    if (!r.ok) throw new ActError(r.message);
-    masks.push({ key: m[1], value: r.value });
-    if (r.value.length < MIN_MASK_LENGTH) warnings.push(`<env:${m[1]}> の値は ${MIN_MASK_LENGTH} 文字未満のため、出力で伏せられない`);
-    return { actual: r.value, recorded: v };
+    const x = resolveEnvArg(cfg, root, v, masks, warnings);
+    if (x.error) throw new ActError(x.error);
+    return x;
   };
   const cli = new PlaywrightCli(cfg, q.flow_id, root);
   let rawOut = '';

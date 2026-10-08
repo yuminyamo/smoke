@@ -56,6 +56,7 @@ deny_shell:
   - "npx playwright-cli *"
   - "npx @playwright/cli *"
   - "node tools/env/env.mjs get *--reveal*"
+  - "node tools/pms/pms.mjs pwcli *"
 deny_write:
   - "procedure/**"
   - ".github/skills/**"

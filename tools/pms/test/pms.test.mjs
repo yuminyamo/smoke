@@ -71,6 +71,7 @@ test('act: 1操作1行の記録(連番・時刻・ロケータの区分・now/ne
   assert.equal(fill.intent, '管理者IDを入力');
   assert.equal(log[4].url_after, 'https://pms.test/menu');
   assert.equal(log[4].url_before, log[3].url_after);
+  assert.ok(stubCalls(root).filter((c) => c[0] !== '--version').every((c) => c[0] === '-s=F-003'), 'セッション名はフローID');
   // 出力に now と next
   const j = res[1].json;
   assert.deepEqual(Object.keys(j.now).sort(), ['card', 'flow', 'kind', 'state_id', 'target', 'todo']);
@@ -153,6 +154,50 @@ test('act ext: 外部操作の実行体を呼び、操作ID・終了コード・
   assert.equal(x.exit_code, 0);
   assert.equal(x.output.arg, '<env:pms.admin.password>');
   assert.ok(!read(root, 'work/PRT/exploration/act-log.jsonl').includes(SECRET));
+});
+
+// ════════════════════════════════════════════════════════
+// pms pwcli(カードを使わない作業の画面操作)
+// ════════════════════════════════════════════════════════
+
+test('pwcli: カード・フローなしで playwright-cli に渡し、<env:キー> を値に置き換える。出力では値を伏せ、記録は書かない', () => {
+  const root = makeRepo();
+  const r = (args) => pms(root, ['pwcli', '--', ...args]);
+  const res = [
+    r(['open', '<env:pms.url>']),
+    r(['fill', 'e3', '<env:pms.admin.user>']),
+    r(['fill', 'e5', '<env:pms.admin.password>']),
+    r(['snapshot']),
+    r(['click', 'e7']),
+  ];
+  for (const x of res) assert.equal(x.code, 0, x.stdout + x.stderr);
+  const all = res.map((x) => x.stdout + x.stderr).join('\n');
+  assert.ok(!all.includes(SECRET), '秘密情報の値が出ている');
+  assert.ok(!all.includes(ADMIN_USER), '置き換えたアカウントの値が出ている');
+  assert.match(res[2].stdout, /fill\('<env:pms\.admin\.password>'\)/);
+  assert.match(res[3].stdout, /<env:pms\.admin\.password>/, 'snapshot の入力済みの値も伏せる');
+  assert.match(res[4].stdout, /Page URL: https:\/\/pms\.test\/menu/);
+  // playwright-cli には本物の値を、セッションの指定なしで渡している
+  const calls = stubCalls(root);
+  assert.deepEqual(calls[0], ['open', 'https://pms.test/login']);
+  assert.deepEqual(calls[2], ['fill', 'e5', SECRET]);
+  assert.equal(actLog(root).length, 0);
+  assert.ok(!exists(root, 'work/_flows'));
+});
+
+test('pwcli: --session は -s=<名前> で渡す。値を直接書いた秘密情報も伏せる。失敗は終了コード 1、使い方の誤りは 2', () => {
+  const root = makeRepo();
+  const ok = pms(root, ['pwcli', '--session', 'nd-obs', '--', 'fill', 'e5', SECRET]);
+  assert.equal(ok.code, 0, ok.stdout + ok.stderr);
+  assert.ok(!ok.stdout.includes(SECRET));
+  assert.deepEqual(stubCalls(root)[0], ['-s=nd-obs', 'fill', 'e5', SECRET]);
+  assert.equal(pms(root, ['pwcli', '--', 'click', 'e99']).code, 1);
+  assert.equal(pms(root, ['pwcli', 'click', 'e7']).code, 2, '-- がない');
+  assert.equal(pms(root, ['pwcli', '--']).code, 2, '引数がない');
+  assert.equal(pms(root, ['pwcli', '--session', 'a b', '--', 'snapshot']).code, 2);
+  const missing = pms(root, ['pwcli', '--', 'fill', 'e5', '<env:pms.nothing>']);
+  assert.equal(missing.code, 2);
+  assert.match(missing.stdout, /require --keys pms\.nothing/);
 });
 
 // ════════════════════════════════════════════════════════

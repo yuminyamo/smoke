@@ -1,8 +1,8 @@
 # tools/pms — 進行役(操作の記録・タスクキュー・カード・提出の検査・セッションの起動・報告書の生成)
 
-手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。proc-v019 で IDE 内のループ(B1。入口のエージェント `pms-runner`)のために `next` の出力にエージェントの名前と依頼文を足した(`03_IDE内ループ.md`、段3。14章)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
+手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。proc-v019 で IDE 内のループ(B1。入口のエージェント `pms-runner`)のために `next` の出力にエージェントの名前と依頼文を足した(`03_IDE内ループ.md`、段3。14章)。proc-v021 でカードを使わない作業の画面操作のために `pms pwcli` を足した(2.5)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
 
-- Node.js 18 以上だけで動く(外部パッケージなし)。playwright-cli を呼ぶのは `pms act` だけ、AI の CLI を呼ぶのは `pms run` だけ
+- Node.js 18 以上だけで動く(外部パッケージなし)。playwright-cli を呼ぶのは `pms act` と `pms pwcli` だけ、AI の CLI を呼ぶのは `pms run` だけ
 - テスト: `node --test tools/pms/test/`(playwright-cli・AI の CLI・環境情報は偽物に差し替える。`test-support/`。カードを行うAIの代わりは `test-support/explore-agent.mjs`)
 - 入口: `node tools/pms/pms.mjs <サブコマンド>`。使い方は `--help`(ファイル先頭のコメント)
 
@@ -16,6 +16,7 @@
 | `report --flow F [--dod-unmet "<理由>"]` | 報告書と status.yaml を記録から作る(11章) | `{ok, flow, wrote[], summary[], next}` | 0 / 2(カードが終わっていない) |
 | `stats [--flow F \| --since YYYY-MM-DD] [--json]` | カードの合格率などを集計する(12章) | `--json` なら `{flows, since, by_kind[], records}`、なければ表 | 0 / 2 |
 | `act --flow F --card C [--intent "…"] <操作> [引数…]` | 画面操作を1回実行し、act-log に1行書く(2章) | `{ok, seq, action, locator, locator_class, unique, url_after, error, warnings[], now, next, hint}`。`snapshot` は画面の内容のあとに `--- pms ---` の行と同じ JSON | 0 / 1(操作の失敗・assert の不成立)/ 2 |
+| `pwcli [--session 名前] -- <playwright-cli の引数…>` | カードを使わない作業の画面操作。`<env:キー>` を値に置き換えて playwright-cli に渡し、値を伏せた出力を返す。`--flow` は要らず、記録は書かない(2.5) | playwright-cli の出力(値を伏せたもの)。標準エラー出力があれば `--- stderr ---` の行のあとに続ける | 0 / 1(playwright-cli が 0 以外で終わった)/ 2(`--` がない・環境情報がない など) |
 | `submit --flow F --card C [--file …]` | 出力を検査し、合格なら記録を書く(5章) | 合格 `{ok: true, card, result, status, wrote[], next, hint}` / 不合格 `{ok: false, card, attempt, rejections, stopped, failures[{category, message, fix}], next, hint}` | 0(合格。`cannot_proceed` の受け付けを含む)/ 1(不合格)/ 2 |
 | `status --flow F [--json]` | 現在のカード・枚数・STOP の理由・pms が記録した状態・警告・`complete`・`report_pending`(パートCのカードが全部終わったのに、そのあとで `pms report` をしていない。14章) | `--json` なら JSON、なければ人間向けの文 | 0 / 2 |
 | `reopen --flow F --card C` | (人間が使う)STOP のカードを `pending` に戻し、出した回数・不合格の回数を 0 にする。続けて止めた後続のステップ(`chained_from`)も戻す | `{ok, flow, card, reopened[], status, next}` | 0 / 2 |
@@ -70,6 +71,16 @@
 ### 2.4 `now` と `next`
 
 `act` と `next` の出力には毎回 `now`(`flow`・`card`・`kind`・`state_id`・`todo`)と `next`(次に実行すべきコマンド1つ)を付ける。会話が長くなったり要約されたりしても、AIが道具の出力から現在地を取り戻せるようにするためである(docs/004 7章の④)。`next` は、失敗のあと・操作のあとは `snapshot`、`assert` の成功のあとは `submit`。
+
+### 2.5 `pms pwcli`(カードを使わない作業の画面操作。`lib/pwcli.mjs`)
+
+作業01・02・15・20・30 と作業10のカード以外の工程(00 ■進行役と記録の道具)は、カードがないため `pms act` を使えない。proc-v020 までは playwright-cli を直接呼ぶとしていたが、それではログインのパスワードを入力するのに、AIが値を `env.mjs get --reveal` で取り出してコマンドに書くしかなく、値が会話・コマンドの履歴・playwright-cli の出力に残る(作業02のAIが fill を使えず止まった。proc-v021)。`pms pwcli` は、`pms act` の値の扱い(2.3)だけを取り出したものである。値の置き換えは `pms act` と同じ `lib/cli.mjs` の `resolveEnvArg`、伏せるのは同じ `lib/store.mjs` の `secretsToMask`・`mask`、playwright-cli の呼び出しは同じ `PlaywrightCli` を使う(伏せ方を片方だけ直すことがないように、部品を分けない)。
+
+- 引数は `--` の後ろをそのまま playwright-cli に渡す。`<env:キー>` だけの引数を `env.mjs get --reveal` の値に置き換える(`act` と同じく引数の一部だけの置き換えはしない)
+- 出力(標準出力と標準エラー出力)から、置き換えた値と全環境の秘密情報を伏せる(2.3 と同じ `mask`)
+- `--session <名前>` があれば `session_arg` の形で渡す。なければセッションを指定しない(playwright-cli の既定のセッション。AIが直接呼んだ playwright-cli と同じブラウザを使える)
+- カード・フロー・act-log・キューに触らない。ロケータの記録もしない(カードを使わない作業は、KB や報告書に自分で書く。KB に書く操作列では値を `<env:キー>` と書く。00 R-ENV-1)
+- `pms run` が起こすカードのセッションでは使用禁止にする(`procedure/cards/agents.yaml` の `deny_shell`、`config/pms.sample.json` の `runner.copilot.deny`)。カードの画面操作は記録の残る `pms act` に限るため
 
 ## 3. タスクキュー(`work/_flows/F-<番号>/queue.json`)
 

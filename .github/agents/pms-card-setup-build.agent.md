@@ -4,7 +4,7 @@ description: "作業10フェーズA: 状態を1つ、pms act の画面操作で�
 model: "gpt-6-luna"
 tools: ["read", "edit", "search", "execute"]
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 setup.build)/ 手順版: proc-v019 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 setup.build)/ 手順版: proc-v020 / 生成: tools/build-skills/build-skills.mjs -->
 
 あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
 

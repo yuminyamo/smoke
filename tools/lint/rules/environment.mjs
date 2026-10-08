@@ -11,6 +11,9 @@ import { LintSetupError } from '../lib/repo.mjs';
 
 // 検査する成果物の置き場所と拡張子
 const SCAN_DIRS = ['work', 'kb', 'logs', 'tests', 'traceability'];
+// skills の生成先(外部操作 skill の条件2: 資格情報の値を skill に書かない)。procedure/skills.config.json の targets[].dir
+const SKILLS_CONFIG = 'procedure/skills.config.json';
+const DEFAULT_SKILL_DIRS = ['.github/skills', '.kiro/skills'];
 const TEXT_EXT = new Set(['.md', '.yaml', '.yml', '.json', '.jsonl', '.ts', '.js', '.mjs', '.cjs', '.txt', '.csv', '.log', '.sql', '.ps1']);
 const MAX_BYTES = 5 * 1024 * 1024;
 // これより短い値は、ほかの文字列と偶然一致しやすいので探さない(notes に書く)
@@ -47,6 +50,18 @@ function files(repo, dirs) {
   });
 }
 
+/** skills の生成先(設定がない・読めないときは既定の2つ) */
+function skillDirs(repo) {
+  return repo.memo('envSkillDirs', () => {
+    const p = repo.abs(SKILLS_CONFIG);
+    if (!fs.existsSync(p)) return DEFAULT_SKILL_DIRS;
+    try {
+      const dirs = (JSON.parse(fs.readFileSync(p, 'utf8')).targets || []).map((t) => t.dir).filter(Boolean);
+      return dirs.length ? dirs : DEFAULT_SKILL_DIRS;
+    } catch { return DEFAULT_SKILL_DIRS; }
+  });
+}
+
 function scan(repo, values, dirs) {
   const hits = [];
   if (!values.length) return hits;
@@ -70,11 +85,15 @@ export function env_value_leak(repo) {
   const short = secrets.filter((v) => v.value.length < MIN_SECRET_LENGTH);
   if (!cfg.local && !cfg.shared) notes.push(`${SHARED_FILE}・${LOCAL_FILE} がないため、探す値がありません`);
   else if (!cfg.local) notes.push(`${LOCAL_FILE} がないため、共有の設定にある秘密情報だけを探しました`);
-  notes.push(`秘密情報 ${scanned.length} 件を ${SCAN_DIRS.join('/')} の成果物から探しました`);
+  const dirs = [...SCAN_DIRS, ...skillDirs(repo)];
+  notes.push(`秘密情報 ${scanned.length} 件を ${SCAN_DIRS.join('/')} の成果物と skills(${skillDirs(repo).join('/')})から探しました`);
   if (short.length) notes.push(`${MIN_SECRET_LENGTH} 文字未満の秘密情報 ${short.length} 件は探していません(${short.map((v) => `${v.env}:${v.key}`).join(', ')})`);
-  const findings = scan(repo, scanned, SCAN_DIRS).map((h) => ({
+  const isSkill = (rel) => skillDirs(repo).some((d) => rel === d || rel.startsWith(`${d}/`));
+  const findings = scan(repo, scanned, dirs).map((h) => ({
     file: h.rel,
-    message: `秘密情報(環境 ${h.env} の ${h.key})の値が書かれています。値を消して <env:${h.key}> で参照する(テストコードは tests/helpers/env.ts の envValue('${h.key}'))`,
+    message: isSkill(h.rel)
+      ? `秘密情報(環境 ${h.env} の ${h.key})の値が skill に書かれています。資格情報を変更し、skill の共有と履歴を確かめる。skill は値を持たず、検証環境の情報か資格情報の参照名から受け取る(00 ■外部操作 skill の条件2)`
+      : `秘密情報(環境 ${h.env} の ${h.key})の値が書かれています。値を消して <env:${h.key}> で参照する(テストコードは tests/helpers/env.ts の envValue('${h.key}'))`,
   }));
   return { findings, notes };
 }

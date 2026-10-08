@@ -39,7 +39,7 @@
 //   skills_in_sync             tools/build-skills/build-skills.mjs --check を呼ぶ
 //   prohibition_recheck        作業20の前は tools/checks/prohibited-ops.mjs --compare を呼ぶ。作業20のあとは prohibition_check: ok を確かめる
 //   env_restored               skill restore-golden-image 同梱の Test-EnvRestoreMarker.ps1 を呼ぶ(PowerShell が必要)
-//   env_value_leak             秘密情報(config/environments*.json の kind: secret)の値が成果物に書かれていない
+//   env_value_leak             秘密情報(config/environments*.json の kind: secret)の値が成果物と skills(.github/skills・.kiro/skills)に書かれていない
 //   env_value_hardcoded        接続先(kind: endpoint)の値がテストコードにそのまま書かれていない
 
 import fs from 'node:fs';

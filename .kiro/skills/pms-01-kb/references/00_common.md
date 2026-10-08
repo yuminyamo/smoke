@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-08 / 版: v23(低価格モデル対応 段3 IDE 内のループ: ■進行役と記録の道具に実行形態の表(B2 主・B1 副・それぞれが向く場面)と、フックなしで正しさを保つ仕組みの表を加えた。B1 を、入口のエージェント `pms-runner` がカードごとにサブエージェント(カードの種類のエージェント)を起こす形にした。フックは使わない。前版 v22 は 2026-10-08 の段2 スクリプト実行(`pms run`・パートCのカード・`pms report`・`pms stats`))
+改訂: 2026-10-08 / 版: v24(作業02の画面操作の手段と skill の資格情報: ■進行役と記録の道具の規則 R-PMS-1〜5 がカードの規則であることと、カードを使わない作業(01・02・15・20・30 と作業10のカード以外の工程)の画面操作は playwright-cli で行うことを書いた。■外部操作 skill の条件に、資格情報の値を skill に書かない(条件2)を加え、lint `env_value_leak` の対象に skills を加えた。前版 v23 は 2026-10-08 の段3 IDE 内のループ)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -63,7 +63,7 @@
 
 ## ■ 進行役と記録の道具(pms)
 
-手順の正しさを、「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らないために、**進行役 `tools/pms/pms.mjs`(以下 pms)が、順序・記録・集計・完了判定を受け持つ。** AIは、pms が出すカードの判断だけを行う。この版では、作業10のフェーズA(初期状態の準備)とパートC(探索的実行・報告の所見。`stages.md` §10)に使う。工程0・パートA・パートB・パートR・パートP、作業15・20・30はこれまでどおりチャットの skill が行う。
+手順の正しさを、「長い会話の中でAIが規則を覚えていること」と「AIが自分で記録すること」に頼らないために、**進行役 `tools/pms/pms.mjs`(以下 pms)が、順序・記録・集計・完了判定を受け持つ。** AIは、pms が出すカードの判断だけを行う。この版では、作業10のフェーズA(初期状態の準備)とパートC(探索的実行・報告の所見。`stages.md` §10)に使う。工程0・パートA・パートB・パートR・パートP、作業01・02・15・20・30はこれまでどおりチャットの skill が行い、画面操作は playwright-cli で直接行う(カードがないので `pms act` は使えない。下の R-PMS-1〜5 はカードの規則であり、これらには当てはまらない)。
 
 この道具が拠る原則(`docs/94 低価格モデル対応 検討.md` §3 のうち、この版で効くもの):
 
@@ -96,6 +96,8 @@
 | 作業10の開始時の事実 | `work/_flows/F-<番号>/stage10-context.json`(工程0〜パートBの結果。書式 `procedure/schemas/stage10-context.json`) | チャットの作業10 |
 | カードの出力 | `work/_flows/F-<番号>/out/C-<番号>.json` | AI |
 | pms の設定 | `config/pms.json`(各自。git に入れない。見本 `config/pms.sample.json`) | 人間 |
+
+次の規則(R-PMS-1〜5)は、pms のカードで行う作業(作業10のフェーズA・パートC)の規則である。カードを使わない作業・工程の画面操作は playwright-cli で行う(この節の冒頭)。
 
 - **[R-PMS-1]** 画面操作は必ず `pms act` で行う。playwright-cli を直接呼ばない(直接呼んだ操作は記録に残らず、その操作を含む提出は不合格になる)
 - **[R-PMS-2]** 記録(setup-log・探索記録・申し送り台帳・外部操作需要リスト・状態需要リスト・DISC・手順改善台帳・報告書・status.yaml)を書かない。pms が提出の合格時に書く。AIが記録として書くのは、カードが指定するファイルへの出力の JSON だけである(KB・テストコードはカードの指示どおりに書く)
@@ -509,8 +511,13 @@ waitUntil(condition, options)
 
 理由: 回帰テストは実行時にAIを使わない(§20)。探索時にAIが skill を使えても、テストコードから呼べなければ回帰テストにならない。`tests/external/` のラッパは、この実行体を呼ぶだけにする。
 
+2. **資格情報(パスワード・接続文字列・API キーなど)の値を skill に書かないこと。** SKILL.md・同梱の実行体・参照ファイルのどこにも値を持たず、検証環境の情報(`tools/env/env.mjs`。■検証環境の情報)か、リモートコマンドの資格情報の参照名(値は各自のパソコンに暗号化して保存する。`docs/003_リモートコマンド整備方針.html`)から受け取る
+
+理由: skill は git で配られ、AIも人間も全文を読む。値を書くと、配った先・履歴・AIのセッションの記録のすべてに残る。lint `env_value_leak` が、各自の設定にある秘密情報の値を生成先の skills(`.github/skills/`・`.kiro/skills/`)からも探す。
+
 - 条件の確認は、**作業10(skill を使って操作を確立するとき)と作業20(コード生成の前)**で行う
-- 条件を満たさない skill は「使える skill がない」と同じに扱い、外部操作需要リストに不足の区分 `実行体なし` で記録する
+- 条件1を満たさない skill は「使える skill がない」と同じに扱い、外部操作需要リストに不足の区分 `実行体なし` で記録する
+- 条件2を満たさない skill(資格情報の値が書かれているもの)を見つけたら、**値を成果物・報告書・チャットに書き写さず**、skill の名前とファイルだけを報告書に書いて人間に知らせる(資格情報の変更と skill の修正は人間が行う。AIは skill を直さない)。知らせたうえで作業は続けてよい(止めるかどうかは人間が決める)
 - **別のマシンで実行する外部操作(リモートコマンド)を使う skill の実行体は、CLI 本体 `tools/remote/pms-remote.ps1` を呼ぶ入口である**(例: `restore-golden-image`・`collect-server-logs`)。`tests/external/` のラッパも、同じ CLI を `tests/external/remote.ts` 経由で呼ぶ。AIは JEA・`Invoke-Command` を直接呼ばず、CLI の `deploy`・`cred-set` と配置用(管理者)の資格情報を使わない。リモートコマンドの整備(人間が行う)は、リモートコマンドの整備方針 `docs/003_リモートコマンド整備方針.html` に従う
 
 <!-- protected:PROHIBITED_OPS -->
@@ -1175,7 +1182,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `skills_in_sync` | ERROR | 生成した skills が、正本から再生成した結果と一致する(手編集がない)。skill に同梱された保護ブロックが正本と一字一句一致する。実装: `node tools/build-skills/build-skills.mjs --check`(`tools/lint/lint.mjs` からも呼ぶ) |
 | `env_restored` | ERROR | 作業10・20の status.yaml に `env_restore.restore_id` があり、復元記録(`work/_common/env-restore-log.jsonl`)に成功として存在し、目的が作業と一致し、他の作業と重複せず、起動確認の方法(`readiness`)が復元記録と矛盾しない(起動確認テストがなかった復元は `human`)。実装: skill `restore-golden-image` 同梱の `Test-EnvRestoreMarker.ps1`(`tools/lint/lint.mjs` からも呼ぶ。PowerShell がない環境では未実行と表示する) |
 | `prohibition_recheck` | ERROR | 作業20の開始前に、作業10の status.yaml の `prohibited_ops.digest` と現在の禁止操作リストが照合されている。`blocked_by_prohibition` があるのに版が変わっていれば作業20を起動しない(作業10のパートPへ戻す)。実装: `node tools/checks/prohibited-ops.mjs --compare <作業10の status.yaml>`(終了コード 0 / 3 / 2)。`tools/lint/lint.mjs` は、作業20の前のフローではこれを呼び、作業20まで進んだフローでは作業20の status.yaml の `prohibition_check: ok` を確かめる |
-| `env_value_leak` | ERROR | 検証環境の情報の秘密情報(種類 `secret`)の値が、成果物(`work/`・`kb/`・`logs/`・`tests/`・`traceability/`)に書かれていない。設定ファイルの形が正しい。実装: `tools/lint/lint.mjs`(値は `tools/env/` と同じ読み方で読む。6文字未満の値は探さない) |
+| `env_value_leak` | ERROR | 検証環境の情報の秘密情報(種類 `secret`)の値が、成果物(`work/`・`kb/`・`logs/`・`tests/`・`traceability/`)と skills(`procedure/skills.config.json` の生成先。`.github/skills/`・`.kiro/skills/`。■外部操作 skill の条件2)に書かれていない。設定ファイルの形が正しい。実装: `tools/lint/lint.mjs`(値は `tools/env/` と同じ読み方で読む。6文字未満の値は探さない) |
 | `env_value_hardcoded` | WARNING | テストコード(`tests/`)に、検証環境の情報の接続先(種類 `endpoint`)の値がそのまま書かれていない(`envValue` で読む)。実装: `tools/lint/lint.mjs` |
 | `requires_in_state_set` | ERROR | 作業10の対象シナリオ(探索記録のあるもの)の `requires` の全状態が初期状態セット(`vocab.initial_state_set` と、状態需要リストで状態が `採用` / `整備済` の行)にある。申し送り台帳の想定手段が参照する需要ID(`SD-...`)が状態需要リストにある。状態需要リストの需要IDが重複しない。実装: `tools/lint/lint.mjs` |
 | `requires_covered` | ERROR | 作業10: 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある。作業20: コード化した全シナリオの `requires` の全状態に、established check を持つ fixture がある(`S-CLEAN-ENV` は復元そのものなので除く)。実装: `tools/lint/lint.mjs` |

@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-08 / 版: v21(低価格モデル対応 段3 IDE 内のループ: 手順版を proc-v019 に更新、pms_runner の b1 を IDE 内のループ(入口のエージェント pms-runner がカードごとにサブエージェントを起こす)に書き直した)
+# 改訂: 2026-10-08 / 版: v22(作業02の画面操作の手段と skill の資格情報: 手順版を proc-v020 に更新、external_op.skill_requirement に no_credentials を追加)
+#       2026-10-08 / 版: v21(低価格モデル対応 段3 IDE 内のループ: 手順版を proc-v019 に更新、pms_runner の b1 を IDE 内のループ(入口のエージェント pms-runner がカードごとにサブエージェントを起こす)に書き直した)
 #       2026-10-08 / 版: v20(低価格モデル対応 段2 スクリプト実行: 手順版を proc-v018 に更新、pms_card_kind に explore.step・explore.close・explore.session_close・report.findings、pms_card_status に skipped、pms_reject_kind に expected_changed・verdict_evidence・health_time・blocked_refs、pms_act_action に screenshot、pms_runner・pms_stop_reason・discrepancy_kind・discrepancy_assessment・reflection_target を追加)
 #       2026-10-07 / 版: v19(低価格モデル対応 段1 共通の土台: 手順版を proc-v017 に更新、pms_card_kind・pms_card_status・pms_reject_kind・pms_act_action・locator_class・pms_vague_words・id_format.card・id_format.rule を追加)
 #       2026-10-06 / 版: v18(setup-log の記録の強化: 手順版を proc-v016 に更新)
@@ -37,7 +38,7 @@
 meta:
   step: 1                       # 本語彙が対象とするステップ
   revision: "2026-10-08"
-  procedure_version: proc-v019  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  procedure_version: proc-v020  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -253,6 +254,7 @@ external_op:
     VM: 検証環境の仮想マシンと Hyper-V ホスト(ゴールデンイメージの復元。skill restore-golden-image 経由でのみ操作する)
   skill_requirement:            # 外部操作 skill に求める条件(00 ■外部操作 skill の条件)
     executable: コードから呼べる実行体(CLI・スクリプト)を同梱していること。非対話で起動でき、成否を機械的に判定できること
+    no_credentials: 資格情報(パスワード・接続文字列・API キーなど)の値を skill のどのファイルにも書かないこと。検証環境の情報か、リモートコマンドの資格情報の参照名から受け取る(lint env_value_leak)
 
 ext_demand_status:              # 外部操作需要リスト(テンプレート93)の行の状態
   未整備: 回帰テストに使える skill がない(理由は ext_gap)

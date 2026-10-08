@@ -141,7 +141,7 @@ switch (cmd) {
     const sel = selectEnv(cfg, opt.env);
     if (!sel.env) bail('環境が決まりません。--env <環境ID> を付けてください(新しい環境ならその名前で作ります)');
     const cur = cfg.envs.get(sel.env)?.attributes.get(key);
-    const kind = opt.kind ?? cur?.kind ?? cfg.baseKeys[key]?.kind ?? null;
+    const kind = opt.kind ?? cur?.kind ?? cfg.baseKeys[key]?.kind ?? cfg.optionalKeys[key]?.kind ?? null;
     if (!kind) bail(`${key} は新しいキーです。--kind ${cfg.kinds.join('|')} を付けてください`);
     const target = opt.target ?? (kind === 'secret' ? 'local' : 'shared');
     const rel = setValue(ROOT, { env: sel.env, key, value, kind, forceKind: Boolean(opt.kind), description: opt.description, target });

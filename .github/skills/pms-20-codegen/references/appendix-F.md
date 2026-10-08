@@ -87,7 +87,8 @@ export default async function globalTeardown() {
 - **接続先・アカウント・パスワードなどの環境情報をコードに直接書かない。** `tests/helpers/env.ts` の `envValue('<キー>')` で読む(00 ■検証環境の情報。lint `env_value_leak` / `env_value_hardcoded`)。探索記録の `<env:キー>` は `envValue('<キー>')` に置き換える
 - `envValue` は `tools/env/env.mjs get` を呼ぶだけにする(環境の選び方・各自の設定による上書きを1か所で決めるため)。使う環境は環境変数 `PMS_ENV` で切り替える(未指定なら設定の既定)。値がないときは例外で失敗させる(黙って空文字で進めない)
 - `playwright.config.ts` の `baseURL` も `envValue('pms.url')` から取る
-- DB への接続(`tests/helpers/invariants.ts` など)は、サーバ名・DB名を `envValue('db.server')` / `envValue('db.name')` から取り、サーバ証明書の検証は環境情報の `db.trust_server_certificate` に従う(00 ■DB への接続 [R-DB-1])。`true` または未登録なら `trustServerCertificate: true`、`false` なら検証する。**このキーだけは未登録を既定値(`vocab.env_optional_keys`)で補い**、`envValue` の例外で失敗させない
+- DB への接続(`tests/helpers/invariants.ts` など)は、サーバ名・DB名を `envValue('db.server')` / `envValue('db.name')` から取り、サーバ証明書の検証は環境情報の `db.trust_server_certificate` に従う(00 ■DB への接続 [R-DB-1])。`true` または未登録なら `trustServerCertificate: true`、`false` なら検証する
+- DB へのログインは環境情報の `db.auth` に従う(00 ■DB への接続)。`sql` なら `envValue('db.user')` / `envValue('db.password')` で SQL Server 認証、`windows` または未登録なら実行するアカウントの Windows 認証(Node の `mssql` では `msnodesqlv8` ドライバの `trustedConnection: true`)。**`db.trust_server_certificate` と `db.auth` は未登録を既定値(`vocab.env_optional_keys`)で補い**、`envValue` の例外で失敗させない
 
 ```typescript
 // tests/helpers/env.ts — 検証環境の情報を読む(00 ■検証環境の情報)。値は config/environments*.json にあり、コードには書かない

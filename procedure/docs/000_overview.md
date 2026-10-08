@@ -238,6 +238,30 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 
 # 改訂履歴
 
+## 34. 2026-10-08 改訂(DB への接続を `pms db` に集約)— 手順版 proc-v024
+
+**人間の指示による改訂である。** `node tools/pms/pms.mjs run --flow F-001` が `explore.close` のカードで `STOP`(`cannot_proceed: DB不変条件の検査に必要な認証確認とSELECTを実行できなかったため。探索記録上、機器グループの説明変更手順はマニュアルに記載がない。`)になった。発生環境で調べたところ、カードの AI が DB の接続情報を確かめるために `node env.mjs get db.server` などを含むコマンドを実行し、`config/pms.json` の使用禁止 `shell(node tools/env/env.mjs get:*)` に当たって拒否されていた。人間の指示は、提案した案(`pms db` の新設とそれに合わせる改訂)で手順を直すこと。DB の認証は混合モード(Windows 認証と SQL Server 認証のどちらも使える)である。
+
+**原因**: カードは DB を確かめるよう求めていたが、接続先とログインを知る手段がカードになかった。33.3 で「カードを行う AI は `env.mjs get` を使えないため」pms が「DB の接続」の行を作るとしたが、行に書いたのはサーバ証明書の扱いだけで、`db.server`・`db.name` の値も、ログインの方式も書かなかった。Copilot CLI の使用禁止のパターンは `--reveal` の有無を分けられないため、`get` 全体が止まっている(正本 `agents.yaml` の意図は `--reveal` だけの禁止)。また、DB のログインの方式(Windows 認証か SQL Server 認証か)が手順書と環境情報のどこにも決まっていなかった。SQL Server 認証ならパスワードが要り、[R-ENV-2] によりAIは取り出せない。理由の文の後半(マニュアルの記載)は同じカードの別の出力 `manual_gap`(R-EXP-18)の補足であり、止まった原因ではない。
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 34.1 | **`pms db` を足した。** `node tools/pms/pms.mjs db [--flow F --card C --intent "<確かめること>"] -- "<SELECT 文>"`。接続先・ログイン・サーバ証明書の扱いを環境情報から決めて sqlcmd を呼ぶ(パスワードは環境変数で渡す)。実行の前に接続先(`@@SERVERNAME`・`DB_NAME()`・`SUSER_SNAME()`)を確かめて返し、`DB_NAME()` が `db.name` と違えば実行しない。SELECT(`WITH … SELECT`)を1文だけ受け付け、書き込み・DDL・手続き・`SELECT INTO`・複数の文・sqlcmd のコマンドは止める。受け付けた文もトランザクションの中で実行して取り消す。カードを付ければ記録 `db-log.jsonl` に1行書く。`--check` は接続先の確認だけをする | tools/pms(`lib/db.mjs`・`pms.mjs`・`lib/config.mjs` の `db_cli`・README 2.7・テスト `db.test.mjs`・偽物 `stub-sqlcmd.mjs`) |
+| 34.2 | **環境情報の任意キー `db.auth`(`windows` / `sql`。既定 `windows`)・`db.user`(account)・`db.password`(secret)を加えた。** 混合モードのサーバでどちらの方式を使うかは人間が環境ごとに決める。`env.mjs` は任意キーの種類も補う(`set db.password` に `--kind` が要らない) | vocab / tools/env / config/environments.sample.json |
+| 34.3 | **00 ■DB への接続 を書き直し、[R-DB-2](DB への SELECT は `pms db` で行う・sqlcmd を直接呼ばない・接続情報を調べない・失敗の `reason` ごとの扱い)を加えた。** [R-DB-1] は、証明書の検証の無効化を `pms db` とテストコードが行う形に書き改めた(人間の承認の意味は変えていない)。■進行役と記録の道具 の道具・記録・使用禁止の表に `pms db`・db-log・sqlcmd を足した | 00 |
+| 34.4 | **カード explore.step・explore.close・explore.session_close の「DB の接続」の行を、`pms db` の使い方と、接続先・ログインの方式・証明書の扱いを書く行にした**(パスワードは書かない。環境情報が足りなければそのことも書く)。3枚に [R-DB-2] を差し込んだ。カードのエージェントの本文に「DB の確認は `pms db` だけで行う」を足した | cards / agents.yaml / tools/pms(`dbConnection` を `lib/db.mjs` へ移した) |
+| 34.5 | **`pms run` のカードのセッションで sqlcmd の直接の呼び出しを使用禁止にした** | agents.yaml の `deny_shell` / config/pms.sample.json の `runner.copilot.deny` |
+| 34.6 | **作業10の工程0で DB への接続を確かめるようにした**(`pms db --check`。パートCのカードが探索を終えてから接続できずに止まることをなくす)。失敗は `reason` で分け、`env_missing` は足りない環境情報の確認と同じく人間に聞く。`connect_failed`・`target_mismatch` は作業を始めず、メモ欄に「DB 接続不可」と書いて止まる。入口 skill に「DB 接続不可」の続きの判定・管理者の判断・伝え方を足した | stages §10 / router |
+| 34.7 | 作業01(S3)・02(工程2)・15 の DB の観測を `pms db` で行うと書いた。付録F にテストコードの DB のログインの方式(`db.auth`)を書いた | stages |
+| 34.8 | 手順版を `proc-v024` に更新 | vocab |
+
+### 変更していないもの
+
+- 保護ブロック(`DB_SAFETY`・`PROHIBITED_OPS`・`HUMAN_APPROVAL`・`INV_NO_RETRY`)・`pipeline.dot` は変更していない。`pms db` は DB_SAFETY(テスト環境のDBのみ・SELECT のみ・接続先の確認と記録)を道具で満たすものである
+- `env.mjs get` の使用禁止(Copilot CLI では `get` 全体)は残した。カードが要る環境情報は、AIが調べなくても済むように pms がカードに書くか、pms の道具が取り出す
+- `explore.close` の出力の形(`invariants` の `未実施(理由)` と `cannot_proceed`)は変えていない。DB に接続できないときは、これまでどおり `cannot_proceed` で人間の確認待ちにする(接続の問題は環境の問題であり、未実施のまま進めると作業20のテストコードの DB 接続も同じく失敗するため)。工程0の `--check` で、探索の前に見つける
+- 止まった F-001 のカードは、環境情報(`db.auth` など)を整えてから `pms reopen` で戻す(人間の操作)
+
 ## 33. 2026-10-08 改訂(DB への接続のサーバ証明書)— 手順版 proc-v023
 
 **人間の指示による改訂である。** `node tools/pms/pms.mjs run --flow F-001` で、カードが `cannot_proceed`(「SQL Server接続の事前確認が証明書チェーンを信頼できないTLSエラーで失敗した。検証用DBでも証明書検証を無効化する承認がないため-Cを使えず、説明変更とDB照合を実施できない」)で止まった。人間の指示は、どの指示が効いたかを調べ、証明書の検証を無効にする承認の指定先がなければ設定を設けること、既定は無効化を承認とすること。

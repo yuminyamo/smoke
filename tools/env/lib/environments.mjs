@@ -34,11 +34,11 @@ export const FALLBACK_KINDS = ['endpoint', 'account', 'secret', 'other'];
 
 export class EnvError extends Error {}
 
-/** vocab.yaml の env_attr_kind(属性の種類)と env_base_keys(基本キー) */
+/** vocab.yaml の env_attr_kind(属性の種類)と env_base_keys(基本キー)・env_optional_keys(任意キー。種類の補完にだけ使い、require では確かめない) */
 export function readVocab(root) {
   const rel = 'procedure/vocab.yaml';
   const p = path.join(root, rel);
-  if (!fs.existsSync(p)) return { kinds: FALLBACK_KINDS, baseKeys: {} };
+  if (!fs.existsSync(p)) return { kinds: FALLBACK_KINDS, baseKeys: {}, optionalKeys: {} };
   let v;
   try { v = parseYaml(fs.readFileSync(p, 'utf8')); } catch (e) { throw new EnvError(`${rel} を読めません — ${e.message}`); }
   const kinds = Object.keys(v?.env_attr_kind ?? {});
@@ -46,7 +46,11 @@ export function readVocab(root) {
   for (const [k, def] of Object.entries(v?.env_base_keys ?? {})) {
     baseKeys[k] = { kind: String(def?.kind ?? 'other'), description: def?.description != null ? String(def.description) : '' };
   }
-  return { kinds: kinds.length ? kinds : FALLBACK_KINDS, baseKeys };
+  const optionalKeys = {};
+  for (const [k, def] of Object.entries(v?.env_optional_keys ?? {})) {
+    optionalKeys[k] = { kind: String(def?.kind ?? 'other'), description: def?.description != null ? String(def.description) : '' };
+  }
+  return { kinds: kinds.length ? kinds : FALLBACK_KINDS, baseKeys, optionalKeys };
 }
 
 /** 1つの設定ファイルを読む。ない場合は null */
@@ -113,7 +117,7 @@ function normAttr(a) {
  * @returns {{ shared, local, errors: string[], envs: Map<string, {description, sources: string[], attributes: Map<string, {kind, value, description, source}>}>, defaults: {shared, local} }}
  */
 export function load(root) {
-  const { kinds, baseKeys } = readVocab(root);
+  const { kinds, baseKeys, optionalKeys } = readVocab(root);
   const shared = readFile(root, SHARED_FILE);
   const local = readFile(root, LOCAL_FILE);
   const errors = [...validate(shared, SHARED_FILE, kinds), ...validate(local, LOCAL_FILE, kinds)];
@@ -135,15 +139,16 @@ export function load(root) {
       }
     }
   }
-  // kind の補完: 設定になければ基本キーの定義、それもなければ other
+  // kind の補完: 設定になければ基本キー・任意キーの定義、それもなければ other
   for (const e of envs.values()) {
     for (const [key, a] of e.attributes) {
-      if (!a.kind) a.kind = baseKeys[key]?.kind ?? 'other';
-      if (a.description === undefined && baseKeys[key]?.description) a.description = baseKeys[key].description;
+      const def = baseKeys[key] ?? optionalKeys[key];
+      if (!a.kind) a.kind = def?.kind ?? 'other';
+      if (a.description === undefined && def?.description) a.description = def.description;
     }
   }
   return {
-    kinds, baseKeys, shared, local, errors, envs,
+    kinds, baseKeys, optionalKeys, shared, local, errors, envs,
     defaults: { shared: shared?.default ?? null, local: local?.default ?? null },
   };
 }

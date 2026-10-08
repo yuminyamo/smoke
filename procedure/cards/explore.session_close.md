@@ -26,6 +26,7 @@ DB不変条件(`vocab.invariant`):
 {{rule:R-EXP-19}}
 {{rule:R-INV-2}}
 {{rule:R-DB-1}}
+{{rule:R-DB-2}}
 {{rule:R-INV-3}}
 {{rule:R-INV-4}}
 

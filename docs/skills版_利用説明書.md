@@ -251,8 +251,15 @@ skills版/
    node tools/env/env.mjs set db.name PMS
    node tools/env/env.mjs require                     (揃っていれば "state":"complete")
    ```
+   DB へのログインは、既定では AI を動かすアカウントの Windows 認証です。混合モードの SQL Server に SQL Server 認証でログインさせるときは、次も保存します(proc-v024。00 ■DB への接続)。読み取りだけの権限のアカウントを勧めます
+   ```
+   node tools/env/env.mjs set db.auth sql
+   node tools/env/env.mjs set db.user e2e-reader
+   node tools/env/env.mjs set db.password -           (値を標準入力から。各自の environments.local.json に入る)
+   node tools/pms/pms.mjs db --check                  (接続先のサーバ名・DB名・ログイン名が出れば "ok":true)
+   ```
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
-10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります
+10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`)。`sqlcmd` で呼べないときは `db_cli` を直します
 11. **AI の CLI を導入する**(proc-v018 以降。`pms run` が使う)。Copilot CLI(`copilot`)か Kiro CLI(`kiro-cli`)を導入して認証し、組織の設定で利用が許可されていることを管理者が確かめます(Copilot CLI はトークン `COPILOT_GITHUB_TOKEN` などでも認証できます。Kiro CLI の非対話の実行には `KIRO_API_KEY` が要ります)。`config/pms.json` に、見本 `config/pms.sample.json` の `runner`・`default_runner`・`cardTypes` を写し、使うモデル(`cardTypes.<種類>.model`)と1枚の上限時間(`runner.<名前>.timeoutSec`)を決めます。呼び出しの雛形は公式のドキュメントで確かめたフラグで書いてありますが、実物では確かめていません。`node tools/pms/pms.mjs run --flow <フローID> --dry-run` で、起こすコマンドを実行せずに確かめられます(`tools/pms/README.md` 13章の「実物で確かめること」)。カードの種類ごとのエージェントは `.github/agents/`・`.kiro/agents/` に生成済みです。課金の数え方(AI credits か premium requests か)は組織の契約で確かめてください(カード1枚が1回の依頼になります)
 12. **チャットで進める準備をする**(proc-v019 以降。`pms-runner` を使う人がいるとき)。`.github/agents/pms-runner.agent.md`・`.kiro/agents/pms-runner.json` と `pms-card-*` は生成済みなので、置くだけで使えます(直接編集しない)。管理者が次を確かめます
    - VS Code: チャットの Agent のドロップダウンに `pms-runner` が出るか。組織の設定でカスタムエージェントとサブエージェントが許可されているか
@@ -266,6 +273,7 @@ skills版/
    - ログ収集: `collect-server-logs` の実行体を `-InfoOnly` で動かし、PMS サーバーVM の窓口・ツール・マスクの指定が揃っているか
    - lint: `node tools/lint/lint.mjs` が動き、`skills_in_sync` が OK になるか(フローがまだなければ、他の規則は検査する成果物がないので OK になります)
    - 進行役: `node --test tools/pms/test/` が通るか。実物の playwright-cli で `pms act` が動くかは、手元の HTML で確かめます(`tools/pms/README.md` 8章の前提。確かめ方は改訂の完了報告にあります)
+   - DB: `node tools/pms/pms.mjs db --check` が `"ok":true` になり、`target` に検証環境の DB が出るか(作業10も開始時に同じことを確かめます)
    - 環境情報: `node tools/env/env.mjs check` が `"ok":true` になるか。登録した場合は `require` が `"state":"complete"` になるか。`git check-ignore config/environments.local.json` で各自の設定が git の無視の対象になっているか
    - フック: skills のファイルに1文字足してコミットしようとすると止められるか(確かめたら元に戻す)
    - チャットで進める(使う人がいるとき): `pms-runner` に切り替えて小さなフローのカードを進め、カードごとにサブエージェントが起動するか、`node tools/pms/pms.mjs stats --flow <フローID>` で実行形態 `b1` として数えられるか
@@ -338,6 +346,7 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 | 場面 | 対応 | 手順書の根拠 |
 |---|---|---|
 | 要許可操作で止まった(作業10・作業15) | 許可するか、今回は見送る(申し送り)かを決め、メンバーに伝える | 00 ■人間の承認が必要な例外 |
+| 作業の開始時に「データベースに接続できない」と止まった(proc-v024) | 止まった理由(ログインの失敗・証明書・接続先の違い)を見て、ログインの方式(`db.auth`)・アカウント(`db.user`・`db.password`)・証明書の扱い(`db.trust_server_certificate`)を `env.mjs set` で直すか、DB 側の権限を直す。`node tools/pms/pms.mjs db --check` で確かめてからメンバーに伝える | 00 ■DB への接続 |
 | 作業の開始時に「開始前シナリオが失敗した」と止まった | 機器・環境・シナリオ・設定(`config/pre-stage-scenarios.json`)のどれが原因かを確かめて直し、メンバーに伝える。今回は外す場合は設定から外す | 00 ■回帰実行の環境前提 開始前シナリオ |
 | DB不変条件の違反で止まった | 不具合として起票して続けるか、中断するかを決める | 00 ■DB不変条件 |
 | 状態カタログ(作業30)でデータ変更の許可を求められた | 許可する範囲を決める | stages §30 フェーズ2 |
@@ -375,7 +384,7 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 - pre-commit フックが検査するのは作業ツリーの内容です。正本を直して再生成したら、再生成した skills も同じコミットに含めてください。また、フックは各自が有効にする必要があります(8. の4)
 - lint は、成果物の YAML を簡易的なパーサで読みます。アンカー・エイリアス・タグは使えません。読めないファイルは「成果物の読み取り」の ERROR として出ます
 - 検証環境の情報の秘密情報(パスワードなど)は、各自のパソコンの `config/environments.local.json` に**平文で**保存されます。ファイルの扱いに注意してください。AIはその値を自分では取り出しません。ログインなどで値が要る画面操作は、`<env:キー>` のまま進行役の `pms act`(カード)か `pms pwcli`(カードを使わない作業)に渡し、道具が値を入力して出力からも伏せます(proc-v021 以降)。ただし AI の道具の設定で `env.mjs get --reveal` を止めていない場合、規則に反して取り出すこと自体は防げません。リモートコマンドのクライアント設定 `config/remote-targets.json`(Hyper-V ホスト・PMS VM の接続先)は、検証環境の情報とは別のファイルです。こちらは資格情報を参照名で持ち、値は各自のパソコンに DPAPI で暗号化して保存します(`pms-remote.ps1 cred-set`)
-- 進行役(`tools/pms/`)のカードで行うのは、proc-v018 では作業10のフェーズA(前提状態の準備)とパートC(探索と報告の所見)です。工程0・シナリオの作成(パートB)・作業01・02・15・20・30は、これまでどおりチャットの skill が行います(画面操作は `pms pwcli` を通して playwright-cli を使います。パスワードを `<env:キー>` のまま入力できるようにするためです。proc-v021 で変更)。`pms run` が起こすセッションで playwright-cli の直接の呼び出し・秘密情報の取り出し・手順書への書き込みを禁止するパターンは、CLI の実物で効くかを確かめていません(`tools/pms/README.md` 13章)。効かなくても、記録を通らない操作を含む提出は不合格になります
+- 進行役(`tools/pms/`)のカードで行うのは、proc-v018 では作業10のフェーズA(前提状態の準備)とパートC(探索と報告の所見)です。工程0・シナリオの作成(パートB)・作業01・02・15・20・30は、これまでどおりチャットの skill が行います(画面操作は `pms pwcli` を通して playwright-cli を使います。パスワードを `<env:キー>` のまま入力できるようにするためです。proc-v021 で変更)。DB の確認は、カードでもチャットでも `pms db` が行います(接続先とログインを AI が調べずに済むようにするためです。proc-v024 で変更)。`pms run` が起こすセッションで playwright-cli・sqlcmd の直接の呼び出し・秘密情報の取り出し・手順書への書き込みを禁止するパターンは、CLI の実物で効くかを確かめていません(`tools/pms/README.md` 13章。`env.mjs get` の禁止が Copilot CLI で効くことは F-001 で確かめられました)。効かなくても、記録を通らない操作を含む提出は不合格になります
 - `pms run` はカードごとに新しいセッションを起こすので、カードの枚数だけ AI への依頼が増えます(探索はシナリオのステップごとに1枚)。課金の数え方によっては、チャットで行うより費用がかかることがあります
 - `pms run` の lint で指摘が残ったとき(lint 止まり)、指摘を直すのはチャットの作業10です(直すカードはまだありません)
 - チャットで進める(`pms-runner`)ときは、IDE の道具の設定で playwright-cli の直接の呼び出しを止められないことがあります(VS Code のエージェントの道具はコマンドごとに絞れません)。直接呼んだ操作は記録に残らないため、その操作を含む提出は不合格になり、AIがやり直します(記録が誤ることはありませんが、やり直しの分だけ時間がかかります)。フックは使っていません

@@ -1,7 +1,7 @@
 {
   "name": "pms-card-setup-build",
-  "description": "作業10フェーズA: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめて提出する(手順版 proc-v023。正本 procedure/cards/agents.yaml から生成。直接編集しない)",
-  "prompt": "あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。\n\n1. 依頼文が示すカードのファイル(work/_flows/F-<番号>/cards/C-<番号>.md)を読む。依頼文にカードがなければ `node tools/pms/pms.mjs next --flow <フローID>` が出したカードを読む\n2. カードの指示どおりに行う。画面操作はカードが示す `pms act` だけで行い、playwright-cli を直接呼ばない\n3. カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)で提出する\n4. 提出が不合格なら、返された理由のところだけを直して再提出する。合格したら終わる\n5. カードの外の作業をしない(次のカードを取りに行かない・記録や台帳・手順書を直接書き換えない)。カードの範囲で判断できないときは、出力の result を cannot_proceed にして理由を書き、提出する\n",
+  "description": "作業10フェーズA: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめて提出する(手順版 proc-v024。正本 procedure/cards/agents.yaml から生成。直接編集しない)",
+  "prompt": "あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。\n\n1. 依頼文が示すカードのファイル(work/_flows/F-<番号>/cards/C-<番号>.md)を読む。依頼文にカードがなければ `node tools/pms/pms.mjs next --flow <フローID>` が出したカードを読む\n2. カードの指示どおりに行う。画面操作はカードが示す `pms act` だけで行い、playwright-cli を直接呼ばない。DB の確認はカードが示す `pms db` だけで行い、sqlcmd を直接呼ばない\n3. カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)で提出する\n4. 提出が不合格なら、返された理由のところだけを直して再提出する。合格したら終わる\n5. カードの外の作業をしない(次のカードを取りに行かない・記録や台帳・手順書を直接書き換えない)。カードの範囲で判断できないときは、出力の result を cannot_proceed にして理由を書き、提出する\n",
   "tools": [
     "*"
   ],
@@ -14,6 +14,7 @@
           "npx playwright-cli *",
           "npx @playwright/cli *",
           "node tools/env/env.mjs get *--reveal*",
+          "sqlcmd *",
           "node tools/pms/pms.mjs pwcli *",
           "npx *"
         ],
@@ -39,6 +40,7 @@
         "npx playwright-cli *",
         "npx @playwright/cli *",
         "node tools/env/env.mjs get *--reveal*",
+        "sqlcmd *",
         "node tools/pms/pms.mjs pwcli *",
         "npx *"
       ]

@@ -6,7 +6,7 @@ tools: ["execute", "agent"]
 agents: ["pms-card-setup-build", "pms-card-setup-code", "pms-card-setup-reuse", "pms-card-explore-step", "pms-card-explore-close", "pms-card-explore-session-close", "pms-card-report-findings"]
 disable-model-invocation: true
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(runner)/ 手順版: proc-v023 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(runner)/ 手順版: proc-v024 / 生成: tools/build-skills/build-skills.mjs -->
 
 あなたはカードを配る係である。カードの作業は自分でしない。フローID(F-<番号>)は利用者の依頼から取る。
 

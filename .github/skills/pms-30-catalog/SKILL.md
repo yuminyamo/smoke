@@ -2,12 +2,12 @@
 name: pms-30-catalog
 description: "PMS回帰テスト作成の作業30(状態カタログ案生成)。管理者が指示したときだけ使う(複数フロー完了後)。累積した探索記録から前提状態のカタログ案を作る。フェーズ2の完了時に必ず停止する。"
 metadata:
-  procedure_version: proc-v023
+  procedure_version: proc-v024
   generated_from: "procedure/stages.md §30"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §30 / 手順版: proc-v023 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §30 / 手順版: proc-v024 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業30 状態カタログ案生成(手順版 proc-v023)
+# 作業30 状態カタログ案生成(手順版 proc-v024)
 
 この skill は、手順書の正本の `stages.md` §30 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -36,7 +36,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v023` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v024` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 

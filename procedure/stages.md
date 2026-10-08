@@ -2,7 +2,7 @@
 
 本書は**各作業に固有な内容だけ**を持つ。原則・規約は `00_common.md`、統制語彙は `vocab.yaml`、実行順序と分岐は `pipeline.dot` を参照する。**それらの再掲を本書に書かない。**
 
-改訂: 2026-10-08 / 版: v18(カードを使わない作業の秘密情報の入力: §02 工程2の画面操作を `pms pwcli` 経由にし、ログインのパスワードを `<env:キー>` のまま渡すことを書いた。前版 v17 は 2026-10-08 の作業02の画面操作の手段)
+改訂: 2026-10-08 / 版: v19(DB への接続を `pms db` に集約: 作業01・02・15の DB の観測と作業10のカードの DB の確認を `pms db` で行うことと、作業10の工程0で DB への接続を確かめること(`pms db --check`)を書いた。付録F にテストコードの DB のログインの方式(`db.auth`)を書いた。前版 v18 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
 
 ---
 
@@ -107,7 +107,7 @@
 ### S3: DB定義と蓄積データの調査
 
 - `INFORMATION_SCHEMA`(TABLES / COLUMNS / KEY_COLUMN_USAGE / REFERENTIAL_CONSTRAINTS)から、対象に関係するテーブルの定義・PK/FK・NULL可否・型を機械抽出する
-- **実際に蓄積されているデータを観測する**(`SELECT` のみ)。列の意味は定義だけでは分からないことが多い
+- **実際に蓄積されているデータを観測する**(`SELECT` のみ。`node tools/pms/pms.mjs db -- "<SELECT 文>"` で行う。00 ■DB への接続 [R-DB-2])。列の意味は定義だけでは分からないことが多い
   - 例: ステータス列に実在する値の一覧、金額列が予測系か実績系か、日時列が更新のたびに変わるか
   - 実在値の一覧は仕様書の記載と突き合わせる。**文書にあるが実データに存在しない値**(死んだenum値)、**実データにあるが文書にない値**はどちらも重要な知見
 - 機械抽出部と注記部を明確に分離し、**機械抽出部を手で編集しない**(再抽出で上書きされる前提)
@@ -270,7 +270,7 @@ context_updates:
 操作ごとに:
 
 1. **観測開始時に1回だけクリーンな状態に戻す**
-2. 操作を実行し、UI(スナップショットとスクリーンショット)とDB(変化したテーブルの行内容。`SELECT` のみ)を記録する
+2. 操作を実行し、UI(スナップショットとスクリーンショット)とDB(変化したテーブルの行内容。`SELECT` のみ。`pms db` で行う。00 [R-DB-2])を記録する
 3. **2 を復元を挟まず `vocab.default.observation_runs` 回連続で繰り返す。** 判断がつかない値があれば、その値についてのみ追加実行する
    - 蓄積の影響(件数・連番・集計値)を切り分けたい値に限り、復元を挟んだ追加観測を行ってよい。その場合「復元直後の値」と「連続実行時の値」を分けて記録する
 4. 突き合わせて判定する
@@ -451,6 +451,8 @@ context_updates:
 | 0 | `skipped`(設定なし)/ `passed` / `warning` | 作業を続ける。`warning` のときは失敗したシナリオを報告書の固有セクション1に書く |
 | 1 | `failed` | **作業を始めない。** flow.md のメモ欄に「開始前シナリオ失敗」と、失敗したシナリオと理由を書いて止まる(status.yaml は出力しない)。管理者が原因を直したら、工程0の復元からやり直す |
 | 2 | — | **作業を始めない。** 実行体の理由(設定の誤りなど)を flow.md のメモ欄に書いて止まる |
+
+**DB への接続を確かめる**(`node tools/pms/pms.mjs db --check`。00 ■DB への接続)。パートCのカードが DB を確かめる前に、接続・ログイン・接続先を1回確かめておく(探索を終えてからカードが接続できずに止まらないようにするため)。出力の `target`(サーバ名・DB名・ログイン名)を flow.md のメモ欄に残す。終了コード1のときは出力の `reason` で分ける: `env_missing` は足りない環境情報の確認(00 ■検証環境の情報)と同じく人間にまとめて聞き、`set` で保存して `--check` をやり直す。`connect_failed`・`target_mismatch` は**作業を始めない。** flow.md のメモ欄に「DB 接続不可」と `error` を書いて止まり、利用者に伝える(ログインの方式 `db.auth`・アカウント・証明書の扱いを人間が直したら、`--check` からやり直す。復元はやり直さない)。
 
 **開始前シナリオのあと、禁止操作リストの記入状態と版を照合スクリプトで取得する**(`node tools/checks/prohibited-ops.mjs`。出力の JSON の `state` と `digest`)。flow.md のメモ欄に残し、status.yaml の `prohibited_ops` に転記する。記入状態が `unfilled` / `absent` のときは禁止操作なしとして扱う(00 ■外部操作 禁止操作リストが未記入・存在しないとき)。**リストが未記入・存在しないことを理由に、シナリオやステップを `blocked` にしない。** 再開時は取り直さず、メモ欄の値を使う。
 
@@ -781,6 +783,7 @@ context_updates:
 - [ ] 工程0で環境を復元し、restore_id・purpose(`work10`)・readiness を stage10-context.json の `env_restore` に書いた(lint `env_restored`)
 - [ ] 工程0の起動完了の確認のあとに開始前シナリオを実行し、state と run_id を stage10-context.json の `pre_stage` に書いた(設定がなければ `skipped`)
 - [ ] 工程0のあとに禁止操作リストの記入状態と版を照合スクリプトで取得し、stage10-context.json の `prohibited_ops` に書いた
+- [ ] 工程0で `pms db --check` が通り、接続先(`target`)を flow.md のメモ欄に残した
 - [ ] パートA・B(R・P)で台帳に書いたID(需要ID・SD-ID・操作ID・SIG-ID)を stage10-context.json に書き、`node tools/pms/pms.mjs queue build --flow <フローID> --phase all` が終了コード 0 で終わった(stage10-context.json は schema で検査される)
 - [ ] flow.md のメモ欄に「pms run 待ち」と書き、利用者に進め方(`pms run`。チャットで進めるなら `pms-runner`)を伝えて止まった(IDE でサブエージェントを使えない場合の代わりのときは、`pms next` が `done` を返すまでカードを行い、`pms report` を実行した)
 
@@ -968,7 +971,7 @@ skills の機構で、問い合わせ skill(00 ■健全性シグナルと問い
 問い合わせの入力の質を上げるため、**読み取りだけで**事実を集める。
 
 - 探索記録の `health_signal` と証跡を読み、状態値・エラーコード・メッセージを確かめる
-- 自データに絞った DB の `SELECT`(00 ■DB操作の安全規約)、画面の表示、KB T05 に登録済みの読み取りの外部操作で、関係するデータと設定を確かめる
+- 自データに絞った DB の `SELECT`(00 ■DB操作の安全規約。`pms db` で行う。[R-DB-2])、画面の表示、KB T05 に登録済みの読み取りの外部操作で、関係するデータと設定を確かめる
 - ログ収集 skill があれば、ログを集める(時間範囲は、自データを作成・操作した最初のステップの `started_at` から、健全性シグナルの `observed_at` まで。前後に `vocab.default.log_window_margin_sec` 秒を足す)。集めたログ一式は `work/<feature_code>/health/inquiries/<シナリオID>-<回>-logs/` に置く。**読むのは実行体が返すログIDと件数の一覧だけ**で、ログの本文を開かない。探索記録に時刻がない(proc-v013 以前に始めたフロー)ときは、時間範囲を推測せず、ログを集めない
 - KB(`kb/00_索引.md` → T09 環境・T10 落とし穴・T12 ログID知見)に同じ事象がないかを見る。T12 はログIDの一覧のIDで引く。**KB に解消の方法があれば、問い合わせずに H4 の「操作の変更」として試してよい**(解消すれば問い合わせは0回)
 
@@ -2436,7 +2439,8 @@ export default async function globalTeardown() {
 - **接続先・アカウント・パスワードなどの環境情報をコードに直接書かない。** `tests/helpers/env.ts` の `envValue('<キー>')` で読む(00 ■検証環境の情報。lint `env_value_leak` / `env_value_hardcoded`)。探索記録の `<env:キー>` は `envValue('<キー>')` に置き換える
 - `envValue` は `tools/env/env.mjs get` を呼ぶだけにする(環境の選び方・各自の設定による上書きを1か所で決めるため)。使う環境は環境変数 `PMS_ENV` で切り替える(未指定なら設定の既定)。値がないときは例外で失敗させる(黙って空文字で進めない)
 - `playwright.config.ts` の `baseURL` も `envValue('pms.url')` から取る
-- DB への接続(`tests/helpers/invariants.ts` など)は、サーバ名・DB名を `envValue('db.server')` / `envValue('db.name')` から取り、サーバ証明書の検証は環境情報の `db.trust_server_certificate` に従う(00 ■DB への接続 [R-DB-1])。`true` または未登録なら `trustServerCertificate: true`、`false` なら検証する。**このキーだけは未登録を既定値(`vocab.env_optional_keys`)で補い**、`envValue` の例外で失敗させない
+- DB への接続(`tests/helpers/invariants.ts` など)は、サーバ名・DB名を `envValue('db.server')` / `envValue('db.name')` から取り、サーバ証明書の検証は環境情報の `db.trust_server_certificate` に従う(00 ■DB への接続 [R-DB-1])。`true` または未登録なら `trustServerCertificate: true`、`false` なら検証する
+- DB へのログインは環境情報の `db.auth` に従う(00 ■DB への接続)。`sql` なら `envValue('db.user')` / `envValue('db.password')` で SQL Server 認証、`windows` または未登録なら実行するアカウントの Windows 認証(Node の `mssql` では `msnodesqlv8` ドライバの `trustedConnection: true`)。**`db.trust_server_certificate` と `db.auth` は未登録を既定値(`vocab.env_optional_keys`)で補い**、`envValue` の例外で失敗させない
 
 ```typescript
 // tests/helpers/env.ts — 検証環境の情報を読む(00 ■検証環境の情報)。値は config/environments*.json にあり、コードには書かない

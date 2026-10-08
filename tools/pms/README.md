@@ -1,8 +1,8 @@
 # tools/pms — 進行役(操作の記録・タスクキュー・カード・提出の検査・セッションの起動・報告書の生成)
 
-手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。proc-v019 で IDE 内のループ(B1。入口のエージェント `pms-runner`)のために `next` の出力にエージェントの名前と依頼文を足した(`03_IDE内ループ.md`、段3。14章)。proc-v021 でカードを使わない作業の画面操作のために `pms pwcli` を足した(2.5)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
+手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。proc-v019 で IDE 内のループ(B1。入口のエージェント `pms-runner`)のために `next` の出力にエージェントの名前と依頼文を足した(`03_IDE内ループ.md`、段3。14章)。proc-v021 でカードを使わない作業の画面操作のために `pms pwcli` を足した(2.5)。proc-v024 で DB への SELECT のために `pms db` を足した(2.7)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
 
-- Node.js 18 以上だけで動く(外部パッケージなし)。playwright-cli を呼ぶのは `pms act` と `pms pwcli` だけ、AI の CLI を呼ぶのは `pms run` だけ
+- Node.js 18 以上だけで動く(外部パッケージなし)。playwright-cli を呼ぶのは `pms act` と `pms pwcli` だけ、sqlcmd を呼ぶのは `pms db` だけ、AI の CLI を呼ぶのは `pms run` だけ
 - テスト: `node --test tools/pms/test/`(playwright-cli・AI の CLI・環境情報は偽物に差し替える。`test-support/`。カードを行うAIの代わりは `test-support/explore-agent.mjs`)
 - 入口: `node tools/pms/pms.mjs <サブコマンド>`。使い方は `--help`(ファイル先頭のコメント)
 
@@ -17,6 +17,7 @@
 | `stats [--flow F \| --since YYYY-MM-DD] [--json]` | カードの合格率などを集計する(12章) | `--json` なら `{flows, since, by_kind[], records}`、なければ表 | 0 / 2 |
 | `act --flow F --card C [--intent "…"] <操作> [引数…]` | 画面操作を1回実行し、act-log に1行書く(2章) | `{ok, seq, action, locator, locator_class, unique, url_after, error, warnings[], now, next, hint}`。`snapshot` は画面の内容のあとに `--- pms ---` の行と同じ JSON | 0 / 1(操作の失敗・assert の不成立)/ 2 |
 | `pwcli [--session 名前] -- <playwright-cli の引数…>` | カードを使わない作業の画面操作。`<env:キー>` を値に置き換えて playwright-cli に渡し、値を伏せた出力を返す。`--flow` は要らず、記録は書かない(2.5) | playwright-cli の出力(値を伏せたもの)。標準エラー出力があれば `--- stderr ---` の行のあとに続ける | 0 / 1(playwright-cli が 0 以外で終わった)/ 2(`--` がない・環境情報がない など) |
+| `db [--flow F --card C --intent "…"] -- "<SELECT 文>"` / `db --check [--flow F]` | DB に SELECT を1つ実行する。接続先・ログイン・証明書は環境情報から決め、実行の前に接続先を確かめる。カードを付ければ db-log に1行書く(2.7) | `{ok, settings, target, sql, rows, output, truncated, reason, error}`(カードを付ければ `now, next, hint` も)/ `--check` は `{ok, check, settings, target, reason, error}` | 0 / 1(環境情報の不足・接続の失敗・接続先の違い・SELECT の失敗。`reason`)/ 2(SELECT 以外の文・使い方の誤り) |
 | `submit --flow F --card C [--file …]` | 出力を検査し、合格なら記録を書く(5章) | 合格 `{ok: true, card, result, status, wrote[], next, hint}` / 不合格 `{ok: false, card, attempt, rejections, stopped, failures[{category, message, fix}], next, hint}` | 0(合格。`cannot_proceed` の受け付けを含む)/ 1(不合格)/ 2 |
 | `status --flow F [--json]` | 現在のカード・枚数・STOP の理由・pms が記録した状態・警告・`complete`・`report_pending`(パートCのカードが全部終わったのに、そのあとで `pms report` をしていない。14章) | `--json` なら JSON、なければ人間向けの文 | 0 / 2 |
 | `reopen --flow F --card C` | (人間が使う)STOP のカードを `pending` に戻し、出した回数・不合格の回数を 0 にする。続けて止めた後続のステップ(`chained_from`)も戻す | `{ok, flow, card, reopened[], status, next}` | 0 / 2 |
@@ -82,6 +83,26 @@
 - カード・フロー・act-log・キューに触らない。ロケータの記録もしない(カードを使わない作業は、KB や報告書に自分で書く。KB に書く操作列では値を `<env:キー>` と書く。00 R-ENV-1)
 - 先頭の引数が `open` なら、`pms act` と同じく `browser_config`(locale の既定値は `ja-JP`)を `--config=<絶対パス>` で足す(2.6)。`--config` を自分で書いたときは足さない
 - `pms run` が起こすカードのセッションでは使用禁止にする(`procedure/cards/agents.yaml` の `deny_shell`、`config/pms.sample.json` の `runner.copilot.deny`)。カードの画面操作は記録の残る `pms act` に限るため
+
+### 2.7 `pms db`(DB への SELECT。`lib/db.mjs`)
+
+F-001 の `pms run` で `explore.close` のカードが「DB不変条件の検査に必要な認証確認とSELECTを実行できなかった」として `cannot_proceed` で止まった。カードの AI が DB の接続先を知るために `node tools/env/env.mjs get db.server` を実行し、`pms run` の使用禁止 `shell(node tools/env/env.mjs get:*)` に当たって拒否された。カードの「DB の接続」の行(9.4)は proc-v023 までサーバ証明書の扱いしか書いておらず、接続先とログインを知る手段がカードになかった(proc-v024)。`pms db` は、DB への SELECT を `pms act` と同じ「道具が値を扱い、AI は値を知らない」形にしたものである。
+
+- 文は `--` の後ろの1つの引数(`selectOnly`)。コメント・文字列・区切った識別子(`[…]`・`"…"`)を除いてから調べ、`SELECT` か `WITH` で始まる文を1つだけ受け付ける。`;` で文をつなぐもの・`INSERT`・`UPDATE`・`DELETE`・`MERGE`・DDL・`EXEC`・`INTO`(SELECT INTO)・`DECLARE`・`SET`・トランザクションの操作・`OPENROWSET` など(`FORBIDDEN`)・`xp_` / `sp_` の手続き・sqlcmd のコマンド(行頭の `:`・`!!`)・`GO`・sqlcmd の変数 `$(…)` は終了コード 2。列名がこれらの語と同じなら `[ ]` で囲む
+- 設定(`dbSettings`)は、フローの環境(最後のラウンドの `stage10-context.json` の `environment`。なければ env.mjs と同じ選び方)の環境情報から読む。`db.trust_server_certificate`・`db.auth` は `vocab.env_optional_keys` の既定値で補う。`db.server`・`db.name`(と `db.auth` が `sql` なら `db.user`・`db.password`)がなければ実行せず `reason: env_missing`(`error` に `env.mjs require --keys …` の形を書く)
+- sqlcmd の呼び出し: `<db_cli> -S <db.server> -d <db.name> (-E | -U <db.user>) [-C] -b -X -l 15 -t 60 -W -s <TAB> -w 65535 -Q <文>`。パスワードは環境変数 `SQLCMDPASSWORD` で渡す(引数に書かない。プロセスの一覧にも出ない)。`-C` は `db.trust_server_certificate` が true のとき(R-DB-1)
+- 実行の前に、別の呼び出しで `SELECT @@SERVERNAME, DB_NAME(), SUSER_SNAME()` を実行し、`target`(`server_name`・`db_name`・`login`)として返す。`DB_NAME()` が `db.name` と違えば(大文字・小文字は区別しない)実行せず `reason: target_mismatch`。接続できなければ `connect_failed`。`@@SERVERNAME` は `db.server`(別名・ポート付きのことがある)と比べず、記録だけにする
+- 受け付けた文は `SET NOCOUNT ON; BEGIN TRAN; <文>; ROLLBACK TRAN;` で実行する(SELECT のみの検査の取りこぼしに備えた二重の守り)。失敗は `reason: query_failed`
+- 出力の `output` は sqlcmd の表(見出し・区切り線・行)を 200 行・2 万文字まで(超えたら `truncated: true`)。`rows` は見出しと区切り線のあとの行の数。出力・記録の秘密情報(全環境の kind `secret` と `db.password`)は伏せる(2.3 と同じ `mask`)
+- `--card` を付けたら、出ているカード(`issued`)でなければ終了コード 2。`--intent` が要る。記録 `work/<feature_code>/exploration/db-log.jsonl` に1行(`flow`・`card`・`step_id`・`intent`・`sql`・`env`・`server`・`name`・`target`・`started_at`・`ended_at`・`ok`・`rows`・`reason`・`error`)を書く。act-log とは分ける(act-log の `seq` は画面操作の連番として探索記録と lint `explore_act_linked` が使うため)
+- カードなしでも使える(作業01・02・15 の DB の観測。記録は書かない)。`--check` は接続先の確認だけをする(作業10の工程0。stages §10)
+- `pms run` のカードのセッションでは、`sqlcmd` の直接の呼び出しを使用禁止にする(`procedure/cards/agents.yaml` の `deny_shell`、`config/pms.sample.json` の `runner.copilot.deny`)。`pms db` は使用禁止にしない
+
+実物の sqlcmd で確かめていないこと(テストは偽物 `test-support/stub-sqlcmd.mjs`。違っていたら `db_cli` か `lib/db.mjs` を直す):
+
+- `-X`・`-C`・`-s <TAB>`・`-w 65535` を、使う sqlcmd(ODBC 版・Go 版 `go-sqlcmd`)が受け付けるか
+- `SQLCMDPASSWORD` を `-U` と併せたときにパスワードとして使うか(どちらの版も文書にはある)
+- `-h -1 -W -s <TAB>` で、接続先の確認の結果が1行のタブ区切りで出るか
 
 ### 2.6 ブラウザの locale(`config/playwright-cli.json`)
 
@@ -215,6 +236,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 | `open_args` | `["--idle-timeout=0"]` | `open` に足す引数 |
 | `browser_config` | `config/playwright-cli.json` | `open` に `--config=<絶対パス>` で渡す playwright-cli の設定ファイル(ルートからの相対パス。locale など。2.6)。null のとき・locale がないときは locale の既定値 `ja-JP` を渡す |
 | `env_cli` | null | 環境情報の実行体(`get <キー> --reveal` を足して呼ぶ)。null なら `node tools/env/env.mjs --root <root>` |
+| `db_cli` | `["sqlcmd"]` | `pms db` が呼ぶ sqlcmd(コマンドの配列)。接続の引数は pms が足す(2.7) |
 | `max_issues` | 3 | 同じカードを出す回数の上限 |
 | `max_rejections` | 3 | 同じカードの不合格の回数の上限 |
 | `ops` | `{}` | 操作ごとの呼び出しの上書き(`{"press": {"cli": ["press", "{value}"]}}` など。`{ref}` `{value}` `{js_value}` `{locator}` を置き換える。`cli` か `run_code` のどちらか) |
@@ -269,7 +291,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 | explore.session_close | ラウンドのシナリオ、シナリオ末尾の検査の結果、DB の接続 |
 | report.findings | `pms report` と同じ作り方の報告書の下書き(所見の欄は空。`work/_flows/F/report-draft-<機能>.md` にも書く) |
 
-「DB の接続」(`dbConnection`)は、フローの環境(最後のラウンドの `stage10-context.json` の `environment`。なければ env.mjs と同じ選び方)の環境情報 `db.trust_server_certificate` から作る1行である。`true` または未登録(既定は `vocab.env_optional_keys` の `default`)なら、サーバ証明書の検証を無効にして接続することを人間が承認済みと書き、`false` なら検証すると書く。`true` / `false` でない値は既定で扱い、そのことを行に書く(00 ■DB への接続 [R-DB-1]。proc-v023)
+「DB の接続」(`lib/db.mjs` の `dbConnection`)は、`pms db` の使い方(`pms db --flow F --card C --intent "<確かめること>" -- "<SELECT 文>"`)と、フローの環境(2.7 の `dbSettings`)の接続先(`db.server`・`db.name`)・ログインの方式(`db.auth`。`sql` ならログイン名も)・サーバ証明書の扱い(`db.trust_server_certificate`。`true` または未登録なら人間が承認済み、`false` なら検証する)を書く1行である。パスワードは書かない。必要な環境情報がなければ、そのことと「`pms db` が失敗したら `cannot_proceed` で提出する」を書く(00 ■DB への接続 [R-DB-1]・[R-DB-2]。proc-v023 で証明書、proc-v024 で接続先・ログイン・`pms db` を加えた)
 
 ## 10. `pms run`(段2。`lib/run.mjs`)
 
@@ -306,7 +328,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 
 実物で確かめること(人間に頼む。違っていたら `config/pms.json` と `procedure/cards/agents.yaml` を直す):
 
-- Copilot CLI の `--deny-tool` のパターンが、空白を含むコマンド(`shell(npx playwright-cli:*)`・`shell(node tools/env/env.mjs get:*)`)と、`write(procedure/**)` の `**` を受け付けるか。受け付けなければ、`--available-tools` で使える道具を絞る形に変える
+- Copilot CLI の `--deny-tool` のパターンが、空白を含むコマンド(`shell(npx playwright-cli:*)`・`shell(node tools/env/env.mjs get:*)`)と、`write(procedure/**)` の `**` を受け付けるか。受け付けなければ、`--available-tools` で使える道具を絞る形に変える(2026-10-08 の F-001 の `pms run` で、`shell(node tools/env/env.mjs get:*)` が `node env.mjs get db.server` を含むコマンドを拒否したことは確かめられた。2.7)
 - `--allow-all-tools` と `--deny-tool` を併せたとき、`--deny-tool` が優先するか
 - `--agent` に、`.github/agents/pms-card-*.agent.md` のファイル名(`.agent.md` を除いた名前)を渡せるか
 - Kiro CLI の `permissions` と `toolsSettings` を同じエージェントに書いてよいか(旧形式を受け付けない版なら `toolsSettings` を外す)。Kiro のモデルIDを `kinds.<種類>.kiro_model` に書くか

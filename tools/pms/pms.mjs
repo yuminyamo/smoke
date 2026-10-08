@@ -17,6 +17,11 @@
 //                                   カードを使わない作業(01・02・15・20・30 と作業10のカード以外の工程)の画面操作。
 //                                   <env:キー> だけの引数を値に置き換えて playwright-cli を呼び、出力の秘密情報を <env:キー> に戻して返す。
 //                                   --flow・カードは要らず、記録は書かない。--session がなければ playwright-cli の既定のセッション
+//   node tools/pms/pms.mjs db     [--flow F-003 --card C-0001 --intent "<確かめること>"] -- "<SELECT 文>"
+//   node tools/pms/pms.mjs db     --check [--flow F-003]
+//                                   テスト環境の DB に SELECT を1つ実行する(00 ■DB への接続)。接続先・ログイン・サーバ証明書は環境情報から決め、
+//                                   実行前に接続先(サーバ名・DB名・ログイン)を確かめる。SELECT 以外の文は実行しない。
+//                                   カードを付ければ記録(db-log.jsonl)に1行書く。--check は接続先の確認だけをする(作業10の工程0)
 //   node tools/pms/pms.mjs submit --flow F-003 --card C-0001 [--file work/_flows/F-003/out/C-0001.json]
 //                                   AI の出力を検査し、合格なら記録(setup-log・探索記録・台帳)を書く
 //   node tools/pms/pms.mjs run    --flow F-003 [--phase A|C|all] [--runner copilot|kiro] [--max-cards N] [--dry-run]
@@ -38,10 +43,10 @@
 // 出力: 標準出力に JSON を1つ(status・stats は --json のときだけ JSON。snapshot は画面の内容のあとに「--- pms ---」の行と JSON)。
 //       pwcli は playwright-cli の出力(値を伏せたもの)をそのまま。人間向けの説明は標準エラー出力。秘密情報の値は出力と記録のどこにも書かない(<env:キー> と書く)。
 // 終了コード: 0 = 成功(next はカードを出した・done、submit は合格、run はカード・報告書・lint まで終わった)/
-//             1 = 失敗(submit の不合格、act・pwcli の操作の失敗、run の実行の失敗(CLI が起動しない等))/
+//             1 = 失敗(submit の不合格、act・pwcli の操作の失敗、db の接続・実行の失敗、run の実行の失敗(CLI が起動しない等))/
 //             2 = 使い方・設定の誤り / 3 = STOP(next・run。人間の確認待ち。run は lint の ERROR が残ったときも)/
 //             4 = run が --max-cards の枚数で止まった(まだカードが残っている)
-// 依存: Node.js 18 以上のみ(外部パッケージ不要)。playwright-cli は act と pwcli だけが、AI の CLI は run だけが呼ぶ。
+// 依存: Node.js 18 以上のみ(外部パッケージ不要)。playwright-cli は act と pwcli だけが、sqlcmd は db だけが、AI の CLI は run だけが呼ぶ。
 // テスト: node --test tools/pms/test/
 // 仕様(内部の構成・データの形): tools/pms/README.md
 
@@ -55,6 +60,7 @@ import { loadConfig } from './lib/config.mjs';
 import { buildQueue, nextCard, statusOf, reopenCard, targetOf } from './lib/queue.mjs';
 import { act } from './lib/act.mjs';
 import { pwcli } from './lib/pwcli.mjs';
+import { db } from './lib/db.mjs';
 import { submit } from './lib/submit.mjs';
 import { run } from './lib/run.mjs';
 import { noteActivity } from './lib/progress.mjs';
@@ -62,7 +68,7 @@ import { buildReport } from './lib/report.mjs';
 import { stats, statsText } from './lib/stats.mjs';
 
 const argv = process.argv.slice(2);
-const opt = { root: null, session: null, flow: null, card: null, phase: null, file: null, intent: null, scenarios: null, json: false, runner: null, maxCards: null, dryRun: false, since: null, dodUnmet: null, brief: false };
+const opt = { root: null, session: null, check: false, flow: null, card: null, phase: null, file: null, intent: null, scenarios: null, json: false, runner: null, maxCards: null, dryRun: false, since: null, dodUnmet: null, brief: false };
 const pos = [];
 let rawAll = false;
 let argError = null;
@@ -82,6 +88,18 @@ for (let i = 0; i < argv.length; i++) {
     else if (a === '--session') opt.session = next();
     else if (a === '--root') opt.root = next();
     else argError ??= `pwcli の引数は -- の後ろに書く: ${a}`;
+    continue;
+  }
+  // db は -- より後ろ(SELECT 文)をそのまま取る(-- より前は --flow・--card・--intent・--check・--root だけ)
+  if (pos[0] === 'db') {
+    if (rawAll) pos.push(a);
+    else if (a === '--') rawAll = true;
+    else if (a === '--flow') opt.flow = next();
+    else if (a === '--card') opt.card = next();
+    else if (a === '--intent') opt.intent = next();
+    else if (a === '--check') opt.check = true;
+    else if (a === '--root') opt.root = next();
+    else argError ??= `db の SELECT 文は -- の後ろに書く: ${a}`;
     continue;
   }
   if (a === '--root') opt.root = next();
@@ -109,8 +127,8 @@ const ROOT = path.resolve(opt.root ?? path.join(scriptDir, '..', '..'));
 try {
   if (argError) throw new UsageError(argError);
   const cmd = pos.shift();
-  if (!cmd) { help(); throw new UsageError('サブコマンドがありません(queue / next / act / pwcli / submit / run / report / stats / status / reopen)'); }
-  if (!opt.flow && cmd !== 'stats' && cmd !== 'pwcli') throw new UsageError('--flow がありません');
+  if (!cmd) { help(); throw new UsageError('サブコマンドがありません(queue / next / act / pwcli / db / submit / run / report / stats / status / reopen)'); }
+  if (!opt.flow && cmd !== 'stats' && cmd !== 'pwcli' && cmd !== 'db') throw new UsageError('--flow がありません');
   if (opt.flow && !FLOW_RE.test(opt.flow)) throw new UsageError(`--flow は F-<3桁> で指定してください: ${opt.flow}`);
   const proc = new Procedure(ROOT);
   const vocabStatus = proc.values('pms_card_status');
@@ -149,6 +167,11 @@ try {
       res = pwcli(ctx, opt, pos);
       break;
     }
+    case 'db': {
+      if (!opt.check && !rawAll) throw new UsageError('db [--flow F --card C --intent "<確かめること>"] -- "<SELECT 文>"(-- がありません)/ db --check [--flow F]');
+      res = db(ctx, opt, pos);
+      break;
+    }
     case 'submit': res = submit(ctx, opt); break;
     case 'status': {
       const s = statusOf(ctx, opt.flow);
@@ -160,7 +183,7 @@ try {
       res = { code: 0, out: reopenCard(ctx, opt.flow, opt.card) };
       break;
     }
-    default: throw new UsageError(`不明なサブコマンド: ${cmd}(queue / next / act / pwcli / submit / run / report / stats / status / reopen)`);
+    default: throw new UsageError(`不明なサブコマンド: ${cmd}(queue / next / act / pwcli / db / submit / run / report / stats / status / reopen)`);
   }
   noteActivity(cmd, pos, res.code); // pms run のセッションの中なら、進み具合の表示に使うキーワードを書く
   // process.exit は標準出力の書き出しを待たないため(大きな出力が途中で切れる)、終了コードだけを決めて戻る

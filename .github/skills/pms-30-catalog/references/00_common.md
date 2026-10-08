@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-08 / 版: v25(カードを使わない作業の秘密情報の入力: カードを使わない作業の画面操作を `pms pwcli` 経由にし、■検証環境の情報に R-ENV-2(秘密情報の値を取り出さない・コマンドに書かない)を加えた。前版 v24 は 2026-10-08 の作業02の画面操作の手段と skill の資格情報)
+改訂: 2026-10-08 / 版: v26(DB への接続を `pms db` に集約: ■DB への接続 を書き直し、R-DB-2(DB への SELECT は `pms db` で行う)と環境情報 `db.auth`・`db.user`・`db.password` を加えた。カードのセッションで sqlcmd の直接の呼び出しを使用禁止にした。前版 v25 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -74,13 +74,14 @@
 | P1 | AIは判断だけをする。順序・記録・集計・完了判定はプログラムが行う | どの状態を整備するか・どのステップを探索するかは、pms がシナリオの `requires` とステップの表から機械的にカードにする。setup-log・探索記録・台帳の行・報告書の数値と status.yaml は pms が書く |
 | P2 | 1枚のカードで1つの判断をする。カードが終われば会話を捨ててよい形にする(状態はすべてファイルに置く) | `pms run`(B2)がカードごとに新しいセッションを、`pms-runner`(B1)がカードごとにサブエージェントを起こし、終わったら捨てる。前のステップの様子は、AIの要約ではなく記録の抜粋をカードに載せる |
 | P5 | 出力は提出の瞬間に検査し、通らなければ理由を返して差し戻す | `pms submit` が出力を検査し、不合格なら区分(`vocab.pms_reject_kind`)と直し方を返す。同じカードの不合格・出し直しが上限を超えたら人間の確認待ち(STOP)にする |
-| P6 | AIが書かなくても残る記録を優先する。道具の実行がそのまま記録になる | 画面操作は `pms act` が実行し、操作のたびに時刻・ロケータ・操作を記録する。setup-log の操作列と探索記録の `actions`・時刻・証跡はこの記録から作る |
-| P7 | モデルの既定の振る舞いに逆らう規則は、文章で頼まず検査で止める | `pms run` が起こすセッションでは、playwright-cli の直接の呼び出し・秘密情報の値の取り出し・手順書と skills への書き込みを使用禁止にする。期待結果の書き換えは提出の検査で止める(`expected_changed`) |
+| P6 | AIが書かなくても残る記録を優先する。道具の実行がそのまま記録になる | 画面操作は `pms act` が実行し、操作のたびに時刻・ロケータ・操作を記録する。setup-log の操作列と探索記録の `actions`・時刻・証跡はこの記録から作る。DB の確認は `pms db` が実行し、接続先と SELECT 文を記録する |
+| P7 | モデルの既定の振る舞いに逆らう規則は、文章で頼まず検査で止める | `pms run` が起こすセッションでは、playwright-cli・sqlcmd の直接の呼び出し・環境情報の取り出し・手順書と skills への書き込みを使用禁止にする。DB への SELECT 以外の文は `pms db` が実行しない。期待結果の書き換えは提出の検査で止める(`expected_changed`) |
 
 | 道具 | 役割 |
 |---|---|
 | `pms act` | 画面操作を1回ずつ playwright-cli で実行し、操作の記録に1行書く(操作は `vocab.pms_act_action`)。要素の操作の前に `generate-locator` でロケータを取り、区分(`vocab.locator_class`)と一意性を記録する。環境情報の参照 `<env:キー>` は自分で値を取り出して使い、標準出力と記録では値を伏せる |
 | `pms pwcli` | **カードを使わない作業・工程の画面操作。** `node tools/pms/pms.mjs pwcli -- <playwright-cli の引数>` の形で、引数をそのまま playwright-cli に渡す(例 `pwcli -- fill e5 <env:pms.password>`・`pwcli -- snapshot`)。`<env:キー>` だけの引数を値に置き換え、出力(fill の値・snapshot の入力済みの値)の秘密情報を `<env:キー>` に戻して返す。カード・`--flow` は要らず、記録は書かない。`--session <名前>` でセッションを分けられる(なければ playwright-cli の既定のセッション) |
+| `pms db` | **DB への `SELECT`(カードでもカードを使わない作業でも)。** `node tools/pms/pms.mjs db [--flow F --card C --intent "<確かめること>"] -- "<SELECT 文>"`。接続先・ログイン・サーバ証明書の扱いは環境情報から決め(■DB への接続)、実行の前に接続先(サーバ名・DB名・ログイン名)を確かめて出力に返す。SELECT 以外の文は実行しない。カードを付ければ記録(`work/<feature_code>/exploration/db-log.jsonl`)に1行書く。`--check` は接続先の確認だけをする(作業10の工程0) |
 | `pms queue build` / `pms next` | 対象シナリオの `requires`(フェーズA)とステップの表(パートC)からカードを作り(タスクキュー)、1枚ずつ出す。出したカードが提出されないまま `next` が呼ばれたら、同じカードを出し直す。全部終われば `done`、人間の判断が要れば `STOP` を返す。カードの出力には、カードを渡すエージェントの名前(`agent`)と依頼文(`prompt`)が入る |
 | 入口のエージェント `pms-runner` | **実行形態 B1(副経路)。** IDE のチャット(VS Code + Copilot・Kiro)で選ぶエージェント。`pms next` を呼び、出たカードを、カードの種類のエージェント(出力の `agent`)にサブエージェントとして渡し(出力の `prompt`。カードの本文はファイルのパスで渡す)、返事の内容にかかわらずまた `pms next` を呼ぶ。自分ではカードの作業をしない。done・STOP なら利用者に伝えて終わる。正本 `procedure/cards/agents.yaml` の `runner` から生成する |
 | `pms run` | **実行形態 B2(主な経路)。** カードを1枚ずつ、新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせる。セッションには、カードの種類ごとのエージェントとモデルを指定し、カードのファイルのパスを渡す。終わったら、キューで合格したかを確かめる(AIの「できました」ではなく提出の記録で決める)。合格していなければ同じカードを出し直し、上限を超えたら STOP。1枚ごとに上限時間を設け、セッションの出力を保存する(秘密情報の値は伏せる)。全部終われば `pms report` と完了前の lint を行う。CLI の呼び出し方は `config/pms.json` の `runner` に書く(コードに CLI のフラグを書かない) |
@@ -93,6 +94,7 @@
 | 記録 | 所在 | 書く者 |
 |---|---|---|
 | 操作の記録 | `work/<feature_code>/exploration/act-log.jsonl`(1操作1行) | `pms act` |
+| DB の確認の記録 | `work/<feature_code>/exploration/db-log.jsonl`(1回1行。接続先・SELECT 文・行数) | `pms db`(カードを付けたとき) |
 | タスクキュー・出したカード・提出の検査の結果 | `work/_flows/F-<番号>/queue.json`・`cards/C-<番号>.md`・`submit-log.jsonl` | pms |
 | セッションの出力 | `work/_flows/F-<番号>/runs/C-<番号>-<回>.jsonl`(秘密情報の値は伏せる) | `pms run` |
 | 証跡 | `work/<feature_code>/exploration/evidence/<ステップID>_<連番>.png` | `pms act screenshot` |
@@ -134,7 +136,8 @@
 | 使用禁止 | 理由 |
 |---|---|
 | playwright-cli の直接の呼び出し(`npx` 経由を含む) | 記録(`pms act`)を通らない操作をそもそも実行できないようにする |
-| `node tools/env/env.mjs get … --reveal` | 秘密情報の値をAIが取り出せないようにする(値は `pms act` が `<env:キー>` から取り出して使う) |
+| `node tools/env/env.mjs get … --reveal`(Copilot CLI では `get` 全体。使用禁止のパターンで `--reveal` だけを分けられないため) | 秘密情報の値をAIが取り出せないようにする(値は `pms act` が `<env:キー>` から取り出して使う)。**カードが要る環境情報は、AIが調べなくても済むようにする**(画面の値は `<env:キー>` を `pms act` に渡す。DB の接続先・ログインは `pms db` が使い、カードの「DB の接続」の行に pms が書く) |
+| sqlcmd の直接の呼び出し | DB への SELECT を、接続先の確認・SELECT のみの検査・記録のある `pms db` に限る(■DB への接続 [R-DB-2]) |
 | `node tools/pms/pms.mjs pwcli` | 記録(`pms act`)を通らない画面操作を、カードのセッションで実行できないようにする |
 | 手順書(`procedure/`)・skills・エージェントの定義への書き込み | 実行中に手順を書き換えない(■手順改善シグナル) |
 
@@ -962,13 +965,23 @@ lint の違反・人間の指摘・回帰実行の切り分けに由来するシ
 
 <!-- /protected:DB_SAFETY -->
 
-### DB への接続(TLS のサーバ証明書)
+### DB への接続
 
-検証環境の SQL Server は、自己署名など信頼できない証明書で TLS 接続を求めることが多い(sqlcmd・ODBC Driver 18 以降・Node の `mssql` は既定で暗号化と証明書の検証を行う)。サーバ証明書を検証するかは、人間が環境ごとに環境情報のキー `db.trust_server_certificate`(`vocab.env_optional_keys`)で決める。
+**AIが DB を確かめる(`SELECT`)ときは、進行役の `pms db` を使う。** 接続先・ログイン・サーバ証明書の扱いは pms が環境情報から決め、実行の前に接続先(サーバ名・DB名・ログイン名)を確かめて出力に返す(■DB操作の安全規約 の「接続先を実行前に必ず確認し、サーバ名・DB名をログに残す」を道具で満たす。接続した DB の名前が `db.name` と違えば実行しない)。SELECT(または `WITH … SELECT`)の文を1つだけ受け付け、書き込み・DDL・手続きの実行・`SELECT INTO` を含む文は実行しない。念のため、受け付けた文もトランザクションの中で実行して取り消す。
 
-- **[R-DB-1]** `db.trust_server_certificate` が `true` または未登録(既定)のとき、**人間はテスト環境のDBへの接続でサーバ証明書の検証を無効にすること(sqlcmd の `-C`、接続文字列の `TrustServerCertificate=yes`、`mssql` の `options.trustServerCertificate: true`)を承認している。** 証明書のエラーを理由に止まらず、無効にして接続する。`false` のときは検証を無効にしない(証明書のエラーで接続できなければ `cannot_proceed` で提出する)。いずれのときも、接続先がテスト環境のDB(環境情報の `db.server` / `db.name`)であることは DB操作の安全規約どおりに確かめる。**この設定による接続は ■人間の承認が必要な例外 の要許可操作・包括原則に当たらない**(テスト環境の中のDBへの `SELECT` であり、環境の状態を変えない)
+| 環境情報のキー | 意味 |
+|---|---|
+| `db.server` / `db.name` | サーバ名(インスタンス名を含む)と PMS の DB 名(基本キー `vocab.env_base_keys`) |
+| `db.auth` | ログインの方式(`vocab.env_optional_keys`。未登録なら既定の `windows`)。`windows` = 実行するアカウントの Windows 認証 / `sql` = SQL Server 認証。混合モードのサーバではどちらも使える。どちらにするかは人間が環境ごとに決める |
+| `db.user` / `db.password` | `db.auth` が `sql` のときのログイン名とパスワード(`account` / `secret`)。パスワードは pms が環境変数で sqlcmd に渡し、引数・出力・記録に書かない |
+| `db.trust_server_certificate` | サーバ証明書の検証を無効にするか([R-DB-1]) |
 
-カードでは、pms が使う環境の設定値を「DB の接続」の行に示す。値を変えるのは人間である(`node tools/env/env.mjs set db.trust_server_certificate false --kind other`)。
+検証環境の SQL Server は、自己署名など信頼できない証明書で TLS 接続を求めることが多い(sqlcmd・ODBC Driver 18 以降・Node の `mssql` は既定で暗号化と証明書の検証を行う)。サーバ証明書を検証するかは、人間が環境ごとに環境情報のキー `db.trust_server_certificate` で決める。
+
+- **[R-DB-1]** `db.trust_server_certificate` が `true` または未登録(既定)のとき、**人間はテスト環境のDBへの接続でサーバ証明書の検証を無効にすること(sqlcmd の `-C`、接続文字列の `TrustServerCertificate=yes`、`mssql` の `options.trustServerCertificate: true`)を承認している。** `pms db` とテストコードは無効にして接続し、証明書のエラーを理由に止まらない。`false` のときは検証を無効にしない(証明書のエラーで接続できなければ、カードでは `cannot_proceed` で提出する)。いずれのときも、接続先がテスト環境のDB(環境情報の `db.server` / `db.name`)であることは DB操作の安全規約どおりに確かめる(`pms db` が実行の前に確かめる)。**この設定による接続は ■人間の承認が必要な例外 の要許可操作・包括原則に当たらない**(テスト環境の中のDBへの `SELECT` であり、環境の状態を変えない)
+- **[R-DB-2]** DB への `SELECT` は `pms db` で行う(カードでは `--flow`・`--card`・`--intent` を付ける。カードを使わない作業ではカードを付けない)。sqlcmd などを直接呼ばない。接続情報(サーバ名・DB名・ログイン名・パスワード)を `env.mjs` で調べない(カードのセッションでは `env.mjs get` が使用禁止であり、パスワードは [R-ENV-2] により取り出さない)。`pms db` が失敗したら出力の `reason` で分ける: `query_failed`(文の誤り)は文を直してやり直す。`env_missing`(環境情報の不足)・`connect_failed`(接続・ログインの失敗)・`target_mismatch`(接続先の違い)は、カードでは出力の `error` を `notes` に写して `cannot_proceed` で提出し、カードを使わない作業では `env_missing` なら ■検証環境の情報 の足りない環境情報の確認に、それ以外なら利用者への報告に進む(接続先を推測で変えない)
+
+カードでは、「DB の接続」の行に pms が `pms db` の使い方と、使う環境の接続先・ログインの方式・サーバ証明書の扱いを書く(パスワードは書かない)。値を変えるのは人間である(例 `node tools/env/env.mjs set db.auth sql`、`node tools/env/env.mjs set db.password - --kind secret`、`node tools/env/env.mjs set db.trust_server_certificate false --kind other`)。
 
 ## ■ 項目ステータスのライフサイクル
 

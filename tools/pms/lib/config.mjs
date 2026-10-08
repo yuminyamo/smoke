@@ -36,6 +36,8 @@ export const DEFAULTS = {
   browser_config: 'config/playwright-cli.json',
   // 環境情報の取り出し(get <キー> --reveal を足して呼ぶ)。null なら node tools/env/env.mjs
   env_cli: null,
+  // pms db が呼ぶ sqlcmd(コマンドの配列)。接続の引数は pms が環境情報から足す(00 ■DB への接続)
+  db_cli: ['sqlcmd'],
   // 同じカードを出す回数の上限(超えたら STOP)
   max_issues: 3,
   // 同じカードの提出が不合格になる回数の上限(達したら STOP)
@@ -74,6 +76,7 @@ export function loadConfig(root) {
   }
   const isCmd = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'string' && x !== '');
   if (!isCmd(cfg.playwright_cli)) throw new UsageError(`${CONFIG_FILE} の playwright_cli はコマンドの配列(空でない文字列の配列)でなければなりません`);
+  if (!isCmd(cfg.db_cli)) throw new UsageError(`${CONFIG_FILE} の db_cli はコマンドの配列(空でない文字列の配列)でなければなりません`);
   if (cfg.env_cli !== null && !isCmd(cfg.env_cli)) throw new UsageError(`${CONFIG_FILE} の env_cli はコマンドの配列か null でなければなりません`);
   if (!Array.isArray(cfg.open_args) || !cfg.open_args.every((x) => typeof x === 'string')) throw new UsageError(`${CONFIG_FILE} の open_args は文字列の配列でなければなりません`);
   if (cfg.browser_config !== null && (typeof cfg.browser_config !== 'string' || cfg.browser_config === '')) throw new UsageError(`${CONFIG_FILE} の browser_config はファイルのパス(文字列)か null でなければなりません`);

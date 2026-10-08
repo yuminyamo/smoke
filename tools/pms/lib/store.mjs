@@ -1,4 +1,4 @@
-// store.mjs — タスクキュー(queue.json)・操作の記録(act-log.jsonl)・提出の記録(submit-log.jsonl)
+// store.mjs — タスクキュー(queue.json)・操作の記録(act-log.jsonl)・DB の確認の記録(db-log.jsonl)・提出の記録(submit-log.jsonl)
 
 import fs from 'node:fs';
 import { load as loadEnv, valuesOfKind, EnvError } from '../../env/lib/environments.mjs';
@@ -53,6 +53,8 @@ export class Store {
   }
 
   appendAct(feature, row) { appendLine(this.paths.abs(this.paths.actLog(feature)), row); }
+
+  appendDb(feature, row) { appendLine(this.paths.abs(this.paths.dbLog(feature)), row); }
 
   appendSubmit(flow, row) { appendLine(this.paths.abs(this.paths.submitLog(flow)), row); }
 

@@ -90,6 +90,7 @@ export class Paths {
   draft(flow, feature) { return `${this.flowDir(flow)}/report-draft-${feature}.md`; }
   flowMd(flow) { return `${this.flowDir(flow)}/flow.md`; }
   actLog(feature) { return `work/${feature}/exploration/act-log.jsonl`; }
+  dbLog(feature) { return `work/${feature}/exploration/db-log.jsonl`; }
   setupLog(feature) { return `work/${feature}/exploration/setup-log.yaml`; }
   explorationLog(feature) { return `work/${feature}/exploration/exploration-log.yaml`; }
   evidenceDir(feature) { return `work/${feature}/exploration/evidence`; }

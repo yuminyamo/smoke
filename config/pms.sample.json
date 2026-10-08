@@ -6,6 +6,7 @@
   "open_args": ["--idle-timeout=0"],
   "browser_config": "config/playwright-cli.json",
   "env_cli": null,
+  "db_cli": ["sqlcmd"],
   "max_issues": 3,
   "max_rejections": 3,
   "ops": {},
@@ -21,6 +22,7 @@
         "shell(playwright-cli)", "shell(playwright-cli:*)",
         "shell(npx playwright-cli:*)", "shell(npx @playwright/cli:*)",
         "shell(node tools/env/env.mjs get:*)", "shell(node tools/pms/pms.mjs pwcli:*)",
+        "shell(sqlcmd)", "shell(sqlcmd:*)",
         "write(procedure/**)", "write(.github/skills/**)", "write(.github/agents/**)", "write(.kiro/skills/**)", "write(.kiro/agents/**)"
       ],
       "stdin": null,

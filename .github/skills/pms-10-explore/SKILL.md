@@ -2,12 +2,12 @@
 name: pms-10-explore
 description: "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、進行役 pms のカード(pms run がカードごとにAIのセッションを、チャットではエージェント pms-runner がカードごとにサブエージェントを起こす)で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。"
 metadata:
-  procedure_version: proc-v023
+  procedure_version: proc-v024
   generated_from: "procedure/stages.md §10"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v023 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v024 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業10 シナリオ生成と探索(手順版 proc-v023)
+# 作業10 シナリオ生成と探索(手順版 proc-v024)
 
 この skill は、手順書の正本の `stages.md` §10 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -43,7 +43,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v023` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v024` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -148,6 +148,8 @@ metadata:
 | 0 | `skipped`(設定なし)/ `passed` / `warning` | 作業を続ける。`warning` のときは失敗したシナリオを報告書の固有セクション1に書く |
 | 1 | `failed` | **作業を始めない。** flow.md のメモ欄に「開始前シナリオ失敗」と、失敗したシナリオと理由を書いて止まる(status.yaml は出力しない)。管理者が原因を直したら、工程0の復元からやり直す |
 | 2 | — | **作業を始めない。** 実行体の理由(設定の誤りなど)を flow.md のメモ欄に書いて止まる |
+
+**DB への接続を確かめる**(`node tools/pms/pms.mjs db --check`。00 ■DB への接続)。パートCのカードが DB を確かめる前に、接続・ログイン・接続先を1回確かめておく(探索を終えてからカードが接続できずに止まらないようにするため)。出力の `target`(サーバ名・DB名・ログイン名)を flow.md のメモ欄に残す。終了コード1のときは出力の `reason` で分ける: `env_missing` は足りない環境情報の確認(00 ■検証環境の情報)と同じく人間にまとめて聞き、`set` で保存して `--check` をやり直す。`connect_failed`・`target_mismatch` は**作業を始めない。** flow.md のメモ欄に「DB 接続不可」と `error` を書いて止まり、利用者に伝える(ログインの方式 `db.auth`・アカウント・証明書の扱いを人間が直したら、`--check` からやり直す。復元はやり直さない)。
 
 **開始前シナリオのあと、禁止操作リストの記入状態と版を照合スクリプトで取得する**(`node tools/checks/prohibited-ops.mjs`。出力の JSON の `state` と `digest`)。flow.md のメモ欄に残し、status.yaml の `prohibited_ops` に転記する。記入状態が `unfilled` / `absent` のときは禁止操作なしとして扱う(00 ■外部操作 禁止操作リストが未記入・存在しないとき)。**リストが未記入・存在しないことを理由に、シナリオやステップを `blocked` にしない。** 再開時は取り直さず、メモ欄の値を使う。
 
@@ -478,6 +480,7 @@ metadata:
 - [ ] 工程0で環境を復元し、restore_id・purpose(`work10`)・readiness を stage10-context.json の `env_restore` に書いた(lint `env_restored`)
 - [ ] 工程0の起動完了の確認のあとに開始前シナリオを実行し、state と run_id を stage10-context.json の `pre_stage` に書いた(設定がなければ `skipped`)
 - [ ] 工程0のあとに禁止操作リストの記入状態と版を照合スクリプトで取得し、stage10-context.json の `prohibited_ops` に書いた
+- [ ] 工程0で `pms db --check` が通り、接続先(`target`)を flow.md のメモ欄に残した
 - [ ] パートA・B(R・P)で台帳に書いたID(需要ID・SD-ID・操作ID・SIG-ID)を stage10-context.json に書き、`node tools/pms/pms.mjs queue build --flow <フローID> --phase all` が終了コード 0 で終わった(stage10-context.json は schema で検査される)
 - [ ] flow.md のメモ欄に「pms run 待ち」と書き、利用者に進め方(`pms run`。チャットで進めるなら `pms-runner`)を伝えて止まった(IDE でサブエージェントを使えない場合の代わりのときは、`pms next` が `done` を返すまでカードを行い、`pms report` を実行した)
 

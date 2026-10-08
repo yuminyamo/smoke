@@ -1,5 +1,5 @@
 {
-  "_comment": "検証環境の情報の例(00_common.md ■検証環境の情報)。このファイル(.sample.json)は読まれない。実際の設定は node tools/env/env.mjs set で作る(共有: config/environments.json / 各自: config/environments.local.json。秘密情報(kind: secret)は既定で各自の方に保存され、git に入らない)。環境ID(environments の名前)と属性のキー(<対象>.<属性>)は任意に決めてよい。kind は endpoint / account / secret / other(vocab.env_attr_kind)。値は文字列だけでも書ける(kind は other として扱う)。基本キー(vocab.env_base_keys): pms.url / pms.user / pms.password / db.server / db.name",
+  "_comment": "検証環境の情報の例(00_common.md ■検証環境の情報)。このファイル(.sample.json)は読まれない。実際の設定は node tools/env/env.mjs set で作る(共有: config/environments.json / 各自: config/environments.local.json。秘密情報(kind: secret)は既定で各自の方に保存され、git に入らない)。環境ID(environments の名前)と属性のキー(<対象>.<属性>)は任意に決めてよい。kind は endpoint / account / secret / other(vocab.env_attr_kind)。値は文字列だけでも書ける(kind は other として扱う)。基本キー(vocab.env_base_keys): pms.url / pms.user / pms.password / db.server / db.name。任意キー(vocab.env_optional_keys。未登録なら既定値): db.trust_server_certificate / db.auth(windows / sql)。db.auth が sql なら db.user / db.password も要る",
   "default": "vm01",
   "environments": {
     "vm01": {
@@ -11,6 +11,9 @@
         "db.server": { "kind": "endpoint", "value": "pms-test-01\\SQLEXPRESS" },
         "db.name": { "kind": "endpoint", "value": "PMS" },
         "db.trust_server_certificate": { "kind": "other", "value": "false", "description": "この環境の SQL Server は信頼できる証明書なので検証する。未登録なら既定の true(検証を無効にして接続することを承認)。00 ■DB への接続" },
+        "db.auth": { "kind": "other", "value": "sql", "description": "混合モードの SQL Server に SQL Server 認証でログインする。未登録なら既定の windows(実行するアカウントの Windows 認証)。00 ■DB への接続" },
+        "db.user": { "kind": "account", "value": "e2e-reader" },
+        "db.password": { "kind": "secret", "description": "値は config/environments.local.json に保存する(ここには書かない)" },
         "mfp.a.host": { "kind": "endpoint", "value": "192.0.2.10", "description": "複合機A(実機)" },
         "mfp.a.admin.user": { "kind": "account", "value": "admin" },
         "mfp.a.admin.password": { "kind": "secret" },

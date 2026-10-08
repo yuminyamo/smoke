@@ -238,6 +238,25 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 
 # 改訂履歴
 
+## 35. 2026-10-09 改訂(`pms db` のパスワードの渡し方)— 手順版 proc-v025
+
+**人間の指示による改訂である。** proc-v024 を取り込んだ発生環境で `node tools/pms/pms.mjs db --check` が `"ok": false` になった。発生環境の AI の調べでは、原因は sqlcmd の `-X` とパスワードの渡し方の食い違いだった。`lib/db.mjs` はパスワードを環境変数 `SQLCMDPASSWORD` で渡していたが、同時に付けていた `-X` が環境変数の読み込みを止める。標準入力と `-X1` の組み合わせではログインできた。人間の指示は、この調べを踏まえて直すこと。
+
+**原因**: `-X` を、`ED`・`!!` などのコマンドを止めるためだけのものと考えていた。Microsoft の文書では、`-X` は環境変数を sqlcmd に渡さなくすること(と `SQLCMDINI` の起動スクリプトを実行しないこと)も含む。テストの偽物の sqlcmd は `-X` があっても `SQLCMDPASSWORD` を読んでいたため、食い違いを見つけられなかった。
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 35.1 | **`pms db` は、SQL Server 認証のパスワードを標準入力で sqlcmd に渡すようにした。** `-X` を `-X1`(止めたコマンドが現れたら警告で続けずにエラーで終わる)にした。標準入力から読むときに出ることのある `Password:` の促しは出力の先頭から外す。環境変数 `SQLCMDPASSWORD` は渡さない(呼び出し元の環境にあっても消す) | tools/pms(`lib/db.mjs`・README 2.7) |
+| 35.2 | **偽物の sqlcmd を実物に合わせた。** `-X` があれば `SQLCMDPASSWORD` を読まず、`-U` のときは標準入力のパスワードがなければログインに失敗する。`Password:` の促しを出す場合のテストを足した | tools/pms(`test-support/stub-sqlcmd.mjs`・`test/db.test.mjs`) |
+| 35.3 | 00 ■DB への接続 と `vocab.env_optional_keys.db.password` の説明の「環境変数で渡す」を「標準入力で渡す」に直した | 00 / vocab |
+| 35.4 | 発生環境の復旧手順(`docs/005_発生環境の復旧手順.md`)の7章に proc-v025 の節を足した | docs |
+| 35.5 | 手順版を `proc-v025` に更新 | vocab |
+
+### 変更していないもの
+
+- 規則([R-DB-1]・[R-DB-2])・カード・保護ブロック・`pipeline.dot` は変更していない。変わったのは `pms db` の中の sqlcmd の呼び出し方だけである
+- Windows 認証(`db.auth` が `windows`)の呼び出しは、`-X` が `-X1` になったほかは変わらない
+
 ## 34. 2026-10-08 改訂(DB への接続を `pms db` に集約)— 手順版 proc-v024
 
 **人間の指示による改訂である。** `node tools/pms/pms.mjs run --flow F-001` が `explore.close` のカードで `STOP`(`cannot_proceed: DB不変条件の検査に必要な認証確認とSELECTを実行できなかったため。探索記録上、機器グループの説明変更手順はマニュアルに記載がない。`)になった。発生環境で調べたところ、カードの AI が DB の接続情報を確かめるために `node env.mjs get db.server` などを含むコマンドを実行し、`config/pms.json` の使用禁止 `shell(node tools/env/env.mjs get:*)` に当たって拒否されていた。人間の指示は、提案した案(`pms db` の新設とそれに合わせる改訂)で手順を直すこと。DB の認証は混合モード(Windows 認証と SQL Server 認証のどちらも使える)である。

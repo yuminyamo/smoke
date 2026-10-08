@@ -12,7 +12,7 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-08 / 版: v26(DB への接続を pms db に集約: 手順版を proc-v024 に更新、env_optional_keys に db.auth・db.user・db.password を追加)
+# 改訂: 2026-10-09 / 版: v27(pms db のパスワードの渡し方: 手順版を proc-v025 に更新、db.password の説明を標準入力で渡す形に直した。前版 v26 は 2026-10-08 の DB への接続を pms db に集約)
 #       2026-10-08 / 版: v24(台帳の書式の崩れを早く見つける: 手順版を proc-v022 に更新)
 #       2026-10-08 / 版: v23(カードを使わない作業の秘密情報の入力: 手順版を proc-v021 に更新)
 #       2026-10-08 / 版: v22(作業02の画面操作の手段と skill の資格情報: 手順版を proc-v020 に更新、external_op.skill_requirement に no_credentials を追加)
@@ -41,7 +41,7 @@
 meta:
   step: 1                       # 本語彙が対象とするステップ
   revision: "2026-10-08"
-  procedure_version: proc-v024  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  procedure_version: proc-v025  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -259,7 +259,7 @@ env_optional_keys:              # 全フローで使うが、未登録なら既�
     description: db.auth が sql のときのログイン名
   db.password:
     kind: secret
-    description: db.user のパスワード(db.auth が sql のとき)。pms db が環境変数で sqlcmd に渡す。AIは取り出さない
+    description: db.user のパスワード(db.auth が sql のとき)。pms db が標準入力で sqlcmd に渡す。AIは取り出さない
 
 # ── 外部操作 ────────────────────────────────────────────
 external_op:

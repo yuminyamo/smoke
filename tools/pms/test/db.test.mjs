@@ -71,18 +71,18 @@ test('db: Windows 認証(既定)で、接続先を確かめてから SELECT を�
   const c = calls(root);
   assert.equal(c.length, 2);
   for (const x of c) {
-    assert.deepEqual(x.args.slice(0, 7), ['-S', 'pms-test-01\\SQLEXPRESS', '-d', 'PMS', '-E', '-C', '-b']);
+    assert.deepEqual(x.args.slice(0, 8), ['-S', 'pms-test-01\\SQLEXPRESS', '-d', 'PMS', '-E', '-C', '-b', '-X1']);
     assert.ok(!x.args.includes('-U'));
-    assert.equal(x.password, null);
+    assert.equal(x.stdin_password, null);
   }
   assert.match(c[0].args.at(-1), /@@SERVERNAME, DB_NAME\(\), SUSER_SNAME\(\)/);
   assert.equal(c[1].args.at(-1), 'SET NOCOUNT ON; BEGIN TRAN; SELECT JobId, Status FROM PrintJob\n; ROLLBACK TRAN;');
   assert.ok(!exists(root, 'work/PRT/exploration/db-log.jsonl'));
 });
 
-test('db: SQL Server 認証はパスワードを環境変数で渡し、引数・出力に書かない。証明書を検証する設定なら -C を付けない', () => {
+test('db: SQL Server 認証はパスワードを標準入力で渡し(-X1 は環境変数を読ませないため)、引数・出力に書かない。証明書を検証する設定なら -C を付けない', () => {
   const root = repo({ ...SQL_AUTH.attrs, 'db.trust_server_certificate': { kind: 'other', value: 'false' } }, {
-    local: SQL_AUTH.local, stub: { result: `Note\n----\n${DB_PASSWORD} と ${SECRET}\n` },
+    local: SQL_AUTH.local, stub: { result: `Note\n----\n${DB_PASSWORD} と ${SECRET}\n`, prompt: true },
   });
   const r = pms(root, ['db', '--', 'SELECT Note FROM T']);
   assert.equal(r.code, 0, r.stdout + r.stderr);
@@ -93,9 +93,15 @@ test('db: SQL Server 認証はパスワードを環境変数で渡し、引数�
   for (const x of calls(root)) {
     assert.deepEqual(x.args.slice(0, 6), ['-S', 'pms-test-01\\SQLEXPRESS', '-d', 'PMS', '-U', 'e2e-reader']);
     assert.ok(!x.args.includes('-C') && !x.args.includes('-E'));
+    assert.ok(x.args.includes('-X1'));
     assert.ok(!x.args.some((a) => a.includes(DB_PASSWORD)));
-    assert.equal(x.password, DB_PASSWORD);
+    assert.equal(x.stdin_password, DB_PASSWORD);
+    assert.equal(x.env_password, null);
   }
+  // 「Password:」の促しが標準出力に出ても、接続先の確認と行の数え方は崩れない
+  assert.deepEqual(r.json.target, { server_name: 'PMS-TEST-01\\SQLEXPRESS', db_name: 'PMS', login: 'CORP\\e2e' });
+  assert.equal(r.json.rows, 1);
+  assert.match(r.json.output, /^Note\n----\n/);
 });
 
 test('db: 環境情報の不足・接続の失敗・接続先の違い・SELECT の失敗は終了コード 1 と reason。SELECT 以外の文は sqlcmd を呼ばずに 2', () => {

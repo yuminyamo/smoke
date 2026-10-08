@@ -90,7 +90,7 @@ F-001 の `pms run` で `explore.close` のカードが「DB不変条件の検�
 
 - 文は `--` の後ろの1つの引数(`selectOnly`)。コメント・文字列・区切った識別子(`[…]`・`"…"`)を除いてから調べ、`SELECT` か `WITH` で始まる文を1つだけ受け付ける。`;` で文をつなぐもの・`INSERT`・`UPDATE`・`DELETE`・`MERGE`・DDL・`EXEC`・`INTO`(SELECT INTO)・`DECLARE`・`SET`・トランザクションの操作・`OPENROWSET` など(`FORBIDDEN`)・`xp_` / `sp_` の手続き・sqlcmd のコマンド(行頭の `:`・`!!`)・`GO`・sqlcmd の変数 `$(…)` は終了コード 2。列名がこれらの語と同じなら `[ ]` で囲む
 - 設定(`dbSettings`)は、フローの環境(最後のラウンドの `stage10-context.json` の `environment`。なければ env.mjs と同じ選び方)の環境情報から読む。`db.trust_server_certificate`・`db.auth` は `vocab.env_optional_keys` の既定値で補う。`db.server`・`db.name`(と `db.auth` が `sql` なら `db.user`・`db.password`)がなければ実行せず `reason: env_missing`(`error` に `env.mjs require --keys …` の形を書く)
-- sqlcmd の呼び出し: `<db_cli> -S <db.server> -d <db.name> (-E | -U <db.user>) [-C] -b -X -l 15 -t 60 -W -s <TAB> -w 65535 -Q <文>`。パスワードは環境変数 `SQLCMDPASSWORD` で渡す(引数に書かない。プロセスの一覧にも出ない)。`-C` は `db.trust_server_certificate` が true のとき(R-DB-1)
+- sqlcmd の呼び出し: `<db_cli> -S <db.server> -d <db.name> (-E | -U <db.user>) [-C] -b -X1 -l 15 -t 60 -W -s <TAB> -w 65535 -Q <文>`。パスワードは**標準入力**で渡す(引数に書かない。プロセスの一覧にも出ない)。proc-v024 では環境変数 `SQLCMDPASSWORD` で渡していたが、`-X` は `ED`・`!!` を止めるのと同時に**環境変数を sqlcmd に渡さなくする**ため、SQL Server 認証のログインが失敗した(F-001 の発生環境の `pms db --check`。proc-v025)。`-X1` は、止めたコマンドが現れたら警告で続けずにエラーで終わる。標準入力から読むときに sqlcmd が標準出力に出すことのある `Password:` の促しは、出力の先頭から外す(`stripPrompt`)。偽物 `stub-sqlcmd.mjs` も、`-X` があれば `SQLCMDPASSWORD` を読まない`-C` は `db.trust_server_certificate` が true のとき(R-DB-1)
 - 実行の前に、別の呼び出しで `SELECT @@SERVERNAME, DB_NAME(), SUSER_SNAME()` を実行し、`target`(`server_name`・`db_name`・`login`)として返す。`DB_NAME()` が `db.name` と違えば(大文字・小文字は区別しない)実行せず `reason: target_mismatch`。接続できなければ `connect_failed`。`@@SERVERNAME` は `db.server`(別名・ポート付きのことがある)と比べず、記録だけにする
 - 受け付けた文は `SET NOCOUNT ON; BEGIN TRAN; <文>; ROLLBACK TRAN;` で実行する(SELECT のみの検査の取りこぼしに備えた二重の守り)。失敗は `reason: query_failed`
 - 出力の `output` は sqlcmd の表(見出し・区切り線・行)を 200 行・2 万文字まで(超えたら `truncated: true`)。`rows` は見出しと区切り線のあとの行の数。出力・記録の秘密情報(全環境の kind `secret` と `db.password`)は伏せる(2.3 と同じ `mask`)
@@ -100,8 +100,8 @@ F-001 の `pms run` で `explore.close` のカードが「DB不変条件の検�
 
 実物の sqlcmd で確かめていないこと(テストは偽物 `test-support/stub-sqlcmd.mjs`。違っていたら `db_cli` か `lib/db.mjs` を直す):
 
-- `-X`・`-C`・`-s <TAB>`・`-w 65535` を、使う sqlcmd(ODBC 版・Go 版 `go-sqlcmd`)が受け付けるか
-- `SQLCMDPASSWORD` を `-U` と併せたときにパスワードとして使うか(どちらの版も文書にはある)
+- `-C`・`-s <TAB>`・`-w 65535` を、使う sqlcmd(ODBC 版・Go 版 `go-sqlcmd`)が受け付けるか。`-X1` と標準入力のパスワードの組み合わせでログインできることは、発生環境の調べで確かめられた(2026-10-09。版は報告されていない)
+- Go 版 `go-sqlcmd` が標準入力のパスワードを読むか(読まなければ、Go 版のときだけ `-X1` を外して環境変数で渡す形を考える)
 - `-h -1 -W -s <TAB>` で、接続先の確認の結果が1行のタブ区切りで出るか
 
 ### 2.6 ブラウザの locale(`config/playwright-cli.json`)

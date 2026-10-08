@@ -130,24 +130,32 @@ export function selectOnly(input) {
   return { sql: raw.replace(/;\s*$/, '') };
 }
 
-/** sqlcmd の呼び出し(config/pms.json の db_cli)。パスワードは環境変数 SQLCMDPASSWORD で渡し、引数に書かない */
+/**
+ * sqlcmd の呼び出し(config/pms.json の db_cli)。パスワードは標準入力で渡し、引数に書かない。
+ * 環境変数 SQLCMDPASSWORD は使えない: -X は ED・!! を止めるのと同時に、環境変数を sqlcmd に渡さなくする(proc-v025)。
+ * -X1 は止めたコマンドが現れたら警告で続けずにエラーで終わる
+ */
 function sqlcmd(cfg, s, query, { headers }) {
   const args = [
     '-S', s.server, '-d', s.name,
     ...(s.auth === 'sql' ? ['-U', s.user] : ['-E']),
     ...(s.trust ? ['-C'] : []),
-    '-b', '-X', '-l', String(LOGIN_TIMEOUT_SEC), '-t', String(QUERY_TIMEOUT_SEC), '-W', '-s', '\t', '-w', '65535',
+    '-b', '-X1', '-l', String(LOGIN_TIMEOUT_SEC), '-t', String(QUERY_TIMEOUT_SEC), '-W', '-s', '\t', '-w', '65535',
     ...(headers ? [] : ['-h', '-1']),
     '-Q', query,
   ];
   const env = { ...process.env };
   delete env.SQLCMDPASSWORD;
-  if (s.auth === 'sql') env.SQLCMDPASSWORD = s.password;
   const r = spawnSync(cfg.db_cli[0], [...cfg.db_cli.slice(1), ...args], {
-    encoding: 'utf8', env, timeout: (LOGIN_TIMEOUT_SEC + QUERY_TIMEOUT_SEC + 15) * 1000, maxBuffer: 16 * 1024 * 1024,
+    encoding: 'utf8', env, input: s.auth === 'sql' ? `${s.password}\n` : '', timeout: (LOGIN_TIMEOUT_SEC + QUERY_TIMEOUT_SEC + 15) * 1000, maxBuffer: 16 * 1024 * 1024,
   });
   if (r.error && r.error.code === 'ENOENT') throw new UsageError(`${cfg.db_cli[0]} が見つかりません(sqlcmd を入れるか、config/pms.json の db_cli を直す)`);
-  return { code: r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? '', error: r.error ? String(r.error.message) : null };
+  return { code: r.status ?? 1, stdout: stripPrompt(r.stdout ?? ''), stderr: r.stderr ?? '', error: r.error ? String(r.error.message) : null };
+}
+
+/** 標準入力からパスワードを読むときに sqlcmd が標準出力に出すことのある「Password:」の促しを外す */
+function stripPrompt(text) {
+  return text.replace(/^(\s*Password:[ \t]*\r?\n?)+/i, '');
 }
 
 function failText(r) {

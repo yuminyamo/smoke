@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-08 / 版: v26(DB への接続を `pms db` に集約: ■DB への接続 を書き直し、R-DB-2(DB への SELECT は `pms db` で行う)と環境情報 `db.auth`・`db.user`・`db.password` を加えた。カードのセッションで sqlcmd の直接の呼び出しを使用禁止にした。前版 v25 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
+改訂: 2026-10-09 / 版: v27(`pms db` のパスワードの渡し方: ■DB への接続 の `db.password` の渡し方を標準入力に直した。前版 v26 は 2026-10-08 の DB への接続を `pms db` に集約: ■DB への接続 を書き直し、R-DB-2(DB への SELECT は `pms db` で行う)と環境情報 `db.auth`・`db.user`・`db.password` を加えた。カードのセッションで sqlcmd の直接の呼び出しを使用禁止にした。前版 v25 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -973,7 +973,7 @@ lint の違反・人間の指摘・回帰実行の切り分けに由来するシ
 |---|---|
 | `db.server` / `db.name` | サーバ名(インスタンス名を含む)と PMS の DB 名(基本キー `vocab.env_base_keys`) |
 | `db.auth` | ログインの方式(`vocab.env_optional_keys`。未登録なら既定の `windows`)。`windows` = 実行するアカウントの Windows 認証 / `sql` = SQL Server 認証。混合モードのサーバではどちらも使える。どちらにするかは人間が環境ごとに決める |
-| `db.user` / `db.password` | `db.auth` が `sql` のときのログイン名とパスワード(`account` / `secret`)。パスワードは pms が環境変数で sqlcmd に渡し、引数・出力・記録に書かない |
+| `db.user` / `db.password` | `db.auth` が `sql` のときのログイン名とパスワード(`account` / `secret`)。パスワードは pms が標準入力で sqlcmd に渡し、引数・出力・記録に書かない |
 | `db.trust_server_certificate` | サーバ証明書の検証を無効にするか([R-DB-1]) |
 
 検証環境の SQL Server は、自己署名など信頼できない証明書で TLS 接続を求めることが多い(sqlcmd・ODBC Driver 18 以降・Node の `mssql` は既定で暗号化と証明書の検証を行う)。サーバ証明書を検証するかは、人間が環境ごとに環境情報のキー `db.trust_server_certificate` で決める。

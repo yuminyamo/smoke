@@ -12,6 +12,13 @@
 # 使用禁止(Kiro のエージェントの permissions に書く。Copilot は config/pms.json の runner.copilot.deny で CLI に渡す):
 #   deny_shell: すべての種類に共通のシェルのパターン / deny_write: 書き込みを禁止するパス
 #   kinds.<種類>.deny_shell_extra: その種類だけに足すパターン
+#
+# 入口のエージェント(runner。IDE 内のループ B1。00 ■進行役と記録の道具)も、ここから生成する:
+#   .github/agents/pms-runner.agent.md   VS Code + Copilot のチャットで選ぶエージェント。呼べるサブエージェントは agents に並べた pms-card-* だけ
+#   .kiro/agents/pms-runner.json         Kiro IDE。呼べるサブエージェントは toolsSettings.subagent.availableAgents の pms-card-* だけ
+# 本文(runner.instruction)は、どのモデルでも守れる短さにする。カードの種類とサブエージェントの対応は pms next の出力(agent・prompt)にあり、
+# 入口は対応表を覚えない。自分で使う道具は、端末で pms next・pms status を実行することと、サブエージェントを呼ぶことだけ
+# (Copilot は tools_copilot、Kiro は kiro_tools と allow_shell。VS Code の tools はコマンドごとには絞れない)。
 
 instruction: |
   あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
@@ -23,6 +30,26 @@ instruction: |
   5. カードの外の作業をしない(次のカードを取りに行かない・記録や台帳・手順書を直接書き換えない)。カードの範囲で判断できないときは、出力の result を cannot_proceed にして理由を書き、提出する
 
 tools_copilot: [read, edit, search, execute]
+
+runner:
+  name: pms-runner
+  description: "PMS 回帰テスト作成の作業10のカード(前提状態の準備・探索)を、チャットの中で1枚ずつサブエージェントに行わせる(IDE 内のループ)。「F-003 を進めて」と伝える"
+  model: [gpt-6-luna]
+  tools_copilot: [execute, agent]
+  kiro_tools: [shell, subagent]
+  allow_shell:
+    - "node tools/pms/pms.mjs next *"
+    - "node tools/pms/pms.mjs status *"
+  instruction: |
+    あなたはカードを配る係である。カードの作業は自分でしない。フローID(F-<番号>)は利用者の依頼から取る。
+
+    1. `node tools/pms/pms.mjs next --flow <フローID> --brief` を実行する
+    2. 出力の state が done なら、`node tools/pms/pms.mjs status --flow <フローID>` の要約を利用者に伝え、「エージェントを元に戻して『<フローID> の続き』と伝えてください」と添えて終わる
+    3. state が STOP なら、出力の message をそのまま利用者に伝えて終わる(出力が error なら、その文をそのまま伝えて終わる)
+    4. state が card なら、出力の agent のサブエージェントに、出力の prompt をそのまま渡す(モデルは指定しない)
+    5. サブエージェントの返事の内容にかかわらず、1 に戻る。利用者には1カード1行(カードID・種類・対象)だけを伝える
+
+    利用者が「続けて」と言ったら、1 から始める(進み具合はファイルにあるので、前の会話を思い出さなくてよい)。
 
 deny_shell:
   - "playwright-cli *"

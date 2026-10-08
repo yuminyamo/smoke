@@ -12,6 +12,7 @@ import { TEMP_REF } from './checks.mjs';
 import { DONE_STATUS } from './store.mjs';
 import { validate } from './schema.mjs';
 import { exploreCards, prepareExplore, exploreVars, EXPLORE_TODO } from './explore.mjs';
+import { cardType, promptOf } from './agents.mjs';
 
 export const PMS = 'node tools/pms/pms.mjs';
 // ゴールデンイメージの復元そのものである状態。カードにせず、工程0の復元を記録する(lint の requires_covered と同じ扱い)
@@ -393,7 +394,7 @@ export function skipCard(q, c, reason) {
 
 function runner() { return process.env.PMS_RUNNER || 'b1'; }
 
-function issue(ctx, q, c, reissue) {
+function issue(ctx, q, c, reissue, brief) {
   if (!reissue) {
     c.status = 'issued';
     c.issued_count = 1;
@@ -402,14 +403,15 @@ function issue(ctx, q, c, reissue) {
   q.history.push({ at: c.issued_at, card: c.id, event: reissue ? 'reissued' : 'issued', runner: runner() });
   const body = renderCard(ctx, q, c, reissue);
   ctx.store.saveQueue(q);
-  return { code: 0, out: cardOutput(ctx, q, c, body) };
+  return { code: 0, out: cardOutput(ctx, q, c, brief ? null : body) };
 }
 
 /**
- * @param {{phases?: string[]}} opts phases を渡すと、そのフェーズのカードだけを扱う(pms run --phase)
+ * @param {{phases?: string[], brief?: boolean}} opts phases を渡すと、そのフェーズのカードだけを扱う(pms run --phase)。
+ *   brief なら出力に本文(body)を載せない(B1 の入口のエージェントの会話にカードの本文を溜めないため。本文は card_file にある)
  * @returns {{out: object, code: number}} code 0 = カード / done、3 = STOP
  */
-export function nextCard(ctx, flow, { phases = null } = {}) {
+export function nextCard(ctx, flow, { phases = null, brief = false } = {}) {
   const { store, cfg } = ctx;
   const q = store.loadQueue(flow);
   const inScope = (c) => !phases || phases.includes(phaseOf(c));
@@ -423,7 +425,7 @@ export function nextCard(ctx, flow, { phases = null } = {}) {
       stopCard(q, issued, `出した回数が上限(${cfg.max_issues} 回。config/pms.json の max_issues)に達したが、合格した提出がない`, 'issue_limit');
       chainStop(q, issued);
     } else {
-      return issue(ctx, q, issued, true);
+      return issue(ctx, q, issued, true, brief);
     }
   }
   for (;;) {
@@ -437,7 +439,7 @@ export function nextCard(ctx, flow, { phases = null } = {}) {
     if (!pending) break;
     // 探索のカードは、出す前に前提状態と前のステップを確かめる(blocked なら pms が記録だけを書く)
     const prep = pending.kind.startsWith('explore.') || pending.kind === 'report.findings' ? prepareExplore(ctx, q, pending) : 'issue';
-    if (prep === 'issue') return issue(ctx, q, pending, false);
+    if (prep === 'issue') return issue(ctx, q, pending, false, brief);
     // skipped・stopped になった。続けて次を見る
   }
   store.saveQueue(q);
@@ -475,13 +477,25 @@ export function nextCommand(q, c, paths) {
 }
 
 function cardOutput(ctx, q, c, body) {
+  const cardFile = ctx.paths.card(q.flow_id, c.id);
   return {
     state: 'card', flow: q.flow_id, card: c.id, kind: c.kind, state_id: c.state_id ?? null, target: targetOf(c), issued_count: c.issued_count,
-    card_file: ctx.paths.card(q.flow_id, c.id), out_file: ctx.paths.out(q.flow_id, c.id),
+    card_file: cardFile, out_file: ctx.paths.out(q.flow_id, c.id),
+    // B1: 入口のエージェント pms-runner は、agent のサブエージェントに prompt をそのまま渡す(対応表を覚えなくてよいように)
+    agent: cardType(ctx, c.kind).agent,
+    prompt: promptOf(q.flow_id, c.id, cardFile),
     now: { flow: q.flow_id, card: c.id, kind: c.kind, state_id: c.state_id ?? null, target: targetOf(c), todo: todoOf(c) },
-    body,
+    ...(body == null ? {} : { body }),
     next: nextCommand(q, c, ctx.paths),
   };
+}
+
+/** パートCのカードが全部終わったのに、そのあとで報告書を作っていない(B1 では pms run の代わりに入口 skill が pms report を実行する) */
+function reportPending(q) {
+  if (!q.cards.some((c) => phaseOf(c) === 'C') || q.cards.some((c) => !isDone(c))) return false;
+  const lastReport = q.history.findLastIndex((h) => h.event === 'report');
+  const lastCard = q.history.findLastIndex((h) => h.card);
+  return lastReport < lastCard;
 }
 
 export function statusOf(ctx, flow) {
@@ -503,6 +517,7 @@ export function statusOf(ctx, flow) {
     stopped: q.cards.filter((c) => c.status === 'stopped').map((c) => ({ card: c.id, kind: c.kind, state_id: c.state_id ?? null, target: targetOf(c), code: c.stop?.code ?? null, reason: c.stop?.reason ?? '' })),
     auto: q.auto, warnings: q.warnings,
     complete: count('pending') + count('issued') === 0,
+    report_pending: reportPending(q),
     next: cur ? nextCommand(q, cur, ctx.paths) : count('pending') ? `${PMS} next --flow ${flow}` : null,
   };
 }

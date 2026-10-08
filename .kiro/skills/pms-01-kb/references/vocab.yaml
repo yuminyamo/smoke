@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-08 / 版: v20(低価格モデル対応 段2 スクリプト実行: 手順版を proc-v018 に更新、pms_card_kind に explore.step・explore.close・explore.session_close・report.findings、pms_card_status に skipped、pms_reject_kind に expected_changed・verdict_evidence・health_time・blocked_refs、pms_act_action に screenshot、pms_runner・pms_stop_reason・discrepancy_kind・discrepancy_assessment・reflection_target を追加)
+# 改訂: 2026-10-08 / 版: v21(低価格モデル対応 段3 IDE 内のループ: 手順版を proc-v019 に更新、pms_runner の b1 を IDE 内のループ(入口のエージェント pms-runner がカードごとにサブエージェントを起こす)に書き直した)
+#       2026-10-08 / 版: v20(低価格モデル対応 段2 スクリプト実行: 手順版を proc-v018 に更新、pms_card_kind に explore.step・explore.close・explore.session_close・report.findings、pms_card_status に skipped、pms_reject_kind に expected_changed・verdict_evidence・health_time・blocked_refs、pms_act_action に screenshot、pms_runner・pms_stop_reason・discrepancy_kind・discrepancy_assessment・reflection_target を追加)
 #       2026-10-07 / 版: v19(低価格モデル対応 段1 共通の土台: 手順版を proc-v017 に更新、pms_card_kind・pms_card_status・pms_reject_kind・pms_act_action・locator_class・pms_vague_words・id_format.card・id_format.rule を追加)
 #       2026-10-06 / 版: v18(setup-log の記録の強化: 手順版を proc-v016 に更新)
 #       2026-10-04 / 版: v17(リモートコマンドの整備: 手順版を proc-v015 に更新)
@@ -36,7 +37,7 @@
 meta:
   step: 1                       # 本語彙が対象とするステップ
   revision: "2026-10-08"
-  procedure_version: proc-v018  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  procedure_version: proc-v019  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -560,7 +561,7 @@ locator_class:                  # pms act が generate-locator で取ったロ�
 pms_vague_words: [適宜, など, 必要に応じて, 等]   # pms submit が red_flag として検出するあいまいな語(「等」は「〜等」の形)
 
 pms_runner:                     # カードを行った実行形態(環境変数 PMS_RUNNER。submit-log.jsonl に残し、pms stats で分ける。未設定は b1)
-  b1: IDE のチャットの中でカードを順に行う(チャットの作業10。段3で IDE 内のループに置き換える)
+  b1: IDE のチャットで進める(副経路)。入口のエージェント pms-runner が、カードごとにカードの種類のエージェントをサブエージェントとして起こす(IDE でサブエージェントを使えないときは、同じ会話の中で順に行う)
   b2: 進行役 pms run がカードごとに新しいAIのセッション(Copilot CLI / Kiro CLI)を起こす(主な経路)
 
 pms_stop_reason:                # STOP(人間の確認待ち)の理由の区分(queue.json のカードの stop.code、pms run の出力の code)

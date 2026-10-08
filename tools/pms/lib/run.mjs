@@ -11,33 +11,12 @@ import { nextCard, phaseOf, isDone, cardOrder, targetOf, PMS } from './queue.mjs
 import { buildReport } from './report.mjs';
 import { secretsToMask, mask } from './store.mjs';
 import { timestamp, UsageError, writeText } from './util.mjs';
+import { cardType, agentName, promptOf } from './agents.mjs';
 
 const LINT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'lint', 'lint.mjs');
 
-/**
- * カードの種類のエージェント・モデル・追加の使用禁止。エージェントとモデルは config の cardTypes が procedure/cards/agents.yaml より優先。
- * 使用禁止のパターンは CLI ごとに書き方が違うため、config(runner.<名前>.deny と cardTypes.<種類>.deny)にだけ書く
- */
-export function cardType(ctx, kind) {
-  const a = ctx.proc.agents?.kinds?.[kind] ?? {};
-  const c = ctx.cfg.cardTypes?.[kind] ?? {};
-  const models = c.model ?? a.model ?? [];
-  return {
-    agent: c.agent ?? agentName(kind),
-    model: (Array.isArray(models) ? models : [models]).filter(Boolean)[0] ?? '',
-    deny: c.deny ?? [],
-  };
-}
-
-/** カードの種類のエージェントの名前(build-skills.mjs が生成するファイルの名前と同じ) */
-export function agentName(kind) { return `pms-card-${kind.replace(/[._]/g, '-')}`; }
-
-/** セッションに渡す依頼文(短く固定。カードの本文はファイルのパスで渡す。コマンドラインの長さに頼らない) */
-export function promptOf(flow, card, cardFile) {
-  return `あなたは進行役 pms が出したカード ${card}(${flow})だけを行う。まず ${cardFile} を読み、その指示どおりに行い、`
-    + 'カードの「終わったら」のコマンド(pms submit)で提出する。提出が不合格なら、返された理由のところだけを直して再提出する。'
-    + '合格したら終わる。カードの外の作業をしない。';
-}
+// カードの種類のエージェント・モデル・依頼文は lib/agents.mjs(pms next の B1 と共通)
+export { cardType, agentName, promptOf };
 
 /** 雛形を展開する({prompt} などを置き換え、要素 "{deny}" を使用禁止の引数に広げる) */
 export function expandCommand(rc, vars, deny) {

@@ -4,7 +4,10 @@
 //   node tools/pms/pms.mjs queue build --flow F-003 --phase A|C|all [--scenarios SC-PRT-01,SC-PRT-02]
 //                                   カードを作る(A = 対象シナリオの requires の状態、C = シナリオのステップ・終わりの処理・報告の所見)。
 //                                   C は work/_flows/F-003/stage10-context.json(工程0〜パートBの事実)が要る。C は前のラウンドが終わっていれば足せる(パートP)
-//   node tools/pms/pms.mjs next   --flow F-003 [--phase A|C]   次のカードを出す(終わっていれば done、人間の判断が要れば STOP)
+//   node tools/pms/pms.mjs next   --flow F-003 [--phase A|C] [--brief]
+//                                   次のカードを出す(終わっていれば done、人間の判断が要れば STOP)。カードの出力には、カードを渡す
+//                                   サブエージェントの名前(agent)と依頼文(prompt)が入る。--brief は本文(body)を出さない
+//                                   (IDE 内のループ(B1)の入口のエージェント pms-runner が使う。本文は card_file にある)
 //   node tools/pms/pms.mjs act    --flow F-003 --card C-0001 [--intent "<目的>"] <操作> [引数...]
 //                                   画面操作を1回実行し、記録(act-log.jsonl)に1行書く。操作は vocab.pms_act_action:
 //                                     open <URL|<env:キー>> / goto <URL|<env:キー>> / snapshot / screenshot [ref] /
@@ -19,12 +22,13 @@
 //                                   報告書(report.md)の数値・一覧と status.yaml を記録から作る(所見は report.findings のカードの出力)
 //   node tools/pms/pms.mjs stats  [--flow F-003 | --since 2026-10-01] [--json]
 //                                   カードの種類・実行形態ごとの初回合格率・提出の回数・不合格の区分・出し直し・STOP、記録の必須欄の充足率
-//   node tools/pms/pms.mjs status --flow F-003 [--json]   現在のカード・残りの枚数・止まっている理由
+//   node tools/pms/pms.mjs status --flow F-003 [--json]   現在のカード・残りの枚数・止まっている理由・報告書を作る必要があるか(report_pending)
 //   node tools/pms/pms.mjs reopen --flow F-003 --card C-0001   (人間が使う)STOP のカードを出す前に戻す
 //
 // 共通オプション: --root <dir>(リポジトリのルート。既定: このスクリプトの2階層上)
 // 設定: config/pms.json(なければ既定値。run は runner が要る。見本 config/pms.sample.json)。時刻は環境変数 PMS_NOW で固定できる(テスト用)
-// 環境変数 PMS_RUNNER(b1 / b2。vocab.pms_runner): 提出の記録に実行形態を残す。pms run は起こすセッションに b2 を付ける
+// 環境変数 PMS_RUNNER(b1 / b2。vocab.pms_runner): 提出の記録に実行形態を残す。pms run は起こすセッションに b2 を付ける。
+//   未設定は b1(IDE 内のループ: 入口のエージェント pms-runner がカードごとにサブエージェントを起こす)
 //
 // 出力: 標準出力に JSON を1つ(status・stats は --json のときだけ JSON。snapshot は画面の内容のあとに「--- pms ---」の行と JSON)。
 //       人間向けの説明は標準エラー出力。秘密情報の値は出力と記録のどこにも書かない(<env:キー> と書く)。
@@ -51,7 +55,7 @@ import { buildReport } from './lib/report.mjs';
 import { stats, statsText } from './lib/stats.mjs';
 
 const argv = process.argv.slice(2);
-const opt = { root: null, flow: null, card: null, phase: null, file: null, intent: null, scenarios: null, json: false, runner: null, maxCards: null, dryRun: false, since: null, dodUnmet: null };
+const opt = { root: null, flow: null, card: null, phase: null, file: null, intent: null, scenarios: null, json: false, runner: null, maxCards: null, dryRun: false, since: null, dodUnmet: null, brief: false };
 const pos = [];
 let rawAll = false;
 let argError = null;
@@ -75,6 +79,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--runner') opt.runner = next();
   else if (a === '--max-cards') { const v = next(); opt.maxCards = /^\d+$/.test(String(v)) ? Number(v) : -1; }
   else if (a === '--dry-run') opt.dryRun = true;
+  else if (a === '--brief') opt.brief = true;
   else if (a === '--since') opt.since = next();
   else if (a === '--dod-unmet') opt.dodUnmet = next();
   else if (a === '-h' || a === '--help') { help(); process.exit(0); }
@@ -113,7 +118,7 @@ try {
       };
       break;
     }
-    case 'next': res = nextCard(ctx, opt.flow, { phases: opt.phase && opt.phase !== 'all' ? [opt.phase] : null }); break;
+    case 'next': res = nextCard(ctx, opt.flow, { phases: opt.phase && opt.phase !== 'all' ? [opt.phase] : null, brief: opt.brief }); break;
     case 'run': res = run(ctx, opt); break;
     case 'report': res = buildReport(ctx, opt.flow, { dodUnmet: opt.dodUnmet }); break;
     case 'stats': {
@@ -152,6 +157,7 @@ function statusText(s) {
   for (const x of s.stopped) lines.push(`人間の確認待ち: ${x.card}(${x.kind} / ${x.target})— ${x.reason}`);
   for (const a of s.auto) lines.push(`pms が記録した状態: ${a.state_id}(${a.classification}・${a.reason}${a.handoff ? `・${a.handoff}` : ''})`);
   for (const w of s.warnings) lines.push(`警告: ${w}`);
+  if (s.report_pending) lines.push(`報告書と status.yaml がまだない: node tools/pms/pms.mjs report --flow ${s.flow}`);
   lines.push(s.complete ? 'カードはすべて終わっている' : `次: ${s.next}`);
   return lines.join('\n');
 }

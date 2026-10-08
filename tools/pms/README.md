@@ -1,6 +1,6 @@
 # tools/pms — 進行役(操作の記録・タスクキュー・カード・提出の検査・セッションの起動・報告書の生成)
 
-手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
+手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。proc-v019 で IDE 内のループ(B1。入口のエージェント `pms-runner`)のために `next` の出力にエージェントの名前と依頼文を足した(`03_IDE内ループ.md`、段3。14章)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
 
 - Node.js 18 以上だけで動く(外部パッケージなし)。playwright-cli を呼ぶのは `pms act` だけ、AI の CLI を呼ぶのは `pms run` だけ
 - テスト: `node --test tools/pms/test/`(playwright-cli・AI の CLI・環境情報は偽物に差し替える。`test-support/`。カードを行うAIの代わりは `test-support/explore-agent.mjs`)
@@ -11,16 +11,16 @@
 | コマンド | すること | 標準出力 | 終了コード |
 |---|---|---|---|
 | `queue build --flow F --phase A\|C\|all [--scenarios SC-…,…]` | A: 対象シナリオの `requires` からフェーズAのカードを作る(3章)。初期状態セット外の状態と `S-CLEAN-ENV` は、その場で setup-log(と申し送り台帳)に書く。C: パートCのカードを1ラウンド分作る(9章)。`stage10-context.json` が要る | `{ok, flow, phase, cards[](今回足したカード), auto[], warnings[], next}` | 0 / 2(フェーズAが既にある・パートCのカードが残っている・対象シナリオがない・stage10-context.json がない など) |
-| `next --flow F [--phase A\|C]` | 次のカードを出す(4章) | `{state: "card", card, kind, state_id, target, issued_count, card_file, out_file, now, body, next}` / `{state: "done", passed, skipped, stopped[], message, next}` / `{state: "STOP", card, kind, target, code, reason, message, remaining, next}` | 0(カード・done)/ 3(STOP)/ 2 |
+| `next --flow F [--phase A\|C] [--brief]` | 次のカードを出す(4章)。`--brief` は本文(`body`)を出さない(14章) | `{state: "card", card, kind, state_id, target, issued_count, card_file, out_file, agent, prompt, now, body, next}` / `{state: "done", passed, skipped, stopped[], message, next}` / `{state: "STOP", card, kind, target, code, reason, message, remaining, next}` | 0(カード・done)/ 3(STOP)/ 2 |
 | `run --flow F [--phase A\|C\|all] [--runner 名前] [--max-cards N] [--dry-run]` | カードを1枚ずつ新しいAIのセッションで行わせる(10章) | `{state: "done", sessions[], report, lint}` / `{state: "STOP", card, code, reason, message, sessions[]}` / `{state: "paused"}` / `{state: "error", error}` / `{state: "dry-run", card, command[], stdin, timeoutSec}` | 0(全部終わった)/ 3(STOP。lint 止まりを含む)/ 1(実行の失敗)/ 4(`--max-cards` で止めた)/ 2 |
 | `report --flow F [--dod-unmet "<理由>"]` | 報告書と status.yaml を記録から作る(11章) | `{ok, flow, wrote[], summary[], next}` | 0 / 2(カードが終わっていない) |
 | `stats [--flow F \| --since YYYY-MM-DD] [--json]` | カードの合格率などを集計する(12章) | `--json` なら `{flows, since, by_kind[], records}`、なければ表 | 0 / 2 |
 | `act --flow F --card C [--intent "…"] <操作> [引数…]` | 画面操作を1回実行し、act-log に1行書く(2章) | `{ok, seq, action, locator, locator_class, unique, url_after, error, warnings[], now, next, hint}`。`snapshot` は画面の内容のあとに `--- pms ---` の行と同じ JSON | 0 / 1(操作の失敗・assert の不成立)/ 2 |
 | `submit --flow F --card C [--file …]` | 出力を検査し、合格なら記録を書く(5章) | 合格 `{ok: true, card, result, status, wrote[], next, hint}` / 不合格 `{ok: false, card, attempt, rejections, stopped, failures[{category, message, fix}], next, hint}` | 0(合格。`cannot_proceed` の受け付けを含む)/ 1(不合格)/ 2 |
-| `status --flow F [--json]` | 現在のカード・枚数・STOP の理由・pms が記録した状態・警告 | `--json` なら JSON、なければ人間向けの文 | 0 / 2 |
+| `status --flow F [--json]` | 現在のカード・枚数・STOP の理由・pms が記録した状態・警告・`complete`・`report_pending`(パートCのカードが全部終わったのに、そのあとで `pms report` をしていない。14章) | `--json` なら JSON、なければ人間向けの文 | 0 / 2 |
 | `reopen --flow F --card C` | (人間が使う)STOP のカードを `pending` に戻し、出した回数・不合格の回数を 0 にする。続けて止めた後続のステップ(`chained_from`)も戻す | `{ok, flow, card, reopened[], status, next}` | 0 / 2 |
 
-- 共通: `--root <dir>`(既定はこのスクリプトの2階層上)。時刻は環境変数 `PMS_NOW` で固定できる(テスト用)。環境変数 `PMS_RUNNER`(`vocab.pms_runner`。未設定は `b1`)を提出の記録と出したカードの履歴に残す
+- 共通: `--root <dir>`(既定はこのスクリプトの2階層上)。時刻は環境変数 `PMS_NOW` で固定できる(テスト用)。環境変数 `PMS_RUNNER`(`vocab.pms_runner`。未設定は `b1`。IDE のチャットの端末では設定されない)を提出の記録と出したカードの履歴に残す
 - 使い方・設定の誤りは、標準出力に `{ok: false, error}`、標準エラー出力に `ERROR: …`、終了コード 2
 - **`process.exit` を使わない**(`process.exitCode` を使う)。大きな出力(カードの本文)をパイプに書いた直後に `exit` すると、出力が途中で切れるため
 
@@ -283,3 +283,41 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 - `--agent` に、`.github/agents/pms-card-*.agent.md` のファイル名(`.agent.md` を除いた名前)を渡せるか
 - Kiro CLI の `permissions` と `toolsSettings` を同じエージェントに書いてよいか(旧形式を受け付けない版なら `toolsSettings` を外す)。Kiro のモデルIDを `kinds.<種類>.kiro_model` に書くか
 - 1枚 900 秒の上限が、探索のステップに足りるか(`runner.<名前>.timeoutSec`)
+
+## 14. IDE 内のループ(段3。B1。入口のエージェント `pms-runner`)
+
+### 14.1 流れ
+
+1. 利用者が IDE のチャットのエージェントを `pms-runner` に切り替え、「F-003 を進めて」と伝える
+2. `pms-runner` が `node tools/pms/pms.mjs next --flow F-003 --brief` を実行する
+3. `state: "card"` なら、出力の `agent`(カードの種類のエージェント `pms-card-<種類>`)をサブエージェントとして呼び、出力の `prompt` をそのまま渡す。サブエージェントは `prompt` に書かれたカードのファイルを読み、カードを行い、`pms submit` で提出する(B2 のセッションと同じエージェント・同じ依頼文)
+4. サブエージェントの返事の内容にかかわらず 2 に戻る。提出されていなければ、次の `next` が同じカードを出し直す(4章の1。上限 `max_issues` で STOP)
+5. `done` なら `pms status` の要約を、`STOP` なら `message` を利用者に伝えて終わる。利用者が「続けて」と言えば 2 から(キューはファイルにある)
+6. 全部終わったら、入口 skill(`pms-regression`)が次の「続き」で `status` の `report_pending` を見て `pms report` を実行し、完了前の lint を行う(B2 では `pms run` が行うもの)
+
+入口のエージェントの本文は `procedure/cards/agents.yaml` の `runner.instruction`(5行の手順)。生成は `tools/build-skills/build-skills.mjs`(Copilot: `.github/agents/pms-runner.agent.md`、Kiro: `.kiro/agents/pms-runner.json`)。
+
+### 14.2 判断と根拠
+
+| 判断 | 根拠 |
+|---|---|
+| カードの出力に `agent`(`lib/agents.mjs` の `cardType`。`config.cardTypes.<種類>.agent` があればそちら)と `prompt`(`promptOf`。B2 と同じ文)を入れる | 入口がカードの種類とエージェントの対応表を覚えなくてよいように(改訂指示 3.1)。B1 と B2 で依頼文を同じにし、計測の違いを実行形態だけにする |
+| 入口はサブエージェントにカードの**本文ではなく** `prompt`(カードのファイルのパス)を渡し、`next` を `--brief` で呼ぶ | 改訂指示 3.1 は「カードの本文をそのまま渡す」だが、本文(探索のカードは KB の抜粋を含み数千字)を入口のモデルが写すと、写し間違い・省略が起きうる。また、本文が入口の会話に毎回積もり、数十枚でコンパクションが起きる(P2 に反する)。本文は `next` がファイルに書いており、サブエージェントは B2 と同じくファイルを読む |
+| 報告書は入口のエージェントではなく入口 skill が作る(`report_pending`) | 入口のエージェントの道具を `pms next`・`pms status` とサブエージェントの呼び出しだけにし、本文を5行に保つため。`report_pending` は、パートCのカードが全部終わり、履歴の最後の `report` がカードの出来事(出した・合格・STOP・skipped・セッション・reopen)より前のとき true。B2 の `pms run` は lint の前に `report` を書くので false になる |
+| `pms-runner` の `disable-model-invocation: true` | ほかのエージェントがループそのものをサブエージェントとして呼ばないように |
+| カードのエージェントは段2のまま(`user-invocable` を付けない) | Copilot CLI の `--agent`(B2)への影響を確かめていないため。エージェントの選択の一覧にカードのエージェントも出る |
+
+### 14.3 2026-10-08 に公式のドキュメントで確かめたこと(実物では動かしていない)
+
+| IDE | 確かめたこと | 出典 |
+|---|---|---|
+| VS Code + Copilot | カスタムエージェントは `.github/agents/*.agent.md`。frontmatter の `agents`(サブエージェントとして呼べるエージェントの名前の一覧。`tools` に `agent` が要る)・`model`(文字列か候補の配列)・`tools`・`user-invocable`(エージェントの選択の一覧に出すか。既定 true)・`disable-model-invocation`(ほかのエージェントからサブエージェントとして呼ばせない。既定 false)。サブエージェントのモデルは、呼ぶ側が明示したモデル → **呼ばれたカスタムエージェントの `model`** → Auto → 会話のモデル の順。サブエージェントは会話の履歴を引き継がず、最後の結果だけを返す。入れ子は既定で無効(`chat.subagents.allowInvocationsFromSubagents`)。エージェントの切り替えはチャットの Agent のドロップダウン | code.visualstudio.com「Custom agents」「Subagents」 |
+| Kiro IDE | カスタムエージェントは `.kiro/agents/<名前>.json`(または `.md`)。IDE でもカスタムエージェントをサブエージェントとして呼べる。呼ぶ側の `tools` に `subagent`、呼べるエージェントは `toolsSettings.subagent.availableAgents`(glob)、確認なしで呼ぶのは `trustedAgents`。`permissions.rules` の `capability` に `subagent`。エージェントの切り替えは、チャットの入力欄の行のエージェントの選択。**Workflows を有効にしていると、カスタムエージェントへの委任がバックグラウンドの実行になる** | kiro.dev「Subagents」「Custom agents」「Agent configuration reference」「Agent selector」 |
+
+実物で確かめること(人間に頼む。違っていたら `procedure/cards/agents.yaml` の `runner` と生成スクリプトを直す):
+
+- VS Code で `pms-runner` がエージェントの選択に出て、`agents` に並べたカードのエージェントだけをサブエージェントとして呼べるか。`tools: [execute, agent]` で端末のコマンドとサブエージェントの呼び出しができるか
+- サブエージェントがカードのエージェントの `model`(`gpt-6-luna`)で動くか。VS Code が `model` に IDの形(`gpt-6-luna`)ではなく表示名の形(`GPT-6 Luna (copilot)` など)を求める場合は、`kinds.<種類>.model` に候補として足す(配列の先頭だけを書く今の生成を、配列を書く形に直す)
+- サブエージェントの端末で `PMS_RUNNER` が設定されず、提出の記録が `b1` になるか(`pms stats` で `b1` と `b2` が分かれるか)
+- Kiro IDE で、Workflows を有効にしているときに、入口がサブエージェントの終わりを待たずに `pms next` を呼ばないか。呼ぶと、同じカードが二重に出る(出し直しの回数が増え、上限で STOP になる)。待たない場合は、`pms-runner` を使うあいだ Workflows を無効にする(利用説明書の既知の制約)
+- Kiro IDE で、`permissions` の `allow` と `toolsSettings` の旧形式を併記した `pms-runner.json` を読めるか

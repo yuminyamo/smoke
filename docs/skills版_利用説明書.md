@@ -61,8 +61,13 @@ AIに対象の機能を伝えるだけで、次のことを手順書どおりに
   AI : シナリオを作る(フロー番号 F-xxx が付く)
   AI : 「シナリオができました。端末で node tools/pms/pms.mjs run --flow F-xxx を実行してください」 ← proc-v018 以降
 
-あなた(端末): node tools/pms/pms.mjs run --flow F-xxx
+あなた(端末): node tools/pms/pms.mjs run --flow F-xxx          ← 端末で進める(既定)
   進行役: 前提状態の準備と画面での確認を、カードごとに新しいAIのセッションで行い、報告書まで作る
+
+ ※ チャットで進めるときは、端末の代わりに次のようにします(proc-v019 以降)
+あなた: (チャットのエージェントを pms-runner に切り替えて)F-xxx を進めて
+  AI : カードを1枚ずつ別のAI(サブエージェント)に行わせ、1枚ごとに1行で知らせる
+  AI : 「終わりました。エージェントを元に戻して『F-xxx の続き』と伝えてください」
 
 あなた: /pms-regression F-xxx の続き
   AI : 記録を検査して「終わりました。新しいチャットで『F-xxx の続き』と伝えてください」 ← ここで必ず止まる
@@ -89,7 +94,13 @@ AIに対象の機能を伝えるだけで、次のことを手順書どおりに
 - 途中で中断しても、`F-xxx の続き` で再開できます(進み具合はファイルに残っています)
 - シナリオを作ったあとの前提状態の準備(ログイン済みにする・テスト用デバイスを登録する など)と、画面での確認(探索)は、進行役のプログラム(`tools/pms/pms.mjs`)が「カード」に分けて行います(前提状態の準備は proc-v017、探索は proc-v018 以降)。**端末で `node tools/pms/pms.mjs run --flow F-xxx` を実行すると、進行役がカードを1枚ずつ、新しいAIのセッション(Copilot CLI か Kiro CLI)に行わせます。** AIが途中で止まっても進行役が同じカードをやり直させ、提出されたかどうかは進行役が記録で確かめます。画面の操作・記録・報告書の数値はプログラムが作るので、AIが記録を書き忘れることはありません。終わったらチャットで「F-xxx の続き」と伝えます
 - `pms run` は時間がかかります(1枚の上限は既定で15分)。途中で止めたいときは Ctrl+C で止め、もう一度 `pms run` を実行すれば続きから行います。進み具合は `node tools/pms/pms.mjs status --flow F-xxx` で見られます
-- Copilot CLI・Kiro CLI を使えない環境では、チャットで「`pms run` を実行できない」と伝えてください。チャットの中でカードを順に行います(時間がかかり、長い会話になります)
+- **進め方は2つから選べます**(proc-v019 以降)。ふだんは**端末で進める**(`pms run`。既定)を使います。人がそばにいなくても進み、AIの会話が長くならないためです。**チャットで進める**は、チャットのエージェントを `pms-runner` に切り替えて「F-xxx を進めて」と伝える方法です。次のときに使います
+  - AIの動きを見ながら、おかしければその場で止めたいとき(初めての画面を探索するとき・カードの中身を作り込むとき)
+  - 途中で人の判断(環境の情報が足りない・許可が要る操作など)が要りそうで、その場で答えたいとき
+  - Copilot CLI・Kiro CLI を使えないとき
+- エージェントの切り替え方: VS Code はチャットの **Agent のドロップダウン**で `pms-runner` を選びます。Kiro はチャットの入力欄の行にある**エージェントの選択**で `pms-runner` を選びます。終わったら元のエージェントに戻し、`/pms-regression F-xxx の続き` と伝えます(報告書と記録の検査はそこで行います)
+- チャットで進めていて止まった(「続けますか」と聞かれた・返事が途中で終わった)ときは、`pms-runner` に「続けて」と伝えれば続きから進みます。進み具合はファイルにあるので、やり直しにはなりません。どちらの進め方でも、記録・検査・報告書は同じです
+- IDE でサブエージェントを使えない(`pms-runner` が一覧に出ない・別のAIを呼べない)ときは、`/pms-regression F-xxx の続き。pms-runner を使えない` と伝えてください。チャットの中でカードを順に行います(時間がかかり、長い会話になります)
 - コード生成の前とフローの完了の前に、AIが記録を自動で検査します(lint)。決まりを満たしていない箇所が見つかると、「作業10で直します」などと伝えたうえで、AIが自分で前の作業に戻って直します。止まらないので、そのままで構いません
 
 ## 5. 止まって「管理者の判断が必要」と言われたら
@@ -102,7 +113,7 @@ AIは止まった理由と、誰に何を頼めばよいかを伝えてきます
 
 記録の検査(lint)で、AIがやり直しても直らない問題が残ったときも止まります。伝えられた内容を管理者に伝えてください。
 
-カードで、AIが同じカードを何度やっても合格しなかったとき、またはカードの範囲で判断できなかったときは、`pms run` が「カード C-xxxx は人間の確認待ちです: (理由)」と出して止まります(STOP。終了コード 3)。内容を管理者に伝えてください。そのカードを後回しにして残りを進めてよければ、**もう一度 `node tools/pms/pms.mjs run --flow F-xxx` を実行します**(残りのカードを続け、そのカードは報告書に載ります。探索のステップのカードなら、同じシナリオの後のステップも後回しになります)。管理者が原因を直してそのカードをやり直させるときは、`node tools/pms/pms.mjs reopen --flow F-xxx --card C-xxxx` を実行してから `pms run` を実行します。チャットでカードを行っている場合(`pms run` を使えない環境)は、`/pms-regression F-xxx の続き。C-xxxx は後回しでよい(ゆうさん)` のように伝えます。
+カードで、AIが同じカードを何度やっても合格しなかったとき、またはカードの範囲で判断できなかったときは、`pms run` が「カード C-xxxx は人間の確認待ちです: (理由)」と出して止まります(STOP。終了コード 3)。内容を管理者に伝えてください。そのカードを後回しにして残りを進めてよければ、**もう一度 `node tools/pms/pms.mjs run --flow F-xxx` を実行します**(残りのカードを続け、そのカードは報告書に載ります。探索のステップのカードなら、同じシナリオの後のステップも後回しになります)。管理者が原因を直してそのカードをやり直させるときは、`node tools/pms/pms.mjs reopen --flow F-xxx --card C-xxxx` を実行してから `pms run` を実行します。チャットの `pms-runner` で進めている場合は、`pms-runner` が同じ文を伝えて止まります。後回しでよければ `pms-runner` に「続けて」と伝えます(やり直させるときは、先に `reopen` を実行します)。`pms-runner` も使えずチャットの中でカードを行っている場合は、`/pms-regression F-xxx の続き。C-xxxx は後回しでよい(ゆうさん)` のように伝えます。
 
 `pms run` が報告書を作ったあとの記録の検査(lint)で直すところが見つかったときも止まります(「lint 止まり」)。チャットで `F-xxx の続き` と伝えると、作業10が指摘を直します。
 
@@ -207,7 +218,7 @@ skills版/
 
 作業ごとの skill の中身は、`SKILL.md`(stages.md の該当節と読み込み指示)と `references/`(00_common.md・vocab.yaml・参照付録・記入用テンプレート)です。これは、これまで手で組み立てていた「00_common.md + vocab.yaml + stages.md の該当節と参照付録」そのものです。`pms-10-explore` には、加えて `references/methods/` に全方式の方式ファイルが入ります(AIはフローの記録が指す1つだけを読みます)。`kb/00_索引.md` と flow.md は作業場所のデータなので同梱せず、skill の起動時に読ませます。
 
-加えて、カードの種類ごとのエージェント(`pms-card-setup-build` など7つ。正本 `procedure/cards/agents.yaml`)を、Copilot 用(`.github/agents/`)と Kiro 用(`.kiro/agents/`)に生成します。`pms run` がカードごとに起こすセッションで使い、本文はどれも「カードを読み、指示どおりに行い、提出する」という短い指示です。
+加えて、カードの種類ごとのエージェント(`pms-card-setup-build` など7つ)と、チャットで進めるときの入口のエージェント `pms-runner` を、Copilot 用(`.github/agents/`)と Kiro 用(`.kiro/agents/`)に生成します(正本はどちらも `procedure/cards/agents.yaml`)。カードのエージェントは、`pms run` がカードごとに起こすセッションと、`pms-runner` が呼ぶサブエージェントの両方で使い、本文はどれも「カードを読み、指示どおりに行い、提出する」という短い指示です。`pms-runner` の本文は「`pms next` を呼び、出たカードをカードのエージェントに渡し、また `pms next` を呼ぶ」という5行の手順だけで、呼べるのはカードのエージェントだけです。
 
 ## 8. 導入手順
 
@@ -243,7 +254,11 @@ skills版/
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
 10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります
 11. **AI の CLI を導入する**(proc-v018 以降。`pms run` が使う)。Copilot CLI(`copilot`)か Kiro CLI(`kiro-cli`)を導入して認証し、組織の設定で利用が許可されていることを管理者が確かめます(Copilot CLI はトークン `COPILOT_GITHUB_TOKEN` などでも認証できます。Kiro CLI の非対話の実行には `KIRO_API_KEY` が要ります)。`config/pms.json` に、見本 `config/pms.sample.json` の `runner`・`default_runner`・`cardTypes` を写し、使うモデル(`cardTypes.<種類>.model`)と1枚の上限時間(`runner.<名前>.timeoutSec`)を決めます。呼び出しの雛形は公式のドキュメントで確かめたフラグで書いてありますが、実物では確かめていません。`node tools/pms/pms.mjs run --flow <フローID> --dry-run` で、起こすコマンドを実行せずに確かめられます(`tools/pms/README.md` 13章の「実物で確かめること」)。カードの種類ごとのエージェントは `.github/agents/`・`.kiro/agents/` に生成済みです。課金の数え方(AI credits か premium requests か)は組織の契約で確かめてください(カード1枚が1回の依頼になります)
-12. **動作を確かめる**(F-001 の前に)
+12. **チャットで進める準備をする**(proc-v019 以降。`pms-runner` を使う人がいるとき)。`.github/agents/pms-runner.agent.md`・`.kiro/agents/pms-runner.json` と `pms-card-*` は生成済みなので、置くだけで使えます(直接編集しない)。管理者が次を確かめます
+   - VS Code: チャットの Agent のドロップダウンに `pms-runner` が出るか。組織の設定でカスタムエージェントとサブエージェントが許可されているか
+   - モデル: カードのエージェントのモデル(`procedure/cards/agents.yaml` の `kinds.<種類>.model`。既定 `gpt-6-luna`)が、利用者の Copilot で選べるか。サブエージェントは呼ばれたエージェントのモデルで動きます。変えるときは `agents.yaml` を直して skills を再生成します(9.)。`config/pms.json` の `cardTypes.<種類>.model` は `pms run` だけに効きます
+   - Kiro: エージェントの選択に `pms-runner` が出るか。**Workflows を有効にしている場合は、`pms-runner` を使うあいだ無効にします**(有効だとサブエージェントがバックグラウンドで動き、終わる前に次のカードを取りに行くことがあります。13. の既知の制約)
+13. **動作を確かめる**(F-001 の前に)
    - 入口: `/pms-regression いまどうなってる?` で、フローがないことを答えるか
    - 読み込み: 作業 skill が `references/00_common.md` と `vocab.yaml` を実際に読んでいるか(AIの読み込みの表示で確かめる)
    - 自動起動: Copilot で `pms-40-improve` が自動で使われないか
@@ -253,6 +268,7 @@ skills版/
    - 進行役: `node --test tools/pms/test/` が通るか。実物の playwright-cli で `pms act` が動くかは、手元の HTML で確かめます(`tools/pms/README.md` 8章の前提。確かめ方は改訂の完了報告にあります)
    - 環境情報: `node tools/env/env.mjs check` が `"ok":true` になるか。登録した場合は `require` が `"state":"complete"` になるか。`git check-ignore config/environments.local.json` で各自の設定が git の無視の対象になっているか
    - フック: skills のファイルに1文字足してコミットしようとすると止められるか(確かめたら元に戻す)
+   - チャットで進める(使う人がいるとき): `pms-runner` に切り替えて小さなフローのカードを進め、カードごとにサブエージェントが起動するか、`node tools/pms/pms.mjs stats --flow <フローID>` で実行形態 `b1` として数えられるか
    - 1本通す: 小さな1機能で F-001 を作業20まで通す
 
 ## 9. 手順書を改訂する
@@ -352,9 +368,9 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 
 ## 13. 既知の制約
 
-- skills の仕組みは Copilot・Kiro ともに比較的新しく、仕様が変わることがあります。動作確認(8. の12)は、ツールの更新後にも行ってください
+- skills の仕組みは Copilot・Kiro ともに比較的新しく、仕様が変わることがあります。動作確認(8. の13)は、ツールの更新後にも行ってください
 - 依頼の内容による自動起動は確実ではありません。使う人には `/pms-regression` を付けるよう案内してください
-- 作業 skill は `references/` のファイルを読む指示を持っていますが、実際に読むかはAIに依存します。8. の12で確かめてください
+- 作業 skill は `references/` のファイルを読む指示を持っていますが、実際に読むかはAIに依存します。8. の13で確かめてください
 - lint は42規則のうち20規則を実装済みです(`node tools/lint/lint.mjs --list`)。`explore_act_linked`(探索の記録と操作の記録の一致)・`requires_covered`(セットアップの抜け)・`setup_steps_recorded`(セットアップの操作列とロケータの抜け)・`act_log_linked`(セットアップの記録と操作の記録の一致)・`phase_a_queue_complete`(前提状態の準備のカードの終わり)・`requires_in_state_set`(初期状態セットにない状態)・`blocked_recorded`(blocked の記録の抜け)・`health_recorded`(健全性シグナルの記録)・`env_value_leak`(秘密情報の書き込み)・`env_value_hardcoded`(接続先の直書き)・`status_yaml_valid`・`procedure_version_present`・`operation_registered`・`ext_demand_linked`・`verdict_enum`・`reason_code_enum`・`no_temp_locator` と、既存の `skills_in_sync`・`env_restored`・`prohibition_recheck` です。作業20の突合・生成コードの静的検査・保護ブロックの検査(`protected_unchanged`)などは未実装です
 - pre-commit フックが検査するのは作業ツリーの内容です。正本を直して再生成したら、再生成した skills も同じコミットに含めてください。また、フックは各自が有効にする必要があります(8. の4)
 - lint は、成果物の YAML を簡易的なパーサで読みます。アンカー・エイリアス・タグは使えません。読めないファイルは「成果物の読み取り」の ERROR として出ます
@@ -362,6 +378,9 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 - 進行役(`tools/pms/`)のカードで行うのは、proc-v018 では作業10のフェーズA(前提状態の準備)とパートC(探索と報告の所見)です。工程0・シナリオの作成(パートB)・作業15・20・30は、これまでどおりチャットの skill が行います。`pms run` が起こすセッションで playwright-cli の直接の呼び出し・秘密情報の取り出し・手順書への書き込みを禁止するパターンは、CLI の実物で効くかを確かめていません(`tools/pms/README.md` 13章)。効かなくても、記録を通らない操作を含む提出は不合格になります
 - `pms run` はカードごとに新しいセッションを起こすので、カードの枚数だけ AI への依頼が増えます(探索はシナリオのステップごとに1枚)。課金の数え方によっては、チャットで行うより費用がかかることがあります
 - `pms run` の lint で指摘が残ったとき(lint 止まり)、指摘を直すのはチャットの作業10です(直すカードはまだありません)
+- チャットで進める(`pms-runner`)ときは、IDE の道具の設定で playwright-cli の直接の呼び出しを止められないことがあります(VS Code のエージェントの道具はコマンドごとに絞れません)。直接呼んだ操作は記録に残らないため、その操作を含む提出は不合格になり、AIがやり直します(記録が誤ることはありませんが、やり直しの分だけ時間がかかります)。フックは使っていません
+- Kiro の IDE で Workflows を有効にしていると、`pms-runner` がサブエージェントの終わりを待たずに次のカードを取りに行き、同じカードが二重に出ることがあります(実物で確かめていません。`tools/pms/README.md` 14章)。`pms-runner` を使うあいだは Workflows を無効にしてください
+- `pms-runner` は、サブエージェントが提出したかどうかを `pms next` で確かめるので、AIが「できました」と言っても提出がなければ同じカードを出し直します。出し直しの上限(既定 3 回)を超えると「人間の確認待ち」で止まります
 - 進行役は playwright-cli の出力の形(ロケータ・結果・URL の出し方)を前提にしています。テストは偽物の playwright-cli で行っており、実物の版が変わると読み取れなくなることがあります(`tools/pms/README.md` 8章。多くは `config/pms.json` で直せます)
 - proc-v009 以前の版で始めたフローは、status.yaml に `environment` がなくても lint は求めません。そのフローは旧版のとおり完了させてください
 - proc-v004 より前の版で始めたフローは、禁止操作リストの照合ができません(照合スクリプトが「照合できない」を返します。lint のランナーはそのフローの照合を省きます)。そのフローは旧版のとおり完了させてください

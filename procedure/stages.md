@@ -397,7 +397,7 @@ context_updates:
 | 1回の実行範囲 | **1フロー分のみ。** 全機能の網羅は目的ではない |
 | パートB→C | 停止せず連続実行してよい(レビューは非ブロッキング) |
 | 環境 | **開始時に1回、ゴールデンイメージを復元し、開始前シナリオを実行する**(工程0。禁止操作の再判定、lint の指摘による差し戻しを含む)。中断からの再開、許可待ち・起動確認待ちからの再開では復元しない |
-| 退出 | **作業20と連続実行しない。** 完了報告と status.yaml を出力し、完了前の lint を行って停止する。proc-v018 以降のフローでは、パートCのキューを作って「pms run 待ち」で止まり、`pms run` が報告書・status.yaml・lint まで行う。健全性シグナルが出たシナリオの是正は作業15が行う(本作業では問い合わせない) |
+| 退出 | **作業20と連続実行しない。** 完了報告と status.yaml を出力し、完了前の lint を行って停止する。proc-v018 以降のフローでは、パートCのキューを作って「pms run 待ち」で止まり、`pms run` が報告書・status.yaml・lint まで行う(proc-v019 以降、チャットの `pms-runner` で進めたときは、入口 skill が次の「続き」で `pms report` と lint を行う)。健全性シグナルが出たシナリオの是正は作業15が行う(本作業では問い合わせない) |
 
 ## 3. 入力
 
@@ -421,7 +421,7 @@ context_updates:
 | 開始前シナリオ | `tools/pre-stage/run-scenarios.mjs --hook work10`(設定 `config/pre-stage-scenarios.json`。00 ■回帰実行の環境前提 開始前シナリオ) |
 | 前回の status.yaml | パートPのとき: 当該フローの作業10の status.yaml(`blocked_by_prohibition` と `prohibited_ops`) |
 | lint | `tools/lint/lint.mjs`(完了前の lint)。lint の指摘による差し戻しのときは、入口 skill から渡された指摘 |
-| 進行役 | `node tools/pms/pms.mjs`(キュー・カード・操作の記録 `pms act`・提出の検査・`pms run`(カードごとにAIのセッションを起こす)・`pms report`(報告書と status.yaml)。設定 `config/pms.json`。00 ■進行役と記録の道具) |
+| 進行役 | `node tools/pms/pms.mjs`(キュー・カード・操作の記録 `pms act`・提出の検査・`pms run`(カードごとにAIのセッションを起こす)・`pms report`(報告書と status.yaml)。設定 `config/pms.json`)と、チャットで進めるときの入口のエージェント `pms-runner`(00 ■進行役と記録の道具) |
 | 作業10の開始時の事実 | `work/_flows/F-<番号>/stage10-context.json`(パートCのキューを作る前にこの skill が書く。書式 `procedure/schemas/stage10-context.json`) |
 
 ## 4. 固有手順
@@ -556,24 +556,26 @@ context_updates:
 
 ### パートC: 探索的実行
 
-パートCは、進行役 `pms`(00 ■進行役と記録の道具)が出すカードで行う。**主な実行形態は B2 である**: 進行役 `pms run` が、カードを1枚ずつ新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせ、提出が合格したかをキューの記録で確かめて次へ進む。**どのカードを行うか・記録・集計・完了の判定は pms が行い、AIはカードの判断だけを行う。**
+パートCは、進行役 `pms`(00 ■進行役と記録の道具)が出すカードで行う。**主な実行形態は B2 である(既定)**: 進行役 `pms run` が、カードを1枚ずつ新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせ、提出が合格したかをキューの記録で確かめて次へ進む。**副経路として B1 を選んでよい**: 利用者が IDE のチャットのエージェントを `pms-runner` に切り替え、`pms-runner` がカードを1枚ずつサブエージェント(カードの種類のエージェント)に行わせる。**どちらでも、どのカードを行うか・記録・集計・完了の判定は pms が行い、AIはカードの判断だけを行う。** カード・提出の検査・記録(setup-log・探索記録・台帳)・報告書と status.yaml は、B1 と B2 で同じである。
 
 **作業10の流れ(proc-v018 以降)**
 
 1. 工程0・パートA・パートB(再探索フローはパートR、禁止操作の再判定はパートP)は、この skill(チャットの作業10)が行う
 2. 終わったら、工程0〜パートB(R・P)の結果を `work/_flows/F-<番号>/stage10-context.json` に書く(書式は `procedure/schemas/stage10-context.json`。環境ID・`env_restore`・`pre_stage`・`prohibited_ops` は道具の出力とメモ欄から、台帳の需要ID・操作ID・SIG-ID はパートA・B・R・Pで書いたものを写す。推測しない)。`pms report` が status.yaml の最上位の項目とこれらのキーに使う
 3. `node tools/pms/pms.mjs queue build --flow <フローID> --phase all` を実行する(再探索フロー・パートPは `--scenarios <シナリオID,...>` で対象を渡す)。フェーズAとパートCのカードがキューに入る
-4. flow.md のメモ欄に「pms run 待ち」と書き、利用者に端末で `node tools/pms/pms.mjs run --flow <フローID>` を実行するよう伝えて止まる(伝え方は入口 skill)。status.yaml は出力しない
-5. `pms run` が、フェーズA → パートCの探索 → 報告の所見の順にカードを行わせ、終わったら報告書と status.yaml を記録から作り(`pms report`)、完了前の lint を実行する。人間の判断が要るカード(STOP)があれば、理由を出して止まる
+4. flow.md のメモ欄に「pms run 待ち」と書き、利用者に進め方(既定は端末で `node tools/pms/pms.mjs run --flow <フローID>`。チャットで進めるならエージェント `pms-runner`)を伝えて止まる(伝え方は入口 skill)。status.yaml は出力しない
+5. `pms run`(B1 では `pms-runner`)が、フェーズA → パートCの探索 → 報告の所見の順にカードを行わせる。人間の判断が要るカード(STOP)があれば、理由を出して止まる。`pms run` は、終わったら報告書と status.yaml を記録から作り(`pms report`)、完了前の lint を実行する。`pms-runner` はカードだけを行い、報告書と lint は入口 skill が次の「続き」で行う(`pms status` の `report_pending`)
 
-**CLI が使えない環境の代わり**: `pms run` を実行できない場合(Copilot CLI・Kiro CLI を導入できない・組織の設定で許可されていない等)は、この skill が同じ会話の中で、`pms next` のカードを順に行ってよい(下のフェーズAの2〜4と同じやり方。`next` が `done` を返したら `node tools/pms/pms.mjs report --flow <フローID>` を実行し、完了前の lint へ進む)。この形は後の版で IDE 内のループに置き換える。
+**B1 を選んでよい場面**(proc-v019 以降): カードのテンプレートを作り込むとき・初めての画面を探索するとき(AIの動きを見ながら止められる)、途中の人間の判断(環境情報の不足・要許可操作など)にチャットでその場で答えたいとき、Copilot CLI・Kiro CLI を使えない人・環境。どれでもなければ B2 にする。B1 の正しさはフックに頼らず、`pms act`・キュー・`pms submit` で保つ(00 ■進行役と記録の道具 の「フックを使わずに正しさを保つ仕組み」)。
+
+**IDE でサブエージェントを使えない場合の代わり**: `pms run` を実行できず、IDE でもサブエージェント(`pms-runner`)を使えない場合(組織の設定で止められている等)だけ、この skill が同じ会話の中で、`pms next` のカードを順に行ってよい(下のフェーズAの2〜4と同じやり方。`next` が `done` を返したら `node tools/pms/pms.mjs report --flow <フローID>` を実行し、完了前の lint へ進む)。カードごとに会話を捨てられないので、会話が長くなる。
 
 **フェーズA: 初期状態の準備**
 
 フェーズAのカードは、どの状態を整備するかも pms が決め、setup-log・台帳への記録も pms が書く。AIはカードの判断だけを行う。
 
 1. キューは上の3で作る(フェーズAだけを先に作るときは `--phase A`)。pms が、対象シナリオ(このフローで作ったシナリオ。再探索フロー・パートPでは `--scenarios`)の `requires` の状態IDを重複排除して列挙し、状態ごとにカードを作る
-2. (CLI が使えない環境の代わりのとき)`node tools/pms/pms.mjs next --flow <フローID>` を実行し、出力の `body`(カード)の指示どおりに行う。カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)を実行する。不合格なら、返された理由だけを直して再提出する。**`next` が `done` を返すまで2を繰り返す**
+2. (IDE でサブエージェントを使えない場合の代わりのとき)`node tools/pms/pms.mjs next --flow <フローID>` を実行し、出力の `body`(カード)の指示どおりに行う。カードが指定するファイルに出力の JSON を書き、カードの「終わったら」のコマンド(`pms submit`)を実行する。不合格なら、返された理由だけを直して再提出する。**`next` が `done` を返すまで2を繰り返す**
 3. `next` が `STOP` を返したら、出力の `message` を利用者に伝えて指示を待つ。利用者が続けてよいと答えたら、`pms next` から続ける(STOP のカードは人間の確認待ちとして残り、報告書の固有セクション1に載る)
 4. 中断・会話の要約のあとは、`node tools/pms/pms.mjs status --flow <フローID>` で現在のカードを確かめ、`pms next` から続ける(提出していないカードは、`next` が同じカードを出し直す)
 
@@ -671,7 +673,7 @@ context_updates:
 
 報告書と status.yaml を出力したあと、**完了報告(停止)の前に** `node tools/lint/lint.mjs --flow <フローID> --stage 10 --skip skills_in_sync` を実行する(00 ■lint 実行の契機)。
 
-**`pms run` は、報告書と status.yaml を作ったあと(`pms report`)にこの lint を自分で実行する。** ERROR がなければ終わり(終了コード 0)、ERROR が残れば「lint 止まり」として止まる(STOP。終了コード 3)。**pms run は lint の指摘を直すカードを作らない。** 指摘は、入口 skill が次の「続き」で、下の「lint の指摘による差し戻し」の経路でこの skill に渡す。この skill が直したら、`node tools/pms/pms.mjs report --flow <フローID>` で報告書と status.yaml を作り直してから lint を再実行する(proc-v018 以降のフローでは、報告書の数値と status.yaml を手で書き換えない)。
+**`pms run` は、報告書と status.yaml を作ったあと(`pms report`)にこの lint を自分で実行する。** チャットの `pms-runner` で進めたときは、入口 skill が次の「続き」で `pms report` と lint を実行する(結果の扱いは `pms run` と同じ)。 ERROR がなければ終わり(終了コード 0)、ERROR が残れば「lint 止まり」として止まる(STOP。終了コード 3)。**pms run は lint の指摘を直すカードを作らない。** 指摘は、入口 skill が次の「続き」で、下の「lint の指摘による差し戻し」の経路でこの skill に渡す。この skill が直したら、`node tools/pms/pms.mjs report --flow <フローID>` で報告書と status.yaml を作り直してから lint を再実行する(proc-v018 以降のフローでは、報告書の数値と status.yaml を手で書き換えない)。
 
 - **ERROR があれば、指摘された成果物を直して再実行する。** ERROR が0件になるまで繰り返す
 - 直すのは、記録の漏れ・誤り(例: `blocked_by` の参照、blocked の手前のステップの記録、status.yaml のキー)と、足りない整備(例: setup-log にない `requires` の状態)である。整備が要るものは、フェーズAと探索の規約どおりに画面・外部操作で整備する
@@ -748,7 +750,7 @@ context_updates:
 11. **外部操作需要リスト・状態需要リストへの記録**(外部操作需要リスト: 新規追加・要求元の追記・状態を更新した需要IDと不足の区分。整備記録と skills の機構の食い違いがあれば併記。状態需要リスト: 提案・要求元を追記した需要IDと状態ID案、`整備済` にした需要ID、採用された状態で見直した申し送りと、シナリオにしなかった理由)
 12. **再探索・再判定の結果**(再探索フロー・パートPのみ): 再探索フローは需要IDごとの 確立済 / 未確立と理由、再探索したシナリオの判定、対象外にした要求元。パートPは照合の結果(旧版・新版)、実行できるようになったステップと判定し直したシナリオの判定、まだ blocked のステップ、対象外にした申し送り
 
-報告出力後、完了前の lint を行い、flow.md のタスクをチェックし、フロー台帳の状態を更新して**停止する**。`pms run` で行ったフローでは、入口 skill が次の「続き」で lint を確かめてから、flow.md の T3・T4 をチェックする。
+報告出力後、完了前の lint を行い、flow.md のタスクをチェックし、フロー台帳の状態を更新して**停止する**。`pms run`・`pms-runner` で行ったフローでは、入口 skill が次の「続き」で lint を確かめてから、flow.md の T3・T4 をチェックする。
 
 ## 7. 完了条件(DoD)
 
@@ -778,7 +780,7 @@ context_updates:
 - [ ] 工程0の起動完了の確認のあとに開始前シナリオを実行し、state と run_id を stage10-context.json の `pre_stage` に書いた(設定がなければ `skipped`)
 - [ ] 工程0のあとに禁止操作リストの記入状態と版を照合スクリプトで取得し、stage10-context.json の `prohibited_ops` に書いた
 - [ ] パートA・B(R・P)で台帳に書いたID(需要ID・SD-ID・操作ID・SIG-ID)を stage10-context.json に書き、`node tools/pms/pms.mjs queue build --flow <フローID> --phase all` が終了コード 0 で終わった(stage10-context.json は schema で検査される)
-- [ ] flow.md のメモ欄に「pms run 待ち」と書き、利用者に `pms run` の実行を伝えて止まった(CLI が使えない環境の代わりのときは、`pms next` が `done` を返すまでカードを行い、`pms report` を実行した)
+- [ ] flow.md のメモ欄に「pms run 待ち」と書き、利用者に進め方(`pms run`。チャットで進めるなら `pms-runner`)を伝えて止まった(IDE でサブエージェントを使えない場合の代わりのときは、`pms next` が `done` を返すまでカードを行い、`pms report` を実行した)
 
 **パートC — pms が検査するもの**(`pms submit`・`pms report`・lint。AIの自己点検に頼らない。proc-v018 以降のフロー)
 

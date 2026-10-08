@@ -1,4 +1,4 @@
-// explore.test.mjs — 段2(proc-v018)のテスト: パートCのカード・pms report・pms stats・pms run(node --test tools/pms/test/)
+// explore.test.mjs — 段2(proc-v018)のテスト: パートCのカード・pms report・pms stats・pms run。段3(proc-v019)の IDE 内のループ(B1)(node --test tools/pms/test/)
 //
 // playwright-cli と AI の CLI は偽物(test-support/stub-playwright-cli.mjs・stub-ai-cli.mjs)に差し替える。
 // カードを行うAIの代わりは test-support/explore-agent.mjs(同じ会話の中のカードとしても、pms run のセッションとしても使う)。
@@ -344,7 +344,7 @@ test('report: 記録から報告書の数値・一覧と status.yaml を作り�
   assert.deepEqual(r.json.wrote, ['work/PRT/exploration/report.md', 'work/PRT/exploration/status.yaml']);
   const st = parseYamlDocs(read(root, 'work/PRT/exploration/status.yaml'))[0];
   assert.equal(st.stage, '10');
-  assert.equal(st.procedure_version, 'proc-v018');
+  assert.equal(st.procedure_version, queue(root).procedure_version); // キューを作ったときの手順版(vocab.meta.procedure_version)
   assert.equal(st.environment, 'vm01');
   assert.equal(st.outcome, 'partial_success');
   const cu = st.context_updates;
@@ -501,7 +501,7 @@ test('run: explore.step のセッションには、種類ごとの使用禁止�
 // エージェントの定義(生成物)
 // ════════════════════════════════════════════════════════
 
-test('agents: カードの種類ごとのエージェントが生成されていて、pms run が使う名前と一致する', async () => {
+test('agents: カードの種類ごとのエージェントと入口のエージェントが生成されていて、pms run・pms next が使う名前と一致する', async () => {
   const { agentName } = await import('../lib/run.mjs');
   const { Procedure } = await import('../lib/procedure.mjs');
   const kinds = Object.keys(new Procedure(REAL_ROOT).vocab.pms_card_kind);
@@ -509,6 +509,10 @@ test('agents: カードの種類ごとのエージェントが生成されてい
     assert.ok(fs.existsSync(path.join(REAL_ROOT, '.github/agents', `${agentName(k)}.agent.md`)), k);
     assert.ok(fs.existsSync(path.join(REAL_ROOT, '.kiro/agents', `${agentName(k)}.json`)), k);
   }
+  // 入口のエージェント(B1)が呼べるサブエージェントは、pms next が出力の agent に書く名前と同じ
+  const runnerMd = fs.readFileSync(path.join(REAL_ROOT, '.github/agents/pms-runner.agent.md'), 'utf8');
+  assert.ok(runnerMd.includes(`agents: [${kinds.map((k) => `"${agentName(k)}"`).join(', ')}]`), runnerMd.slice(0, 600));
+  assert.ok(fs.existsSync(path.join(REAL_ROOT, '.kiro/agents/pms-runner.json')));
   const kiro = JSON.parse(fs.readFileSync(path.join(REAL_ROOT, '.kiro/agents/pms-card-explore-step.json'), 'utf8'));
   assert.ok(kiro.permissions.rules.some((r) => r.effect === 'deny' && r.match.includes('playwright-cli *')));
   const r = spawnSync(process.execPath, [path.join(REAL_ROOT, 'tools/build-skills/build-skills.mjs'), '--check'], { encoding: 'utf8' });
@@ -554,4 +558,103 @@ test('パートP: 同じフローに新しいラウンドを足し、recheck_of 
   const cu = parseYamlDocs(read(root, 'work/PRT/exploration/status.yaml'))[0].context_updates;
   assert.deepEqual(cu.recheck_resolved, []);
   assert.match(read(root, 'work/PRT/exploration/report.md'), /## 固有12\. 再探索・再判定の結果/);
+});
+
+// ════════════════════════════════════════════════════════
+// IDE 内のループ(B1。段3 proc-v019): 入口のエージェント pms-runner の代わり
+// ════════════════════════════════════════════════════════
+
+/**
+ * 入口のエージェント pms-runner の手順(procedure/cards/agents.yaml の runner.instruction)をなぞる:
+ * pms next --brief → カードならサブエージェント(出力の agent)に出力の prompt を渡す → 返事にかかわらず pms next に戻る。
+ * サブエージェントは prompt に書かれたカードのファイルを読んで行う(会話を引き継がない)。drop のカードは、1回目は提出せずに終わる
+ */
+async function ideLoop(root, { drop = new Set(), max = 40 } = {}) {
+  const { agentName, promptOf } = await import('../lib/agents.mjs');
+  const lines = [];
+  const env = { PMS_RUNNER: '' }; // IDE のチャットの端末では設定されない(既定の b1 になる)
+  for (let i = 0; i < max; i++) {
+    const n = pms(root, ['next', '--flow', 'F-003', '--brief'], { env });
+    if (n.json?.state !== 'card') return { last: n, lines };
+    assert.equal(n.json.body, undefined, '--brief なのに本文が出ている');
+    assert.equal(n.json.prompt, promptOf('F-003', n.json.card, n.json.card_file)); // pms run(B2)と同じ依頼文
+    const file = n.json.prompt.match(/まず (\S+\.md) を読み/)[1];
+    const body = read(root, file);
+    const kind = body.match(/種類: ([a-z._]+)/)[1];
+    assert.equal(kind, n.json.kind);
+    assert.equal(n.json.agent, agentName(kind));
+    lines.push(`${n.json.card} ${n.json.kind} ${n.json.target}`);
+    if (drop.has(n.json.card) && n.json.issued_count === 1) continue; // サブエージェントが提出せずに終わった
+    await agent({ root, flow: 'F-003', card: n.json.card, kind, body, pms: (args) => pms(root, args, { env }) });
+  }
+  throw new Error('終わらない');
+}
+
+test('B1: pms next の出力にサブエージェントの名前と依頼文が入る。--brief は本文を出さず、本文はカードのファイルにある', () => {
+  const root = repo();
+  build(root);
+  const full = pms(root, ['next', '--flow', 'F-003']);
+  assert.equal(full.json.agent, 'pms-card-setup-reuse');
+  assert.ok(full.json.prompt.includes('カード C-0001(F-003)だけを行う。まず work/_flows/F-003/cards/C-0001.md を読み'), full.json.prompt);
+  assert.ok(full.json.body.length > 100);
+  // 提出されないまま呼ばれると同じカードを出し直す(--brief でも同じ)。本文はファイルに書き直される
+  const brief = pms(root, ['next', '--flow', 'F-003', '--brief']);
+  assert.equal(brief.json.card, 'C-0001');
+  assert.equal(brief.json.issued_count, 2);
+  assert.equal(brief.json.body, undefined);
+  assert.equal(brief.json.agent, 'pms-card-setup-reuse');
+  assert.match(read(root, brief.json.card_file), /このカードを出すのは 2 回目である/);
+  assert.ok(brief.stdout.length < full.stdout.length / 3, '--brief の出力が小さくなっていない');
+});
+
+test('B1: 入口のループでカードをサブエージェントに渡し、出し直しを経て終わる。記録は b1 で数え、報告書は status の report_pending を見て作る', async () => {
+  const root = repo();
+  build(root);
+  const { last, lines } = await ideLoop(root, { drop: new Set(['C-0003']) });
+  assert.equal(last.json.state, 'done', last.stdout);
+  assert.equal(lines.filter((l) => l.startsWith('C-0003 ')).length, 2); // 提出せずに終わったカードを、次の next が出し直した
+  assert.equal(lines.length, 9); // 8 枚 + 出し直し 1 回(3 枚は skipped)
+
+  // pms run と違い、ループは報告書を作らない。status が report_pending を示し、入口 skill が pms report を実行する
+  let s = pms(root, ['status', '--flow', 'F-003', '--json']);
+  assert.equal(s.json.complete, true);
+  assert.equal(s.json.report_pending, true);
+  assert.match(pms(root, ['status', '--flow', 'F-003']).stdout, /報告書と status\.yaml がまだない: node tools\/pms\/pms\.mjs report --flow F-003/);
+  assert.equal(pms(root, ['report', '--flow', 'F-003']).code, 0);
+  s = pms(root, ['status', '--flow', 'F-003', '--json']);
+  assert.equal(s.json.report_pending, false);
+  const l = lint(root);
+  assert.equal(l.code, 0, JSON.stringify(l.json?.results?.filter((x) => x.status === 'ng'), null, 1));
+
+  // 提出の記録と集計は b1(pms run の b2 と分かれる)
+  const rows = read(root, 'work/_flows/F-003/submit-log.jsonl').trim().split('\n').map((x) => JSON.parse(x));
+  assert.ok(rows.every((x) => x.runner === 'b1'));
+  const st = pms(root, ['stats', '--flow', 'F-003', '--json']).json;
+  assert.ok(st.by_kind.length && st.by_kind.every((x) => x.runner === 'b1'));
+  const step = st.by_kind.find((x) => x.kind === 'explore.step');
+  assert.equal(step.reissues, 1);
+});
+
+test('B1: 出し直しの上限で STOP を返し(入口は message を伝えて終わる)、利用者が「続けて」と言えば next から残りを続ける', async () => {
+  const root = repo({}, { config: { max_issues: 1 } });
+  build(root);
+  const first = await ideLoop(root, { drop: new Set(['C-0001']) });
+  assert.equal(first.last.code, 3);
+  assert.equal(first.last.json.state, 'STOP');
+  assert.equal(first.last.json.card, 'C-0001');
+  assert.match(first.last.json.message, /人間の確認待ち/);
+  // 入口のエージェントが止まったあと、新しい会話で「続けて」→ 1 から(キューはファイルにある)。
+  // 止めたカードの状態を前提にするシナリオは、出す前に pms が setup_unready で止める(それも1回ずつ伝えて続ける)
+  const stops = [];
+  let again;
+  for (let i = 0; i < 5; i++) {
+    again = await ideLoop(root);
+    if (again.last.json.state !== 'STOP') break;
+    stops.push(again.last.json.code);
+    assert.ok(!again.lines.some((x) => x.startsWith('C-0001 ')), '止めたカードをまた出した');
+  }
+  assert.equal(again.last.json.state, 'done', again.last.stdout);
+  assert.ok(stops.every((c) => c === 'setup_unready'), stops.join(','));
+  const s = pms(root, ['status', '--flow', 'F-003', '--json']).json;
+  assert.deepEqual(s.stopped.find((x) => x.card === 'C-0001')?.code, 'issue_limit');
 });

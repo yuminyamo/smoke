@@ -1,0 +1,8 @@
+{
+  "_comment": "pms act open・pms pwcli -- open が playwright-cli に --config で渡す設定(config/pms.json の browser_config。書式は playwright-cli の設定ファイル。tools/pms/README.md 2.6)。テスト対象の画面を日本語で表示させるため locale を固定する。全員で同じ値を使うので git に入れる",
+  "browser": {
+    "contextOptions": {
+      "locale": "ja-JP"
+    }
+  }
+}

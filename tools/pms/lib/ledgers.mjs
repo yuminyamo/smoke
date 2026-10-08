@@ -19,6 +19,11 @@ const LEDGERS = {
   signals: { rel: 'work/_common/procedure-improvement.md', template: '94_', idCol: 'SIG-ID', content: ['事象(事実)', '手順箇所'], section: /^1\.\s*シグナル/ },
 };
 
+function formatError(def) {
+  const sec = def.section ? '1. シグナル' : '台帳';
+  return `${def.rel} の「## ${sec}」の節に列 ${def.idCol} の表がありません。記入用テンプレート ${def.template.replace(/_$/, '')} の見出しと表の列のまま書き直す(既存の行は、その表に移す。00 ■文書の5層構成・R-HO-3)`;
+}
+
 function cell(v) {
   return String(v ?? '').replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
 }
@@ -43,7 +48,7 @@ class Ledger {
     }
     this.lines = this.text.split('\n');
     this.table = tableInSection(this.text, this.def.section ?? '台帳', this.def.idCol);
-    if (!this.table) throw new UsageError(`${this.def.rel} の「## ${this.def.section ? 'シグナル' : '台帳'}」に列 ${this.def.idCol} の表がありません`);
+    if (!this.table) throw new UsageError(formatError(this.def));
     return this;
   }
 
@@ -249,4 +254,18 @@ export function handoffsOfFlow(root, flow) {
   if (!fs.existsSync(path.join(root, LEDGERS.handoff.rel))) return [];
   const l = new Ledger(root, 'handoff').load();
   return l.rows.filter((r) => new RegExp(`\\b${flow}\\b`).test(r.obj['発生元'] ?? '')).map((r) => ({ ...r.obj }));
+}
+
+/**
+ * 作業場所にある台帳が、pms の読める形(テンプレートの見出しと表)かを確かめる。
+ * AI が手で作った台帳の形の崩れを、カードを行う前(queue build)に見つけるため。
+ * @returns {string[]} 読めない台帳ごとのメッセージ(ないファイルは数えない)
+ */
+export function ledgerFormatErrors(root) {
+  const out = [];
+  for (const def of Object.values(LEDGERS)) {
+    if (!fs.existsSync(path.join(root, def.rel))) continue;
+    if (!tableInSection(readText(path.join(root, def.rel)), def.section ?? '台帳', def.idCol)) out.push(formatError(def));
+  }
+  return out;
 }

@@ -1,7 +1,7 @@
 // act.mjs — pms act: 画面操作を1回ずつ実行し、そのたびに操作の記録(act-log.jsonl)に1行書く
 
 import fs from 'node:fs';
-import { PlaywrightCli, classifyLocator, resolveEnvArg, parsePageUrl, parseRanCode, runExternal } from './cli.mjs';
+import { PlaywrightCli, browserConfigArgs, classifyLocator, resolveEnvArg, parsePageUrl, parseRanCode, runExternal } from './cli.mjs';
 import { secretsToMask, mask, maskDeep } from './store.mjs';
 import { PMS, todoOf, submitCommand, ACT_KINDS, targetOf } from './queue.mjs';
 import { timestamp, UsageError } from './util.mjs';
@@ -75,7 +75,13 @@ export function act(ctx, opt, args) {
           warnings.push(`playwright-cli の版 ${ver} が想定(config/pms.json の playwright_cli_version: ${cfg.playwright_cli_version})と違う`);
         }
       }
-      const r = cli.call(action === 'open' ? ['open', u.actual, ...cfg.open_args] : ['goto', u.actual]);
+      let openArgs = [];
+      if (action === 'open') {
+        const bc = browserConfigArgs(cfg, root);
+        if (bc.warning) warnings.push(bc.warning);
+        openArgs = [...cfg.open_args, ...bc.args];
+      }
+      const r = cli.call(action === 'open' ? ['open', u.actual, ...openArgs] : ['goto', u.actual]);
       rawOut = r.stdout;
       row.ok = r.code === 0;
       row.code = `await page.goto(${jsString(u.recorded)});`;

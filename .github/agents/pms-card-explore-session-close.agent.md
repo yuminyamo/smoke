@@ -4,7 +4,7 @@ description: "作業10パートC: 探索セッションの終わりに DB不変�
 model: "gpt-6-luna"
 tools: ["read", "edit", "search", "execute"]
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 explore.session_close)/ 手順版: proc-v021 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 explore.session_close)/ 手順版: proc-v022 / 生成: tools/build-skills/build-skills.mjs -->
 
 あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
 

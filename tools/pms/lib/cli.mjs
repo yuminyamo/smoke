@@ -1,9 +1,12 @@
 // cli.mjs — playwright-cli と環境情報の実行体の呼び出し(playwright-cli を呼ぶのは pms act と pms pwcli だけ)
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { UsageError } from './util.mjs';
+import { UsageError, readJson } from './util.mjs';
 import { MIN_MASK_LENGTH } from './store.mjs';
 
 // tools/env/env.mjs(pms と同じ tools/ の下にあるもの。--root で対象のリポジトリを渡す)
@@ -62,6 +65,31 @@ export class PlaywrightCli {
   exec(statement) {
     return this.call(['run-code', `async page => { ${statement}; }`]);
   }
+}
+
+// 設定ファイルに locale がないときに使う locale(テスト対象の画面を日本語で表示させる)
+export const DEFAULT_LOCALE = 'ja-JP';
+
+/**
+ * open に足す --config=<絶対パス>(config/pms.json の browser_config。locale などを playwright-cli の設定ファイルで渡す)。
+ * 設定ファイルに browser.contextOptions.locale がなければ DEFAULT_LOCALE を足した写しを一時ディレクトリに作って渡す
+ * (browser_config が null のとき・ファイルがないときも DEFAULT_LOCALE だけの設定を渡す。ファイルがないときは警告も返す)。
+ * JSON として読めなければ使い方の誤り
+ * @returns {{ args: string[], locale: string, warning: string|null }}
+ */
+export function browserConfigArgs(cfg, root) {
+  const file = cfg.browser_config === null ? null : path.resolve(root, cfg.browser_config);
+  const found = file !== null && fs.existsSync(file);
+  const warning = file !== null && !found ? `playwright-cli の設定ファイル ${cfg.browser_config}(config/pms.json の browser_config)がないため、locale の既定値 ${DEFAULT_LOCALE} だけを指定してブラウザを開いた` : null;
+  const conf = found ? readJson(file, cfg.browser_config) : {};
+  if (!conf || typeof conf !== 'object' || Array.isArray(conf)) throw new UsageError(`${cfg.browser_config} はオブジェクトでなければなりません`);
+  const locale = conf.browser?.contextOptions?.locale;
+  if (locale) return { args: [`--config=${file}`], locale, warning };
+  const merged = { ...conf, browser: { ...conf.browser, contextOptions: { ...conf.browser?.contextOptions, locale: DEFAULT_LOCALE } } };
+  const text = JSON.stringify(merged, null, 2);
+  const tmp = path.join(os.tmpdir(), `pms-playwright-cli-${createHash('sha256').update(text).digest('hex').slice(0, 16)}.json`);
+  fs.writeFileSync(tmp, text);
+  return { args: [`--config=${tmp}`], locale: DEFAULT_LOCALE, warning };
 }
 
 /** generate-locator の出力からロケータを取り出す(先頭の page. は外す) */

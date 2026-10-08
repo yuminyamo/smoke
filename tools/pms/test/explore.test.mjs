@@ -6,11 +6,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { makeRepo, write, read, exists, pms, queue, submitOut, SECRET, NOW, REAL_ROOT, PMS_DIR } from '../test-support/helpers.mjs';
 import agent, { OUT } from '../test-support/explore-agent.mjs';
 import { parseYamlDocs } from '../../lint/lib/yaml-lite.mjs';
+import { keywordOf, noteActivity } from '../lib/progress.mjs';
 
 process.env.PMS_NOW = NOW;
 
@@ -482,6 +484,42 @@ test('run: 1枚の上限時間を超えたら止めて未提出として扱う�
   const n = pms(root3, ['run', '--flow', 'F-003']);
   assert.equal(n.code, 2);
   assert.match(n.json.error, /runner がありません/);
+});
+
+test('run: セッションの進み具合を標準エラー出力に出す(pms のコマンドのキーワード・経過・動きがないときの警告)', () => {
+  // 動いているセッション: AI が実行した pms のコマンドがキーワードとして出る。終わったら .activity のファイルを消す
+  const root = repo({}, { config: { ...runner({ heartbeatSec: 1 }) } });
+  build(root);
+  const r = pms(root, ['run', '--flow', 'F-003', '--max-cards', '1'], { env: runEnv('slow') });
+  assert.equal(r.code, 4, r.stdout + r.stderr);
+  assert.match(r.stderr, /\[pms run\] C-0001 \d+秒: pms submit 合格\n/);
+  assert.match(r.stderr, /\[pms run\] C-0001 \d+秒: 実行中 — 最後の動き \d+秒前\(pms submit 合格\)/);
+  assert.ok(!fs.readdirSync(path.join(root, 'work/_flows/F-003/runs')).some((f) => f.endsWith('.activity')));
+
+  // 動きのないセッション: stallWarnSec を超えたら止まっている可能性を出し、上限で打ち切る
+  const root2 = repo({}, { config: { ...runner({ timeoutSec: 4, heartbeatSec: 60, stallWarnSec: 2 }), max_issues: 1 } });
+  build(root2);
+  const s = pms(root2, ['run', '--flow', 'F-003', '--max-cards', '1'], { env: runEnv('sleep') });
+  assert.equal(s.json.sessions[0].timed_out, true);
+  assert.match(s.stderr, /C-0001 \d+秒: 最後の動き \d+秒前.*止まっている可能性\(上限 4秒 で打ち切る\)/);
+  assert.match(s.stderr, /C-0001: 時間切れ/);
+});
+
+test('run: CLI の出力の JSON の行から道具の呼び出しのキーワードを取り出す。pms のコマンドは PMS_ACTIVITY のファイルに書く', () => {
+  assert.equal(keywordOf('{"type":"tool.execution_start","data":{"toolName":"bash","arguments":{"command":"npx playwright test tests/specs/a.spec.ts"}}}'), 'bash npx playwright test tests/specs/a.spec.ts');
+  assert.equal(keywordOf('{"type":"tool_use","name":"fs_write","input":{"path":"tests/fixtures/print.ts"}}'), 'fs_write tests/fixtures/print.ts');
+  assert.equal(keywordOf('{"type":"assistant.message","content":"考え中"}'), null);
+  assert.equal(keywordOf('plain text'), null);
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pms-act-')), 'x.activity');
+  const saved = process.env.PMS_ACTIVITY;
+  process.env.PMS_ACTIVITY = f;
+  try {
+    noteActivity('act', ['click', 'e7'], 0);
+    noteActivity('submit', [], 1);
+  } finally {
+    if (saved === undefined) delete process.env.PMS_ACTIVITY; else process.env.PMS_ACTIVITY = saved;
+  }
+  assert.deepEqual(fs.readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l).kw), ['pms act click', 'pms submit 不合格']);
 });
 
 test('run: explore.step のセッションには、種類ごとの使用禁止を足して CLI に渡す', () => {

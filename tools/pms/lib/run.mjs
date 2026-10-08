@@ -3,7 +3,9 @@
 // ループ(次のカードを取る・やらせる・終わったかを確かめる)はこのプログラムが持ち、AIはループの1回分だけを行う。
 // 終わったかどうかは、AIの「できました」ではなくキューの提出の記録で決める(合格していなければ pms next が同じカードを出し直し、
 // 上限を超えたら STOP にする。段1の規則のまま)。CLI の呼び出し方は config/pms.json の runner に書き、コードに CLI のフラグを書かない。
+// セッションの進み具合(道具の呼び出し・pms のコマンドのキーワード、動きのない時間)は lib/progress.mjs が標準エラー出力に出す。
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +14,7 @@ import { buildReport } from './report.mjs';
 import { secretsToMask, mask } from './store.mjs';
 import { timestamp, UsageError, writeText } from './util.mjs';
 import { cardType, agentName, promptOf } from './agents.mjs';
+import { runSession, fmtDur } from './progress.mjs';
 
 const LINT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'lint', 'lint.mjs');
 
@@ -50,9 +53,9 @@ function lint(root, flow) {
 
 /**
  * @param opt {flow, phase: 'A'|'C'|'all', runner, maxCards, dryRun}
- * @returns {{code: number, out: object}} 0 = 全部終わった / 3 = STOP / 1 = 実行の失敗 / 4 = --max-cards で止めた
+ * @returns {Promise<{code: number, out: object}>} 0 = 全部終わった / 3 = STOP / 1 = 実行の失敗 / 4 = --max-cards で止めた
  */
-export function run(ctx, opt) {
+export async function run(ctx, opt) {
   const { root, paths, store, cfg } = ctx;
   const phase = opt.phase ?? 'all';
   if (!['A', 'C', 'all'].includes(phase)) throw new UsageError(`--phase は A / C / all のいずれか: ${phase}`);
@@ -63,6 +66,8 @@ export function run(ctx, opt) {
   if (!rc) throw new UsageError(`config/pms.json の runner に ${name} がありません(${Object.keys(cfg.runner).filter((k) => !k.startsWith('_')).join(' / ')})`);
   if (opt.maxCards != null && !(Number.isInteger(opt.maxCards) && opt.maxCards > 0)) throw new UsageError('--max-cards は1以上の整数');
   const timeoutMs = (rc.timeoutSec ?? 900) * 1000;
+  const heartbeatMs = (rc.heartbeatSec ?? 30) * 1000;
+  const stallMs = (rc.stallWarnSec ?? 180) * 1000;
   const sessions = [];
   const log = (m) => process.stderr.write(`[pms run] ${m}\n`);
 
@@ -117,20 +122,25 @@ export function run(ctx, opt) {
     const vars = { prompt: promptOf(opt.flow, card.card, card.card_file), agent: t.agent, model: t.model, card_file: card.card_file, flow: opt.flow, card: card.card };
     const cmd = expandCommand(rc, vars, [...(rc.deny ?? []), ...t.deny]);
     const started = timestamp();
-    log(`${card.card}(${card.kind} / ${card.target}、${card.issued_count} 回目)を ${name} で行わせる`);
-    const r = spawnSync(cmd[0], cmd.slice(1), {
-      cwd: root, encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 512 * 1024 * 1024,
+    log(`${card.card}(${card.kind} / ${card.target}、${card.issued_count} 回目)を ${name} で行わせる(上限 ${fmtDur(timeoutMs)}。動きがなければ ${fmtDur(heartbeatMs)} ごとに経過を出す)`);
+    const secrets = secretsToMask(root);
+    const file = paths.run(opt.flow, card.card, card.issued_count);
+    // セッションの中で AI が実行した pms のコマンドを、pms.mjs がこのファイルに書く(進み具合の表示だけに使い、終わったら消す)
+    const activityFile = paths.abs(file.replace(/\.jsonl$/, '.activity'));
+    fs.mkdirSync(path.dirname(activityFile), { recursive: true });
+    fs.rmSync(activityFile, { force: true });
+    const r = await runSession(cmd, {
+      cwd: root, timeoutMs, heartbeatMs, stallMs, label: card.card, log, secrets, activityFile,
       input: rc.stdin === 'prompt' ? vars.prompt : undefined,
-      env: { ...process.env, PMS_RUNNER: 'b2', PMS_FLOW: opt.flow, PMS_CARD: card.card },
+      env: { ...process.env, PMS_RUNNER: 'b2', PMS_FLOW: opt.flow, PMS_CARD: card.card, PMS_ACTIVITY: activityFile },
     });
+    fs.rmSync(activityFile, { force: true });
     if (r.error && r.error.code === 'ENOENT') {
       return { code: 1, out: { state: 'error', flow: opt.flow, card: card.card, error: `${cmd[0]} を起動できない(導入と PATH、config/pms.json の runner.${name}.command を確かめる)`, sessions } };
     }
-    const timedOut = (r.error && r.error.code === 'ETIMEDOUT') || (r.signal && !r.status);
+    const timedOut = r.timedOut || (r.signal && !r.status);
     const ended = timestamp();
     // セッションの出力を保存する(秘密情報の値は伏せる)
-    const secrets = secretsToMask(root);
-    const file = paths.run(opt.flow, card.card, card.issued_count);
     const tail = { pms: { card: card.card, kind: card.kind, runner: name, attempt: card.issued_count, exit_code: r.status, signal: r.signal ?? null, timed_out: !!timedOut, started_at: started, ended_at: ended, stderr: mask(String(r.stderr ?? '').slice(-4000), secrets) } };
     writeText(paths.abs(file), `${mask(String(r.stdout ?? ''), secrets).replace(/\n*$/, '\n')}${JSON.stringify(tail)}\n`);
     const q = store.loadQueue(opt.flow);

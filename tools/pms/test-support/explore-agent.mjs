@@ -6,7 +6,8 @@
 //   SC-PRT-01-S2  hover、assert(text)と screenshot。健全性シグナルで human-check
 //   SC-PRT-01-S3  操作手段なし で blocked(外部操作需要リストに書く項目)
 // setup.build は 操作手段なし で blocked(前提状態が blocked のシナリオを作るため)
-// 環境変数 PMS_STUB_AGENT_MODE=none なら何もしない(提出しない)、sleep なら長く眠る(時間切れの確認)。
+// 環境変数 PMS_STUB_AGENT_MODE=none なら何もしない(提出しない)、sleep なら長く眠る(時間切れの確認)、
+// slow なら提出の後に少し眠る(pms run の進み具合の表示の確認)。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -109,5 +110,6 @@ export default async function agent({ root, flow, card, kind, body, pms }) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(out));
   const r = pms(['submit', '--flow', flow, '--card', card]);
+  if (mode === 'slow') await new Promise((res) => setTimeout(res, 4000));
   return { submit: r.code, failures: r.json?.failures ?? null };
 }

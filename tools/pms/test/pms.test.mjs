@@ -85,6 +85,7 @@ test('act: 1操作1行の記録(連番・時刻・ロケータの区分・now/ne
   assert.ok(calls.every((c) => c[0] === '-s=F-003'), JSON.stringify(calls));
   const open = calls.find((c) => c[1] === 'open');
   assert.ok(open.includes('--idle-timeout=0'));
+  assert.ok(open.includes(`--config=${path.join(root, 'config/playwright-cli.json')}`), 'open に playwright-cli の設定ファイル(locale)を渡す');
   const gi = calls.findIndex((c) => c[1] === 'generate-locator' && c[2] === 'e7');
   const ci = calls.findIndex((c) => c[1] === 'click' && c[2] === 'e7');
   assert.ok(gi >= 0 && gi < ci, '操作の前に generate-locator を呼ぶ');
@@ -179,7 +180,7 @@ test('pwcli: カード・フローなしで playwright-cli に渡し、<env:キ�
   assert.match(res[4].stdout, /Page URL: https:\/\/pms\.test\/menu/);
   // playwright-cli には本物の値を、セッションの指定なしで渡している
   const calls = stubCalls(root);
-  assert.deepEqual(calls[0], ['open', 'https://pms.test/login']);
+  assert.deepEqual(calls[0], ['open', 'https://pms.test/login', `--config=${path.join(root, 'config/playwright-cli.json')}`]);
   assert.deepEqual(calls[2], ['fill', 'e5', SECRET]);
   assert.equal(actLog(root).length, 0);
   assert.ok(!exists(root, 'work/_flows'));
@@ -198,6 +199,57 @@ test('pwcli: --session は -s=<名前> で渡す。値を直接書いた秘密�
   const missing = pms(root, ['pwcli', '--', 'fill', 'e5', '<env:pms.nothing>']);
   assert.equal(missing.code, 2);
   assert.match(missing.stdout, /require --keys pms\.nothing/);
+});
+
+test('open の --config(browser_config): pwcli で自分で書いた --config はそのまま。locale がなければ既定の ja-JP を足す。ファイルがなければ警告、JSON でなければ終了コード 2', () => {
+  const own = makeRepo();
+  assert.equal(pms(own, ['pwcli', '--', 'open', 'https://pms.test/login', '--config=mine.json']).code, 0);
+  assert.deepEqual(stubCalls(own)[0], ['open', 'https://pms.test/login', '--config=mine.json']);
+  // open 以外には足さない
+  const other = makeRepo();
+  assert.equal(pms(other, ['pwcli', '--', 'goto', 'https://pms.test/login']).code, 0);
+  assert.deepEqual(stubCalls(other)[0], ['goto', 'https://pms.test/login']);
+
+  // 渡した --config の中身(一時ディレクトリの写しのときもある)
+  const passed = (root) => {
+    const open = stubCalls(root).find((c) => c.includes('open'));
+    const arg = open.find((a) => a.startsWith('--config='));
+    assert.ok(arg, `--config がない: ${JSON.stringify(open)}`);
+    return JSON.parse(fs.readFileSync(arg.slice('--config='.length), 'utf8'));
+  };
+  // locale を書いた設定ファイルはそのまま渡す
+  const en = makeRepo({ 'config/playwright-cli.json': JSON.stringify({ browser: { contextOptions: { locale: 'en-US' } } }) });
+  assert.equal(pms(en, ['pwcli', '--', 'open', 'https://pms.test/login']).code, 0);
+  assert.equal(passed(en).browser.contextOptions.locale, 'en-US');
+  // locale がなければ ja-JP を足し、ほかの設定は残す
+  const tz = makeRepo({ 'config/playwright-cli.json': JSON.stringify({ browser: { contextOptions: { timezoneId: 'Asia/Tokyo' } } }) });
+  assert.equal(pms(tz, ['pwcli', '--', 'open', 'https://pms.test/login']).code, 0);
+  assert.deepEqual(passed(tz).browser.contextOptions, { timezoneId: 'Asia/Tokyo', locale: 'ja-JP' });
+  // browser_config が null でも ja-JP
+  const off = makeRepo({}, { config: { browser_config: null } });
+  const o = pms(off, ['pwcli', '--', 'open', 'https://pms.test/login']);
+  assert.equal(o.code, 0);
+  assert.ok(!/警告/.test(o.stdout));
+  assert.equal(passed(off).browser.contextOptions.locale, 'ja-JP');
+  // ファイルがなければ ja-JP で開き、警告を返す
+  const missing = makeRepo({ 'config/playwright-cli.json': null });
+  const m = pms(missing, ['pwcli', '--', 'open', 'https://pms.test/login']);
+  assert.equal(m.code, 0);
+  assert.match(m.stdout, /警告: playwright-cli の設定ファイル config\/playwright-cli\.json.*ja-JP/);
+  assert.equal(passed(missing).browser.contextOptions.locale, 'ja-JP');
+
+  const broken = makeRepo({ 'config/playwright-cli.json': '{ locale' });
+  assert.equal(pms(broken, ['pwcli', '--', 'open', 'https://pms.test/login']).code, 2);
+  assert.equal(pms(makeRepo({ 'config/playwright-cli.json': '[]' }), ['pwcli', '--', 'open', 'https://pms.test/login']).code, 2);
+  assert.equal(pms(makeRepo({}, { config: { browser_config: 3 } }), ['pwcli', '--', 'snapshot']).code, 2);
+
+  // pms act open でも、ファイルがなければ警告を返して ja-JP で開く
+  const act = setup({ 'work/PRT/scenarios.md': ONLY_LOGIN, 'config/playwright-cli.json': null });
+  pms(act, ['next', '--flow', 'F-003']);
+  const a = pms(act, ['act', '--flow', 'F-003', '--card', 'C-0001', 'open', '<env:pms.url>']);
+  assert.equal(a.code, 0, a.stdout + a.stderr);
+  assert.ok(a.json.warnings.some((w) => /config\/playwright-cli\.json/.test(w)));
+  assert.equal(passed(act).browser.contextOptions.locale, 'ja-JP');
 });
 
 // ════════════════════════════════════════════════════════
@@ -273,6 +325,22 @@ test('queue build: 状態需要リストで 採用 の状態は初期状態セ�
   assert.equal(r.code, 0, r.stdout);
   assert.deepEqual(queue(root2, 'F-004').cards.map((c) => c.state_id), ['S-USER-LOGIN']);
   assert.equal(pms(root2, ['queue', 'build', '--flow', 'F-005', '--phase', 'A', '--scenarios', 'SC-NONE-01']).code, 2);
+});
+
+test('queue build: 台帳がテンプレートの見出しと表の形でなければ、カードを作らずに終了コード 2(直し方を返す)', () => {
+  // パートBで AI がテンプレートを写さずに作った申し送り台帳(「## 台帳」の節がない)
+  const root = makeRepo({
+    'work/_common/handoff-register.md': `# 申し送り台帳
+
+| ID | 対象 | 理由コード | 引き継ぎ先 | 想定手段 | 発生元 | 起票日 | 状態 |
+|---|---|---|---|---|---|---|---|
+| HO-PRT-001 | 用紙サイズ別の印刷 | 同一経路 | ステップ2 |  | F-003 / 作業10 / SC-PRT-01 | 2026-10-06 | open |
+`,
+  });
+  const r = pms(root, ['queue', 'build', '--flow', 'F-003', '--phase', 'A']);
+  assert.equal(r.code, 2, r.stdout);
+  assert.match(r.json.error, /handoff-register\.md の「## 台帳」の節に列 ID の表がありません。記入用テンプレート 91/);
+  assert.ok(!fs.existsSync(path.join(root, 'work/_flows/F-003/queue.json')));
 });
 
 test('submit(blocked): 申し送り台帳と外部操作需要リストに行を足す。同じ外部操作と操作対象なら要求元の追記にする', () => {

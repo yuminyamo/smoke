@@ -31,6 +31,9 @@ export const DEFAULTS = {
   session_arg: '-s={session}',
   // open に足す引数(ヘッドレスのセッションが1時間で閉じないように。docs/94 §9)
   open_args: ['--idle-timeout=0'],
+  // open に --config=<絶対パス> で渡す playwright-cli の設定ファイル(ルートからの相対パス。locale など。git に入れる)。
+  // null のとき・ファイルに locale がないときは locale の既定値 ja-JP(lib/cli.mjs の DEFAULT_LOCALE)を渡す
+  browser_config: 'config/playwright-cli.json',
   // 環境情報の取り出し(get <キー> --reveal を足して呼ぶ)。null なら node tools/env/env.mjs
   env_cli: null,
   // 同じカードを出す回数の上限(超えたら STOP)
@@ -45,6 +48,7 @@ export const DEFAULTS = {
   //   command: コマンドの配列。{prompt} {agent} {model} {card_file} {flow} {card} を置き換え、要素 "{deny}" は deny の各パターンを deny_arg の形に広げる
   //   deny_arg: 使用禁止の1つ分の引数({pattern} を置き換える)/ deny: すべてのカードに共通の使用禁止のパターン
   //   stdin: "prompt" なら依頼文を標準入力で渡す(null なら渡さない)/ timeoutSec: 1枚の上限時間(秒)
+  //   heartbeatSec: 動きがないときに経過を出す間隔(秒。既定 30)/ stallWarnSec: 動きがない時間がこれを超えたら止まっている可能性を出す(秒。既定 180)
   // 見本は config/pms.sample.json。runner がなければ pms run は使えない(終了コード 2)
   runner: null,
   // pms run の既定の CLI(--runner を省いたとき)
@@ -72,6 +76,7 @@ export function loadConfig(root) {
   if (!isCmd(cfg.playwright_cli)) throw new UsageError(`${CONFIG_FILE} の playwright_cli はコマンドの配列(空でない文字列の配列)でなければなりません`);
   if (cfg.env_cli !== null && !isCmd(cfg.env_cli)) throw new UsageError(`${CONFIG_FILE} の env_cli はコマンドの配列か null でなければなりません`);
   if (!Array.isArray(cfg.open_args) || !cfg.open_args.every((x) => typeof x === 'string')) throw new UsageError(`${CONFIG_FILE} の open_args は文字列の配列でなければなりません`);
+  if (cfg.browser_config !== null && (typeof cfg.browser_config !== 'string' || cfg.browser_config === '')) throw new UsageError(`${CONFIG_FILE} の browser_config はファイルのパス(文字列)か null でなければなりません`);
   for (const k of ['max_issues', 'max_rejections']) {
     if (!Number.isInteger(cfg[k]) || cfg[k] < 1) throw new UsageError(`${CONFIG_FILE} の ${k} は1以上の整数でなければなりません`);
   }
@@ -83,7 +88,9 @@ export function loadConfig(root) {
     for (const [name, r] of Object.entries(cfg.runner)) {
       if (name.startsWith('_')) continue;
       if (!r || typeof r !== 'object' || !isCmd(r.command)) throw new UsageError(`${CONFIG_FILE} の runner.${name}.command はコマンドの配列でなければなりません`);
-      if (r.timeoutSec != null && (!Number.isInteger(r.timeoutSec) || r.timeoutSec < 1)) throw new UsageError(`${CONFIG_FILE} の runner.${name}.timeoutSec は1以上の整数でなければなりません`);
+      for (const k of ['timeoutSec', 'heartbeatSec', 'stallWarnSec']) {
+        if (r[k] != null && (!Number.isInteger(r[k]) || r[k] < 1)) throw new UsageError(`${CONFIG_FILE} の runner.${name}.${k} は1以上の整数でなければなりません`);
+      }
       if (r.deny != null && (!Array.isArray(r.deny) || !r.deny.every((x) => typeof x === 'string'))) throw new UsageError(`${CONFIG_FILE} の runner.${name}.deny は文字列の配列でなければなりません`);
       if (r.deny_arg != null && !(Array.isArray(r.deny_arg) && r.deny_arg.every((x) => typeof x === 'string'))) throw new UsageError(`${CONFIG_FILE} の runner.${name}.deny_arg は文字列の配列でなければなりません`);
       if (r.stdin != null && r.stdin !== 'prompt') throw new UsageError(`${CONFIG_FILE} の runner.${name}.stdin は "prompt" か null でなければなりません`);

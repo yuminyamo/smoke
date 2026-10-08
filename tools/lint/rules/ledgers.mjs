@@ -10,6 +10,12 @@ function handoffInScope(repo, row) {
   return new RegExp(`\\b${repo.flow}\\b`).test(row.obj['発生元'] ?? '');
 }
 
+// 台帳のファイルはあるのに「## 台帳」の節に表がない(テンプレートを写さずに作った等)。行を読めないので、0件として通さない
+function tableMissing(ledger, idCol, template) {
+  if (!ledger.exists || ledger.table) return [];
+  return [{ file: ledger.rel, message: `「## 台帳」の節に列 ${idCol} の表がありません。記入用テンプレート ${template} の見出しと表の列のまま書き直す(既存の行は、その表に移す。pms もこの表を読む)` }];
+}
+
 function blockedSteps(repo) {
   const out = [];
   for (const r of repo.latestRecords()) {
@@ -29,6 +35,7 @@ export function reason_code_enum(repo) {
   const findings = [];
   const allowed = Object.keys(repo.vocab.reason_code ?? {});
   const h = repo.handoffRows;
+  findings.push(...tableMissing(h, 'ID', '91'));
   for (const row of h.rows) {
     if (!handoffInScope(repo, row)) continue;
     const code = String(row.obj['理由コード'] ?? '').replace(/`/g, '').trim();
@@ -55,6 +62,7 @@ export function ext_demand_linked(repo) {
   const h = repo.handoffRows;
   const handoffById = new Map(h.rows.map((r) => [String(r.obj['ID'] ?? '').trim(), r]));
   if (!d.exists) notes.push(`${d.rel} がありません`);
+  findings.push(...tableMissing(d, '需要ID', '93'));
 
   for (const row of h.rows) {
     if (!handoffInScope(repo, row)) continue;
@@ -147,6 +155,7 @@ export function requires_in_state_set(repo) {
   const statuses = Object.keys(repo.vocab.state_demand_status ?? {});
   const d = repo.stateDemandRows;
   if (!d.exists) notes.push(`${d.rel} がありません(初期状態セットは vocab.initial_state_set だけ)`);
+  findings.push(...tableMissing(d, '需要ID', '96'));
 
   const demandIds = new Set();
   const stateRow = new Map(); // 状態ID → { id, status }

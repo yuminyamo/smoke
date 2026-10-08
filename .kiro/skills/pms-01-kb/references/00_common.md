@@ -31,6 +31,8 @@
 
 記入用テンプレート(`90` 禁止操作リスト / `91` 申し送り台帳 / `92` フロー記録 / `93` 外部操作需要リスト / `94` 手順改善台帳 / `95` 要確認事項台帳 / `96` 状態需要リスト)は人間が使う都合で語彙の表を持っているが、**それは `vocab.yaml` の写しである。食い違ったら `vocab.yaml` を正とする。**
 
+記入先のファイル(`work/_common/` 配下の台帳など)がなければ、**記入用テンプレートを丸ごと写して作る。** 見出し(「## 台帳」など)と表の列名を変えず、独自の見出し・表で作らない。pms と lint は、この見出しの下の表を読む(形が違うと、行を読めずに後の作業で pms が止まる)。
+
 ## ■ AIへの渡し方(抽出単位)
 
 **`stages.md` を丸ごと渡してはならない。** 作業ごとに抽出して渡す。
@@ -820,6 +822,8 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件�
 
 記録する列: ID / 対象(1文で具体的に) / 理由コード / 引き継ぎ先 / 想定手段(なければ空欄。埋めるために推測しない) / 発生元(フローID・作業・項目ID) / 起票日 / 状態。
 
+**[R-HO-3]** **ファイルがなければテンプレート91を丸ごと写して作り、行は「## 台帳」の表に足す。** 見出しと列名を変えない。記入例の節には足さない。テンプレートの空の行(`HO-XXX-001`)は、最初の行を足すときに外す(■文書の5層構成。pms と lint はこの表を読む)。
+
 **理由コード `操作手段なし` の行は、想定手段欄に外部操作需要リストの需要IDを必ず書く**(■外部操作)。再探索フローで解消したら状態を `done` にする。
 
 **理由コード `初期状態外` の行で状態需要リストに提案・追記した場合は、想定手段欄にその需要ID(`SD-...`)を書く**(■状態(前提条件)の扱い)。採用された状態でシナリオを作ったら状態を `done` にする。
@@ -1167,9 +1171,9 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `scenario_id_exists` | ERROR | exploration-log / 突合表の全シナリオIDが scenarios.md に存在する |
 | `scenario_id_unique` | ERROR | シナリオIDがコードベース全体(過去フロー含む)でちょうど1回出現する |
 | `verdict_enum` | ERROR | 判定値が `vocab.verdict` のいずれか。実装: `tools/lint/lint.mjs` |
-| `reason_code_enum` | ERROR | 申し送り理由コードが `vocab.reason_code` のいずれか(探索記録の `blocked_by.reason` を含む)。実装: `tools/lint/lint.mjs` |
+| `reason_code_enum` | ERROR | 申し送り理由コードが `vocab.reason_code` のいずれか(探索記録の `blocked_by.reason` を含む)。申し送り台帳のファイルがあれば、「## 台帳」の節に列 ID の表がある(テンプレート91の形)。実装: `tools/lint/lint.mjs` |
 | `operation_registered` | ERROR | 使用した全 `operation_id` が KB T05 に登録済みで、禁止操作リストの `禁止`/`要許可` に該当しない(該当は、KB T05 のエントリの「禁止操作リストとの適合」が挙げる禁止IDの現在の禁止レベルで判定する)。実装: `tools/lint/lint.mjs` |
-| `ext_demand_linked` | ERROR | 理由コード `操作手段なし` の申し送り行と、`操作手段なし` で `blocked` にしたステップが、外部操作需要リストの需要IDを参照している。実装: `tools/lint/lint.mjs` |
+| `ext_demand_linked` | ERROR | 理由コード `操作手段なし` の申し送り行と、`操作手段なし` で `blocked` にしたステップが、外部操作需要リストの需要IDを参照している。外部操作需要リストのファイルがあれば、「## 台帳」の節に列 需要ID の表がある(テンプレート93の形)。実装: `tools/lint/lint.mjs` |
 | `ext_demand_unique` | ERROR | 外部操作需要リストで「外部操作(業務語)+操作対象」の組が重複しない |
 | `ext_wrapper_only` | ERROR | 生成コードが外部操作を `tests/external/` のラッパ経由でのみ呼んでいる(`tests/specs/` から実行体を直接呼ばない) |
 | `review_header_valid` | ERROR | 全AI成果物にレビューヘッダがあり、値が `vocab.review_status` のいずれか |
@@ -1187,7 +1191,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `prohibition_recheck` | ERROR | 作業20の開始前に、作業10の status.yaml の `prohibited_ops.digest` と現在の禁止操作リストが照合されている。`blocked_by_prohibition` があるのに版が変わっていれば作業20を起動しない(作業10のパートPへ戻す)。実装: `node tools/checks/prohibited-ops.mjs --compare <作業10の status.yaml>`(終了コード 0 / 3 / 2)。`tools/lint/lint.mjs` は、作業20の前のフローではこれを呼び、作業20まで進んだフローでは作業20の status.yaml の `prohibition_check: ok` を確かめる |
 | `env_value_leak` | ERROR | 検証環境の情報の秘密情報(種類 `secret`)の値が、成果物(`work/`・`kb/`・`logs/`・`tests/`・`traceability/`)と skills(`procedure/skills.config.json` の生成先。`.github/skills/`・`.kiro/skills/`。■外部操作 skill の条件2)に書かれていない。設定ファイルの形が正しい。実装: `tools/lint/lint.mjs`(値は `tools/env/` と同じ読み方で読む。6文字未満の値は探さない) |
 | `env_value_hardcoded` | WARNING | テストコード(`tests/`)に、検証環境の情報の接続先(種類 `endpoint`)の値がそのまま書かれていない(`envValue` で読む)。実装: `tools/lint/lint.mjs` |
-| `requires_in_state_set` | ERROR | 作業10の対象シナリオ(探索記録のあるもの)の `requires` の全状態が初期状態セット(`vocab.initial_state_set` と、状態需要リストで状態が `採用` / `整備済` の行)にある。申し送り台帳の想定手段が参照する需要ID(`SD-...`)が状態需要リストにある。状態需要リストの需要IDが重複しない。実装: `tools/lint/lint.mjs` |
+| `requires_in_state_set` | ERROR | 作業10の対象シナリオ(探索記録のあるもの)の `requires` の全状態が初期状態セット(`vocab.initial_state_set` と、状態需要リストで状態が `採用` / `整備済` の行)にある。申し送り台帳の想定手段が参照する需要ID(`SD-...`)が状態需要リストにある。状態需要リストの需要IDが重複しない。状態需要リストのファイルがあれば、「## 台帳」の節に列 需要ID の表がある(テンプレート96の形)。実装: `tools/lint/lint.mjs` |
 | `requires_covered` | ERROR | 作業10: 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある。作業20: コード化した全シナリオの `requires` の全状態に、established check を持つ fixture がある(`S-CLEAN-ENV` は復元そのものなので除く)。実装: `tools/lint/lint.mjs` |
 | `setup_steps_recorded` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `steps` があり、各 step に操作の対象がある(`goto` は `detail`、`external` は `operation_id`、それ以外の操作は `locator`)。proc-v016 以降のフロー(作業10の status.yaml の `procedure_version` で判定する)。proc-v017 以降のフローでは `classification: provided` のエントリにも当て、流用元(`reused_from.flow_id`)があることも見る(工程0の復元そのものである `S-CLEAN-ENV` を除く)。実装: `tools/lint/lint.mjs` |
 | `act_log_linked` | ERROR | setup-log の `classification: built-by-ui` の全エントリに `act`(カード・連番 `seqs`・`established_check_seq`)があり、各連番が操作の記録(`act-log.jsonl`)に同じフロー・同じカードの成功した操作としてあり、`steps` の各 step と記録の操作・対象・値が順に一致する。`established_check_seq` は同じカードの成功した `assert` である。proc-v017 以降のフロー。実装: `tools/lint/lint.mjs` |

@@ -21,7 +21,8 @@
 //                                   AI の出力を検査し、合格なら記録(setup-log・探索記録・台帳)を書く
 //   node tools/pms/pms.mjs run    --flow F-003 [--phase A|C|all] [--runner copilot|kiro] [--max-cards N] [--dry-run]
 //                                   カードを1枚ずつ新しいAIのセッション(config/pms.json の runner)で行わせ、提出を確かめて次へ進む。
-//                                   全部終われば報告書と status.yaml を作り、lint を実行する(実行形態 B2)
+//                                   全部終われば報告書と status.yaml を作り、lint を実行する(実行形態 B2)。
+//                                   セッションの進み具合(道具・pms のコマンドのキーワード、動きのない時間)を標準エラー出力に出す
 //   node tools/pms/pms.mjs report --flow F-003 [--dod-unmet "<満たせない DoD と理由>"]
 //                                   報告書(report.md)の数値・一覧と status.yaml を記録から作る(所見は report.findings のカードの出力)
 //   node tools/pms/pms.mjs stats  [--flow F-003 | --since 2026-10-01] [--json]
@@ -56,6 +57,7 @@ import { act } from './lib/act.mjs';
 import { pwcli } from './lib/pwcli.mjs';
 import { submit } from './lib/submit.mjs';
 import { run } from './lib/run.mjs';
+import { noteActivity } from './lib/progress.mjs';
 import { buildReport } from './lib/report.mjs';
 import { stats, statsText } from './lib/stats.mjs';
 
@@ -133,7 +135,7 @@ try {
       break;
     }
     case 'next': res = nextCard(ctx, opt.flow, { phases: opt.phase && opt.phase !== 'all' ? [opt.phase] : null, brief: opt.brief }); break;
-    case 'run': res = run(ctx, opt); break;
+    case 'run': res = await run(ctx, opt); break;
     case 'report': res = buildReport(ctx, opt.flow, { dodUnmet: opt.dodUnmet }); break;
     case 'stats': {
       const st = stats(ctx, opt);
@@ -160,6 +162,7 @@ try {
     }
     default: throw new UsageError(`不明なサブコマンド: ${cmd}(queue / next / act / pwcli / submit / run / report / stats / status / reopen)`);
   }
+  noteActivity(cmd, pos, res.code); // pms run のセッションの中なら、進み具合の表示に使うキーワードを書く
   // process.exit は標準出力の書き出しを待たないため(大きな出力が途中で切れる)、終了コードだけを決めて戻る
   process.stdout.write((typeof res.out === 'string' ? res.out : JSON.stringify(res.out, null, 2)) + '\n');
   process.exitCode = res.code;

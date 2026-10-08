@@ -4,7 +4,7 @@ description: "作業10: pms が記録から作った報告書の下書きを読�
 model: "gpt-6-luna"
 tools: ["read", "edit", "search", "execute"]
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 report.findings)/ 手順版: proc-v021 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 report.findings)/ 手順版: proc-v022 / 生成: tools/build-skills/build-skills.mjs -->
 
 あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
 

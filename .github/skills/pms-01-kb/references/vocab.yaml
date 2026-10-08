@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-08 / 版: v23(カードを使わない作業の秘密情報の入力: 手順版を proc-v021 に更新)
+# 改訂: 2026-10-08 / 版: v24(台帳の書式の崩れを早く見つける: 手順版を proc-v022 に更新)
+#       2026-10-08 / 版: v23(カードを使わない作業の秘密情報の入力: 手順版を proc-v021 に更新)
 #       2026-10-08 / 版: v22(作業02の画面操作の手段と skill の資格情報: 手順版を proc-v020 に更新、external_op.skill_requirement に no_credentials を追加)
 #       2026-10-08 / 版: v21(低価格モデル対応 段3 IDE 内のループ: 手順版を proc-v019 に更新、pms_runner の b1 を IDE 内のループ(入口のエージェント pms-runner がカードごとにサブエージェントを起こす)に書き直した)
 #       2026-10-08 / 版: v20(低価格モデル対応 段2 スクリプト実行: 手順版を proc-v018 に更新、pms_card_kind に explore.step・explore.close・explore.session_close・report.findings、pms_card_status に skipped、pms_reject_kind に expected_changed・verdict_evidence・health_time・blocked_refs、pms_act_action に screenshot、pms_runner・pms_stop_reason・discrepancy_kind・discrepancy_assessment・reflection_target を追加)
@@ -39,7 +40,7 @@
 meta:
   step: 1                       # 本語彙が対象とするステップ
   revision: "2026-10-08"
-  procedure_version: proc-v021  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  procedure_version: proc-v022  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:

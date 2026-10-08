@@ -301,10 +301,10 @@ export class Repo {
   get handoffRows() {
     return this.memo('handoff', () => {
       const rel = 'work/_common/handoff-register.md';
-      if (!this.exists(rel)) return { rel, exists: false, rows: [] };
+      if (!this.exists(rel)) return { rel, exists: false, table: false, rows: [] };
       const t = tableInSection(this.read(rel), '台帳', 'ID');
       const rows = (t?.rows ?? []).filter((r) => !isBlank(r.obj['対象']) || !isBlank(r.obj['理由コード']));
-      return { rel, exists: true, rows };
+      return { rel, exists: true, table: !!t, rows };
     });
   }
 
@@ -312,10 +312,10 @@ export class Repo {
   get extDemandRows() {
     return this.memo('extdemand', () => {
       const rel = 'work/_common/external-op-demand.md';
-      if (!this.exists(rel)) return { rel, exists: false, rows: [] };
+      if (!this.exists(rel)) return { rel, exists: false, table: false, rows: [] };
       const t = tableInSection(this.read(rel), '台帳', '需要ID');
       const rows = (t?.rows ?? []).filter((r) => !isBlank(r.obj['外部操作(業務語)']) || !isBlank(r.obj['操作対象']));
-      return { rel, exists: true, rows };
+      return { rel, exists: true, table: !!t, rows };
     });
   }
 
@@ -323,10 +323,10 @@ export class Repo {
   get stateDemandRows() {
     return this.memo('statedemand', () => {
       const rel = 'work/_common/state-demand.md';
-      if (!this.exists(rel)) return { rel, exists: false, rows: [] };
+      if (!this.exists(rel)) return { rel, exists: false, table: false, rows: [] };
       const t = tableInSection(this.read(rel), '台帳', '需要ID');
       const rows = (t?.rows ?? []).filter((r) => !isBlank(r.obj['状態ID']) || !isBlank(r.obj['定義(業務語)']));
-      return { rel, exists: true, rows };
+      return { rel, exists: true, table: !!t, rows };
     });
   }
 

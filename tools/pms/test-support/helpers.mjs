@@ -84,6 +84,7 @@ export function makeRepo(files = {}, { config = {} } = {}) {
         },
       },
     }),
+    'config/playwright-cli.json': JSON.stringify({ browser: { contextOptions: { locale: 'ja-JP' } } }),
     'config/environments.local.json': JSON.stringify({ environments: { vm01: { attributes: { 'pms.admin.password': { kind: 'secret', value: SECRET } } } } }),
     'work/PRT/scenarios.md': SCENARIOS,
   };

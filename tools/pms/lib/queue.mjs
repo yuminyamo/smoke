@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { targetScenarios, featureDirs } from './scenarios.mjs';
 import { readAllEntries, upsertEntry } from './setup-log.mjs';
-import { adoptedStates, stateDemandRow, appendHandoff } from './ledgers.mjs';
+import { adoptedStates, stateDemandRow, appendHandoff, ledgerFormatErrors } from './ledgers.mjs';
 import { classifyLocator, ENV_SCRIPT } from './cli.mjs';
 import { timestamp, today, writeText, UsageError, flowNum, blank, readText, readJson } from './util.mjs';
 import { TEMP_REF } from './checks.mjs';
@@ -106,6 +106,9 @@ export function buildQueue(ctx, { flow, phase, scenarioIds }) {
   const { scenarios, missing } = targetScenarios(root, flow, scenarioIds);
   if (missing.length) throw new UsageError(`scenarios.md にないシナリオです: ${missing.join(', ')}`);
   if (scenarios.length === 0) throw new UsageError(`${flow} の対象シナリオがありません(scenarios.md の「策定方式」の行に ${flow} を書いたシナリオ。前のフローのシナリオを扱うときは --scenarios で指定する)`);
+  // パートBで AI が書いた台帳を pms が読めなければ、カードの合格時・報告書の作成時に止まる。カードを行う前に止める
+  const bad = ledgerFormatErrors(root);
+  if (bad.length) throw new UsageError(bad.join(' / '));
 
   const existing = store.hasQueue(flow) ? store.loadQueue(flow) : null;
   const hasA = !!existing && existing.cards.some((c) => phaseOf(c) === 'A');

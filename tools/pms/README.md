@@ -33,7 +33,7 @@
 
 | 操作 | 引数 | playwright-cli の呼び出し(既定) | setup-log の step |
 |---|---|---|---|
-| `open` | `<URL|<env:キー>>` | `-s=F open <URL> --idle-timeout=0`(`open_args`)。初回に `--version` も呼び、記録に `cli_version` を残す | `goto`(`detail`) |
+| `open` | `<URL|<env:キー>>` | `-s=F open <URL> --idle-timeout=0 --config=<config/playwright-cli.json の絶対パス>`(`open_args` と `browser_config`。2.6)。初回に `--version` も呼び、記録に `cli_version` を残す | `goto`(`detail`) |
 | `goto` | 同上 | `-s=F goto <URL>` | `goto`(`detail`) |
 | `snapshot` | なし | `-s=F snapshot` | なし |
 | `click` `dblclick` `check` `uncheck` `hover` | `<ref>` | `-s=F <操作> <ref>` | 同名(`locator`) |
@@ -80,7 +80,19 @@
 - 出力(標準出力と標準エラー出力)から、置き換えた値と全環境の秘密情報を伏せる(2.3 と同じ `mask`)
 - `--session <名前>` があれば `session_arg` の形で渡す。なければセッションを指定しない(playwright-cli の既定のセッション。AIが直接呼んだ playwright-cli と同じブラウザを使える)
 - カード・フロー・act-log・キューに触らない。ロケータの記録もしない(カードを使わない作業は、KB や報告書に自分で書く。KB に書く操作列では値を `<env:キー>` と書く。00 R-ENV-1)
+- 先頭の引数が `open` なら、`pms act` と同じく `browser_config`(locale の既定値は `ja-JP`)を `--config=<絶対パス>` で足す(2.6)。`--config` を自分で書いたときは足さない
 - `pms run` が起こすカードのセッションでは使用禁止にする(`procedure/cards/agents.yaml` の `deny_shell`、`config/pms.sample.json` の `runner.copilot.deny`)。カードの画面操作は記録の残る `pms act` に限るため
+
+### 2.6 ブラウザの locale(`config/playwright-cli.json`)
+
+テスト対象の画面は、ブラウザが伝える言語(`navigator.language`・`Accept-Language`)で日本語と英語が変わる。playwright-cli は locale を指定しないと OS やブラウザの既定の言語で開くため、端末や起動のしかたで表示が変わる。これを揃えるため、`pms act open` と `pms pwcli -- open` は playwright-cli の設定ファイルを `--config=<絶対パス>` で渡す(`lib/cli.mjs` の `browserConfigArgs`)。
+
+- 設定ファイルは `config/pms.json` の `browser_config`(既定 `config/playwright-cli.json`)。書式は playwright-cli の設定ファイルそのもの(`browser.contextOptions` に Playwright のコンテキストの設定)。全員で同じ値を使うので git に入れる
+- 中身は `{"browser": {"contextOptions": {"locale": "ja-JP"}}}`。タイムゾーンなどを揃えたいときも同じ `contextOptions` に足す(`timezoneId` など)
+- **locale の既定値は `ja-JP`**(`lib/cli.mjs` の `DEFAULT_LOCALE`)。設定ファイルに `browser.contextOptions.locale` がないとき・`browser_config` が null のとき・ファイルがないときは、`ja-JP` を足した写しを一時ディレクトリ(`pms-playwright-cli-<中身のハッシュ>.json`)に作って渡す。ファイルがないときは警告も返す。英語など別の言語で開くときは、設定ファイルの `locale` に書く
+- JSON として読めない・オブジェクトでないときは終了コード 2
+- locale はブラウザを開くときに決まる。開いたままのセッションには効かないため、変えたら `close` してから開き直す
+- `@playwright/cli 0.1.22` で、`--config` の locale が `navigator.languages` に効くこと、`browser_config` が null のときに `pms pwcli -- open` が `ja-JP` で開くことを確かめた(2026-10-08。locale の指定なしでは OS の言語 `ja,en-US,en` だった)
 
 ## 3. タスクキュー(`work/_flows/F-<番号>/queue.json`)
 
@@ -171,6 +183,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 - `appendHandoff` / `peekHandoffId` / `recordExtDemand` / `stateDemandRow` / `adoptedStates` / `markStateProvisioned`
 - 段2で加えたもの: `appendSignal`(テンプレート94の「1. シグナル」の表。`SIG-<4桁>`。振り分け・IMP は空)/ `appendDiscrepancy`(`work/_common/discrepancies.md` に 00 ■不整合レポート(DISC)規約の書式で1件。`DISC-<機能>-<3桁>`。ファイルがなければレビューヘッダ付きで作る)/ `prohibitionLevels`(禁止操作表の禁止IDとレベル)/ `ledgerIds` / `handoffsOfFlow`
 - 表は記入用テンプレートの「## 台帳」の表(列の名前で書く)。ファイルがなければテンプレート(`procedure/templates/91_`・`93_`・`96_`)を写して作り、テンプレートの空の行は最初の行を足すときに外す
+- `ledgerFormatErrors`: 作業場所にある台帳(申し送り・外部操作需要・状態需要・手順改善)が、テンプレートの見出しの下に ID の列の表を持つかを確かめる。`queue build` がカードを作る前に呼び、読めない台帳があれば終了コード 2 で止まる(パートBで AI が手で作った台帳の形の崩れを、カードを行ったあとの報告書の作成で初めて見つけないため。proc-v022)
 - 採番は「## 台帳」の表の中の最大 + 1(`HO-<機能コード>-<3桁>`・`EXT-<3桁>`)。記入例の節は数えない
 - 書くのは事実の欄だけ(優先度・採否・整備記録など人間の欄には書かない)
 
@@ -200,12 +213,13 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 | `playwright_cli_version` | null | 想定する版。`open` のときに `--version` と比べ、違えば警告 |
 | `session_arg` | `-s={session}` | セッション名の引数(`{session}` はフローID) |
 | `open_args` | `["--idle-timeout=0"]` | `open` に足す引数 |
+| `browser_config` | `config/playwright-cli.json` | `open` に `--config=<絶対パス>` で渡す playwright-cli の設定ファイル(ルートからの相対パス。locale など。2.6)。null のとき・locale がないときは locale の既定値 `ja-JP` を渡す |
 | `env_cli` | null | 環境情報の実行体(`get <キー> --reveal` を足して呼ぶ)。null なら `node tools/env/env.mjs --root <root>` |
 | `max_issues` | 3 | 同じカードを出す回数の上限 |
 | `max_rejections` | 3 | 同じカードの不合格の回数の上限 |
 | `ops` | `{}` | 操作ごとの呼び出しの上書き(`{"press": {"cli": ["press", "{value}"]}}` など。`{ref}` `{value}` `{js_value}` `{locator}` を置き換える。`cli` か `run_code` のどちらか) |
 | `screenshot_args` | `["screenshot", "{ref}", "--filename={file}"]` | `pms act screenshot` の呼び出し(要素 `{ref}` は ref がなければ外す) |
-| `runner` | null | `pms run` が起こす AI の CLI(名前 → `{command, deny_arg, deny, stdin, timeoutSec, fatal_exit_codes}`。10章)。null なら `pms run` は終了コード 2 |
+| `runner` | null | `pms run` が起こす AI の CLI(名前 → `{command, deny_arg, deny, stdin, timeoutSec, heartbeatSec, stallWarnSec, fatal_exit_codes}`。10章)。null なら `pms run` は終了コード 2 |
 | `default_runner` | `copilot` | `--runner` を省いたときの CLI |
 | `cardTypes` | `{}` | カードの種類ごとの `agent`・`model`(候補の配列。先頭を使う)・`deny`(その種類だけに足す使用禁止)。書かなかったものは `procedure/cards/agents.yaml` |
 
@@ -259,7 +273,8 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 
 1. `nextCard`(4章。`--phase` のフェーズだけ)で次のカードを取る。STOP → `{state: STOP, code, reason, message}` で終了コード 3(`message` は利用者向けの文面)
 2. カードの種類のエージェント・モデル(`cardType`: `config.cardTypes` → `procedure/cards/agents.yaml`。エージェントの名前は `pms-card-<種類の . と _ を - に>`)と使用禁止(`runner.<名前>.deny` + `cardTypes.<種類>.deny`)で、`runner.<名前>.command` を展開する。依頼文(`{prompt}`)は短い固定の文で、**カードの本文はファイルのパス(`{card_file}`)で渡す**(コマンドラインの長さに頼らない)。`stdin: "prompt"` なら依頼文を標準入力でも渡す
-3. 子プロセスを `cwd = root`、環境変数 `PMS_RUNNER=b2`・`PMS_FLOW`・`PMS_CARD` で起動する(`spawnSync`。`timeout = timeoutSec`、超えたら SIGKILL で止め、未提出として扱う)。`pms run` 自身も `PMS_RUNNER=b2` にして、出したカードの履歴に残す
+3. 子プロセスを `cwd = root`、環境変数 `PMS_RUNNER=b2`・`PMS_FLOW`・`PMS_CARD`・`PMS_ACTIVITY` で起動する(非同期の `spawn`。`timeoutSec` を超えたら SIGKILL で止め、未提出として扱う)。`pms run` 自身も `PMS_RUNNER=b2` にして、出したカードの履歴に残す
+   - 進み具合(`lib/progress.mjs`): セッションの間、標準エラー出力に `[pms run] C-0009 3分05秒: <キーワード>` の形で出す。キーワードは、CLI の出力の JSON の行の道具の呼び出し(`toolName`・`tool_name`・`tool`、または `type` に tool を含む行の `name` と、`command`・`path` など)と、セッションの中で実行された pms のコマンド(pms.mjs が `PMS_ACTIVITY` のファイル `runs/C-<番号>-<回>.activity` に書く。`pms act click`・`pms submit 不合格` など。終わったら消す)。キーワードが変わったら3秒以上あけて出し、何も出していなければ `heartbeatSec`(既定 30)ごとに経過と最後の動きを出す。出力も pms のコマンドもない時間が `stallWarnSec`(既定 180)を超えたら「止まっている可能性」を出す(長いテストの実行中もこうなる。最後のキーワードで見分ける)。CLI の出力の形は実物で確かめていないため、キーワードが取れなくても経過と最後の動きの時刻は出す
 4. 出力(標準出力の JSONL)の後ろに `{"pms": {card, kind, runner, attempt, exit_code, signal, timed_out, started_at, ended_at, stderr}}` の1行を足し、秘密情報の値を伏せてから `runs/C-<番号>-<回>.jsonl` に保存する。キューの履歴に `session` を足す
 5. キューで合否を確かめる。合格でなければ次の `nextCard` が同じカードを出し直す(出し直しの上限は `max_issues`、不合格の上限は `max_rejections`。段1の規則のまま)。終了コードが `fatal_exit_codes`(Copilot CLI の 2 = 引数の誤り)なら終了コード 1
 6. `done` になったら、パートCがあれば `pms report` と `lint --stage 10 --skip skills_in_sync` を行う。lint の終了コード 0 → 0、1 → STOP(`lint_error`。指摘を `errors` に)、2 → 1。**lint の指摘を直すカードは作らない**(チャットの作業10の「lint の指摘による差し戻し」で直す)
@@ -294,6 +309,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 - `--agent` に、`.github/agents/pms-card-*.agent.md` のファイル名(`.agent.md` を除いた名前)を渡せるか
 - Kiro CLI の `permissions` と `toolsSettings` を同じエージェントに書いてよいか(旧形式を受け付けない版なら `toolsSettings` を外す)。Kiro のモデルIDを `kinds.<種類>.kiro_model` に書くか
 - 1枚 900 秒の上限が、探索のステップに足りるか(`runner.<名前>.timeoutSec`)
+- `--output-format json`(Copilot)・`stream-json`(Kiro)の行から、道具の呼び出しのキーワードが取れるか(`pms run` の進み具合。取れなければ `lib/progress.mjs` の `keywordOf` を直す)
 
 ## 14. IDE 内のループ(段3。B1。入口のエージェント `pms-runner`)
 

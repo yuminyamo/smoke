@@ -438,6 +438,17 @@ test('reason_code_enum: 台帳の節だけを見る(記入例は数えない)・
   assertHas(rc, /SC-PRT-03-S3 の blocked_by\.reason「禁止」/);
 });
 
+test('reason_code_enum・ext_demand_linked: 台帳のファイルがあるのに「## 台帳」の表がなければ、0件として通さない', () => {
+  // テンプレートを写さずに作った台帳(見出しが「## 台帳」でない)
+  const root = makeRepo({
+    ...edit('work/_common/handoff-register.md', '## 台帳', '## 申し送り一覧'),
+    ...edit('work/_common/external-op-demand.md', '## 台帳', '## 需要一覧'),
+  });
+  const r = lint(root);
+  assertHas(findings(r, 'reason_code_enum'), /「## 台帳」の節に列 ID の表がありません。記入用テンプレート 91/);
+  assertHas(findings(r, 'ext_demand_linked'), /「## 台帳」の節に列 需要ID の表がありません。記入用テンプレート 93/);
+});
+
 test('ext_demand_linked: 申し送りの需要IDなし・存在しない需要ID・申し送りIDの理由違い', () => {
   const root = makeRepo({ ...edit('work/_common/handoff-register.md', 'EXT-001(skill 未整備)', 'skill 未整備') });
   fs.writeFileSync(path.join(root, 'work/PRT/exploration/exploration-log.yaml'),

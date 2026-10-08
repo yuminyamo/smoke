@@ -12,6 +12,7 @@
 - シナリオ末尾の検査の結果:
 {{scenario_invariants}}
 - DB不変条件の注記: {{invariant_note}}
+- DB の接続: {{db_connection}}
 
 DB不変条件(`vocab.invariant`):
 
@@ -24,6 +25,7 @@ DB不変条件(`vocab.invariant`):
 {{rule:R-PMS-5}}
 {{rule:R-EXP-19}}
 {{rule:R-INV-2}}
+{{rule:R-DB-1}}
 {{rule:R-INV-3}}
 {{rule:R-INV-4}}
 

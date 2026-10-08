@@ -40,7 +40,9 @@
 | 画面で期待結果を確かめる | `{{act}} --intent "<確かめること>" assert <ref> visible`(`hidden` / `text "<文言>"`) |
 | 証跡を撮る | `{{act}} --intent "<何の証跡か>" screenshot`(`{{evidence_dir}}/` に保存される) |
 | 外部操作 | `{{act}} --intent "<目的>" ext --op <KB T05 の操作ID> -- <実行体の呼び出し...>` |
-| DB を確かめる | SELECT だけを実行し、文と結果の要点を出力の `verification.db` に書く |
+| DB を確かめる | SELECT だけを実行し、文と結果の要点を出力の `verification.db` に書く。接続のしかたは下の「DB の接続」 |
+
+DB の接続: {{db_connection}}
 
 `pms act` の出力の `seq` が、その操作の連番である。出力の `warnings` に安定でない・一意でないと出たら、別の要素で操作し直す。
 
@@ -70,6 +72,7 @@
 {{rule:R-JDG-2}}
 {{rule:R-JDG-3}}
 {{rule:R-JDG-4}}
+{{rule:R-DB-1}}
 {{rule:R-HLT-1}}
 {{rule:R-HLT-2}}
 {{rule:R-WAIT-1}}

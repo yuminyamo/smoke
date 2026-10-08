@@ -7,6 +7,7 @@ import { targetScenarios, featureDirs } from './scenarios.mjs';
 import { readAllEntries, upsertEntry } from './setup-log.mjs';
 import { adoptedStates, stateDemandRow, appendHandoff, ledgerFormatErrors } from './ledgers.mjs';
 import { classifyLocator, ENV_SCRIPT } from './cli.mjs';
+import { load as loadEnv, selectEnv, EnvError } from '../../env/lib/environments.mjs';
 import { timestamp, today, writeText, UsageError, flowNum, blank, readText, readJson } from './util.mjs';
 import { TEMP_REF } from './checks.mjs';
 import { DONE_STATUS } from './store.mjs';
@@ -249,6 +250,30 @@ export function envKeys(root) {
   } catch { return null; }
 }
 
+/**
+ * カードの「DB の接続」の行。使う環境の db.trust_server_certificate(vocab.env_optional_keys。未登録なら既定値)から作る
+ * (00 ■DB への接続 [R-DB-1])。envId はフローの stage10-context の environment(なければ env.mjs と同じ選び方)
+ */
+export const DB_TRUST_KEY = 'db.trust_server_certificate';
+export function dbConnection(root, vocab, envId = null) {
+  const def = String(vocab?.env_optional_keys?.[DB_TRUST_KEY]?.default ?? 'true');
+  let value;
+  try {
+    const cfg = loadEnv(root);
+    const { env } = selectEnv(cfg, envId);
+    value = env ? cfg.envs.get(env)?.attributes.get(DB_TRUST_KEY)?.value : undefined;
+  } catch (e) {
+    if (!(e instanceof EnvError)) throw e;
+  }
+  const raw = value === undefined || value === '' ? null : String(value).trim().toLowerCase();
+  const valid = raw === 'true' || raw === 'false';
+  const trust = (valid ? raw : def) === 'true';
+  const src = raw === null ? `未登録のため既定の ${def}` : valid ? raw : `値 "${value}" は true / false でないため既定の ${def}`;
+  return trust
+    ? `サーバ証明書の検証を無効にして接続する(人間が承認済み。環境情報 ${DB_TRUST_KEY}: ${src})。sqlcmd は -C、接続文字列は TrustServerCertificate=yes。証明書のエラーを理由に止まらない [R-DB-1]`
+    : `サーバ証明書を検証して接続する(環境情報 ${DB_TRUST_KEY}: ${src})。-C・TrustServerCertificate=yes は使わない。証明書のエラーで接続できなければ cannot_proceed で提出する [R-DB-1]`;
+}
+
 export function list(items) { return items.length ? items.map((x) => `- ${x}`).join('\n') : 'なし'; }
 
 /** カードの入力(pms が機械的に埋めるもの) */
@@ -261,6 +286,7 @@ function cardVars(ctx, q, c, reissue) {
     card_id: c.id, flow_id: q.flow_id, kind: c.kind, feature: c.feature ?? '',
     current_url: last ? last.url_after : 'まだ画面を開いていない(open から始める)',
     env_keys: keys ? list(keys) : '取得できない(node tools/env/env.mjs list で確かめる)',
+    db_connection: dbConnection(root, ctx.proc.vocab, (q.rounds ?? []).at(-1)?.context?.environment ?? null),
     out_file: paths.out(q.flow_id, c.id),
     submit: submitCommand(q, c, paths),
     act: `${PMS} act --flow ${q.flow_id} --card ${c.id}`,

@@ -962,6 +962,14 @@ lint の違反・人間の指摘・回帰実行の切り分けに由来するシ
 
 <!-- /protected:DB_SAFETY -->
 
+### DB への接続(TLS のサーバ証明書)
+
+検証環境の SQL Server は、自己署名など信頼できない証明書で TLS 接続を求めることが多い(sqlcmd・ODBC Driver 18 以降・Node の `mssql` は既定で暗号化と証明書の検証を行う)。サーバ証明書を検証するかは、人間が環境ごとに環境情報のキー `db.trust_server_certificate`(`vocab.env_optional_keys`)で決める。
+
+- **[R-DB-1]** `db.trust_server_certificate` が `true` または未登録(既定)のとき、**人間はテスト環境のDBへの接続でサーバ証明書の検証を無効にすること(sqlcmd の `-C`、接続文字列の `TrustServerCertificate=yes`、`mssql` の `options.trustServerCertificate: true`)を承認している。** 証明書のエラーを理由に止まらず、無効にして接続する。`false` のときは検証を無効にしない(証明書のエラーで接続できなければ `cannot_proceed` で提出する)。いずれのときも、接続先がテスト環境のDB(環境情報の `db.server` / `db.name`)であることは DB操作の安全規約どおりに確かめる。**この設定による接続は ■人間の承認が必要な例外 の要許可操作・包括原則に当たらない**(テスト環境の中のDBへの `SELECT` であり、環境の状態を変えない)
+
+カードでは、pms が使う環境の設定値を「DB の接続」の行に示す。値を変えるのは人間である(`node tools/env/env.mjs set db.trust_server_certificate false --kind other`)。
+
 ## ■ 項目ステータスのライフサイクル
 
 進捗軸とレビュー軸は独立した列として持つ(`vocab.progress_item` / `vocab.review_status`)。

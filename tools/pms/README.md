@@ -264,10 +264,12 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 
 | カード | 入力(pms が埋める) |
 |---|---|
-| explore.step | シナリオの目的・合格条件・持ち回るデータ・使用する外部操作、ステップの行(原文の表)、位置、前のステップまでの記録の抜粋(判定・操作・観測。記録から)、持ち回るデータの現在の値、前提状態の操作列(最初のステップのとき。setup-log から)、現在の URL、このステップ・シナリオの申し送り、KB の該当ページ(索引とシナリオID・ステップID・操作IDを含むページ)、非決定値カタログの所在、環境情報のキー |
-| explore.close | 目的、ステップの記録の抜粋、持ち回ったデータ、既存の部品・fixture・ページオブジェクト、INV の注記 |
-| explore.session_close | ラウンドのシナリオ、シナリオ末尾の検査の結果 |
+| explore.step | シナリオの目的・合格条件・持ち回るデータ・使用する外部操作、ステップの行(原文の表)、位置、前のステップまでの記録の抜粋(判定・操作・観測。記録から)、持ち回るデータの現在の値、前提状態の操作列(最初のステップのとき。setup-log から)、現在の URL、このステップ・シナリオの申し送り、KB の該当ページ(索引とシナリオID・ステップID・操作IDを含むページ)、非決定値カタログの所在、環境情報のキー、DB の接続 |
+| explore.close | 目的、ステップの記録の抜粋、持ち回ったデータ、既存の部品・fixture・ページオブジェクト、INV の注記、DB の接続 |
+| explore.session_close | ラウンドのシナリオ、シナリオ末尾の検査の結果、DB の接続 |
 | report.findings | `pms report` と同じ作り方の報告書の下書き(所見の欄は空。`work/_flows/F/report-draft-<機能>.md` にも書く) |
+
+「DB の接続」(`dbConnection`)は、フローの環境(最後のラウンドの `stage10-context.json` の `environment`。なければ env.mjs と同じ選び方)の環境情報 `db.trust_server_certificate` から作る1行である。`true` または未登録(既定は `vocab.env_optional_keys` の `default`)なら、サーバ証明書の検証を無効にして接続することを人間が承認済みと書き、`false` なら検証すると書く。`true` / `false` でない値は既定で扱い、そのことを行に書く(00 ■DB への接続 [R-DB-1]。proc-v023)
 
 ## 10. `pms run`(段2。`lib/run.mjs`)
 

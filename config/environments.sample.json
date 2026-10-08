@@ -10,6 +10,7 @@
         "pms.password": { "kind": "secret", "description": "値は config/environments.local.json に保存する(ここには書かない)" },
         "db.server": { "kind": "endpoint", "value": "pms-test-01\\SQLEXPRESS" },
         "db.name": { "kind": "endpoint", "value": "PMS" },
+        "db.trust_server_certificate": { "kind": "other", "value": "false", "description": "この環境の SQL Server は信頼できる証明書なので検証する。未登録なら既定の true(検証を無効にして接続することを承認)。00 ■DB への接続" },
         "mfp.a.host": { "kind": "endpoint", "value": "192.0.2.10", "description": "複合機A(実機)" },
         "mfp.a.admin.user": { "kind": "account", "value": "admin" },
         "mfp.a.admin.password": { "kind": "secret" },

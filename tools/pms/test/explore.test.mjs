@@ -13,6 +13,7 @@ import { makeRepo, write, read, exists, pms, queue, submitOut, SECRET, NOW, REAL
 import agent, { OUT } from '../test-support/explore-agent.mjs';
 import { parseYamlDocs } from '../../lint/lib/yaml-lite.mjs';
 import { keywordOf, noteActivity } from '../lib/progress.mjs';
+import { dbConnection } from '../lib/queue.mjs';
 
 process.env.PMS_NOW = NOW;
 
@@ -248,12 +249,31 @@ test('explore: カードの入力に、前のステップの記録の抜粋・�
   assert.match(n1.json.body, /- \[R-EXP-13\] `blocked` にするのは実行できないステップ\*\*以降\*\*に限る/);
   assert.match(n1.json.body, /<!-- 保護ブロック EXPECTED_IMMUTABLE/);
   assert.match(n1.json.body, /<!-- 保護ブロック PROHIBITED_OPS/);
+  assert.match(n1.json.body, /DB の接続: サーバ証明書の検証を無効にして接続する\(人間が承認済み。環境情報 db\.trust_server_certificate: 未登録のため既定の true\)。sqlcmd は -C/);
+  assert.match(n1.json.body, /- \[R-DB-1\] `db\.trust_server_certificate` が `true` または未登録/);
   assert.equal(n1.json.next, 'node tools/pms/pms.mjs act --flow F-003 --card C-0003 snapshot');
   await agent({ root, flow: 'F-003', card: 'C-0003', kind: 'explore.step', body: n1.json.body, pms: (args) => pms(root, args) });
   const n2 = pms(root, ['next', '--flow', 'F-003']);
   assert.match(n2.json.body, /- SC-PRT-01-S1: passed。操作: fill getByLabel\('ユーザーID'\) ← <env:pms\.admin\.user> → click getByRole/);
   assert.match(n2.json.body, /"job_id": "JOB-1"/);
   assert.match(n2.json.body, /前のステップのあとの画面から続ける/);
+});
+
+test('DB の接続: 環境情報 db.trust_server_certificate が false なら検証する、true / false でない値は既定の true(00 ■DB への接続)', () => {
+  const root = repo();
+  const vocab = { env_optional_keys: { 'db.trust_server_certificate': { default: 'true' } } };
+  const setTrust = (value) => {
+    const f = JSON.parse(read(root, 'config/environments.json'));
+    f.environments.vm01.attributes['db.trust_server_certificate'] = { kind: 'other', value };
+    write(root, 'config/environments.json', JSON.stringify(f));
+  };
+  setTrust('false');
+  assert.match(dbConnection(root, vocab, 'vm01'), /^サーバ証明書を検証して接続する\(環境情報 db\.trust_server_certificate: false\)。-C・TrustServerCertificate=yes は使わない/);
+  setTrust('TRUE');
+  assert.match(dbConnection(root, vocab, 'vm01'), /^サーバ証明書の検証を無効にして接続する\(人間が承認済み。環境情報 db\.trust_server_certificate: true\)/);
+  setTrust('no');
+  assert.match(dbConnection(root, vocab, 'vm01'), /値 "no" は true \/ false でないため既定の true/);
+  assert.match(dbConnection(root, vocab, 'no-such-env'), /未登録のため既定の true/);
 });
 
 test('explore.step の検査: 期待結果の書き換え・証跡なし・健全性シグナルの時刻・blocked の参照・別のカードの連番・検証手段の欠け', async () => {

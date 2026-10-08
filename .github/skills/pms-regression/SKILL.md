@@ -2,12 +2,12 @@
 name: pms-regression
 description: "PMS(プリント管理システム)の回帰テストを作る・続きをする・進み具合を知るときの入口。「〇〇機能の回帰テストを作って」「既存の手順書をもとに〇〇のテストを作って」「F-003の続き」「続けて」「いまどうなってる?」「EXT-002を再探索して」などの依頼で使う。どの作業(シナリオ生成と探索/健全性の是正/コード生成 など)を行うかはこのskillが決め、作業ごとのskill(pms-10-explore 等)を使う。"
 metadata:
-  procedure_version: proc-v022
+  procedure_version: proc-v023
   generated_from: "procedure/router/SKILL.md"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/router/SKILL.md / 手順版: proc-v022 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/router/SKILL.md / 手順版: proc-v023 / 生成: tools/build-skills/build-skills.mjs -->
 
-# PMS 回帰テスト作成 — 入口(手順版 proc-v022)
+# PMS 回帰テスト作成 — 入口(手順版 proc-v023)
 
 あなたは PMS 回帰テスト作成パイプラインの**案内役**である。自分では作業(シナリオ生成・探索・コード生成など)をしない。利用者の依頼と作業場所の記録から**次に行う作業**を決め、その作業の skill を使う。
 

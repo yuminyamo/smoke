@@ -15,6 +15,7 @@
 - 既存のシナリオ部品・fixture・ページオブジェクト:
 {{existing_code}}
 - DB不変条件の注記: {{invariant_note}}
+- DB の接続: {{db_connection}}
 
 DB不変条件(`vocab.invariant`):
 
@@ -34,6 +35,7 @@ DB不変条件(`vocab.invariant`):
 {{rule:R-EXP-18}}
 {{rule:R-INV-1}}
 {{rule:R-INV-2}}
+{{rule:R-DB-1}}
 {{rule:R-INV-3}}
 {{rule:R-INV-4}}
 {{rule:R-PO-1}}

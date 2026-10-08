@@ -2,12 +2,12 @@
 name: pms-02-nd
 description: "PMS回帰テスト作成の作業02(非決定値カタログ抽出)。初回フロー前の初期作成、または作業10が増分実施を求めたとき(nd_needed=yes)に使う。同じ操作を繰り返して、画面・DBの値ごとの検証強度を観測で決める。"
 metadata:
-  procedure_version: proc-v022
+  procedure_version: proc-v023
   generated_from: "procedure/stages.md §02"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §02 / 手順版: proc-v022 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §02 / 手順版: proc-v023 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業02 非決定値カタログ抽出(手順版 proc-v022)
+# 作業02 非決定値カタログ抽出(手順版 proc-v023)
 
 この skill は、手順書の正本の `stages.md` §02 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -35,7 +35,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v022` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v023` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 

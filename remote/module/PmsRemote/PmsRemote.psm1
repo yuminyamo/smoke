@@ -8,6 +8,14 @@
     HyperV.ps1  Hyper-V ホスト(HyperVRead / HyperVChange)
     Server.ps1  PMS サーバーVM(ServerRead / ServerChange)
     Client.ps1  印刷クライアントPC(ClientRead / ClientChange)
+
+  窓口(JEA)の中で使えるコマンドの制約(Windows PowerShell 5.1。ふつうの PowerShell では動くので気付きにくい):
+    - モジュールの自動読み込みが効かない。基本のスナップイン(Core・Management・Utility・Security)以外の
+      コマンド(Hyper-V・LocalAccounts・ScheduledTasks・Archive など)は、使うロールの .psrc の ModulesToImport に足す
+    - Utility のうちスクリプト関数で書かれたもの(Get-FileHash・Import-PowerShellDataFile・New-Guid・Format-Hex・
+      New-TemporaryFile など)は使えない。ModulesToImport に足しても読み込まれない。.NET で書く(Common.ps1 の
+      Get-PmsFileSha256・Get-PmsConfig を参照)
+    - 確かめ方: 関数を足したら、その関数を窓口経由(CLI)で一度呼ぶ。ローカルで Import-Module して動くだけでは足りない
 #>
 Set-StrictMode -Version Latest
 

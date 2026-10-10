@@ -24,7 +24,16 @@ function Get-PmsConfig {
     if (-not (Test-Path -LiteralPath $script:ConfigPath)) {
         throw "CONFIG_NOT_FOUND: $($script:ConfigPath)"
     }
-    return Import-PowerShellDataFile -LiteralPath $script:ConfigPath
+    # JEA の窓口では Import-PowerShellDataFile が使えないため、同じ仕組み(AST の SafeGetValue)で読む
+    $tokens = $null
+    $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:ConfigPath, [ref]$tokens, [ref]$errors)
+    if ($errors -and $errors.Count -gt 0) {
+        throw "CONFIG_INVALID: cannot parse $($script:ConfigPath): $($errors[0].Message)"
+    }
+    $hashAst = $ast.Find({ param($a) $a -is [System.Management.Automation.Language.HashtableAst] }, $false)
+    if (-not $hashAst) { throw "CONFIG_INVALID: no hashtable in $($script:ConfigPath)" }
+    return $hashAst.SafeGetValue()
 }
 
 function Get-PmsConfigSection {
@@ -193,13 +202,26 @@ function Remove-PmsRemoteArtifact {
 
 # --- 版の情報(5.4) ------------------------------------------------------------
 
+function Get-PmsFileSha256 {
+    # JEA の窓口では Get-FileHash が使えないため、.NET で SHA256 を計算する(Get-FileHash と同じ大文字16進)
+    param([Parameter(Mandatory)][string]$Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $fs = [System.IO.File]::OpenRead($Path)
+    try {
+        return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '')
+    } finally {
+        $fs.Dispose()
+        $sha.Dispose()
+    }
+}
+
 function Get-PmsDirectoryHash {
     # フォルダの中身のハッシュ。CLI 本体(tools/remote/lib/Client.ps1)と同じ計算をする
     param([Parameter(Mandatory)][string]$Path)
     $root = (Resolve-Path -LiteralPath $Path).Path.TrimEnd('\', '/')
     $lines = @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
         $rel = $_.FullName.Substring($root.Length).Replace('\', '/').TrimStart('/').ToLowerInvariant()
-        $rel + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+        $rel + ':' + (Get-PmsFileSha256 -Path $_.FullName)
     })
     [Array]::Sort($lines, [StringComparer]::Ordinal)
     $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -224,7 +246,7 @@ function Get-PmsRemoteInfo {
     }
     $configHash = $null
     if (Test-Path -LiteralPath $script:ConfigPath) {
-        $configHash = (Get-FileHash -LiteralPath $script:ConfigPath -Algorithm SHA256).Hash
+        $configHash = Get-PmsFileSha256 -Path $script:ConfigPath
     }
     $roles = @()
     $installedAt = $null

@@ -355,7 +355,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\remote\pms-remote.ps1 
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\remote\pms-remote.ps1 cred-set pms-vm-admin   # ⑤-4 の配置用の管理者
 ```
 
-- **何をする**: ユーザー名とパスワードを入力する画面が出ます。入力した値を、このユーザー・この PC でしか開けない形(DPAPI)で `%APPDATA%\PmsRemote\cred\<参照名>.xml` に保存します。**アカウントを作るのではありません。** パスワードが正しいかもここでは確かめません(⑦で分かります)
+- **何をする**: 端末の中で、ユーザー名とパスワード(確認のため2回)を聞かれます。入力した値を、このユーザー・この PC でしか開けない形(DPAPI)で `%APPDATA%\PmsRemote\cred\<参照名>.xml` に保存します。**アカウントを作るのではありません。** パスワードが正しいかもここでは確かめません(⑦で分かります)
+- 入力画面(ウィンドウ)は出しません。VS Code の端末や SSH でも、そのまま入力できます。ユーザー名は `-UserName PMS-TEST-01\pmsremote` のように引数で渡してもかまいません(そのときはパスワードだけ聞かれます)
+- ユーザー名が `<コンピューター名>\<ユーザー名>` の形でないとき(`pmsremote` だけ、`.\pmsremote` など)と、2回のパスワードが一致しないときは、何も保存せずに `INVALID_ARGUMENT` で止まります
 - **入力する値**:
 
   | コマンド | ユーザー名の欄 | パスワードの欄 |
@@ -422,6 +424,7 @@ Remove-VMSnapshot -VMName PMS-TEST-01 -Name golden-old                          
    - **何をする**: 配置用の管理者(`pms-vm-admin`)で VM に接続し、モジュール・インストーラ・設定の原本を送り込んでインストーラを実行します(ロール `ServerRead`・`ServerChange`)。接続用ユーザー(`pms-vm` に保存したユーザー)を接続許可グループに入れ、最後にそのユーザーで窓口に接続して、版が合うことまで確かめます。出力の `status` が `deployed`(配置した)か `skipped`(同じ版が配置済み)なら成功です
    - **置き換え**: なし
    - **選ぶ**: 1 の `config.psd1` を、配置したあとに直したときは `-Force` を付けます(復元した直後の VM なら不要)
+   - 窓口(エンドポイント)の登録と WinRM の再起動は、配置中の接続を切らないよう、VM の中で約10秒後に動くタスクが行います(出力の `actions` に `endpoint_registration_scheduled`)。CLI はその再起動を待ってから窓口の版を確かめるので、完了まで数十秒かかります。`DEPLOY_VERIFY_FAILED` になったら、VM の中の `C:\ProgramData\PmsRemote\state\restart-winrm.log` を見ます
 
 #### ⑩ 動作を確かめる
 
@@ -566,6 +569,7 @@ pms-remote.ps1 <サブコマンド> [-Target <接続先名>] [引数]
 | `TARGET_NOT_FOUND` | `-Target` の名前の誤り | `hyperv-host` か `pms-vm`(`remote-targets.json` の `targets` のキー) |
 | `CREDENTIAL_NOT_FOUND` | その参照名の資格情報をまだ保存していない | `message` に出るとおり `cred-set <参照名>`(⑥) |
 | `CREDENTIAL_INVALID` | 別の Windows ユーザー・別の PC で保存した | AI を動かすユーザーで `cred-set` をやり直す |
+| `INVALID_ARGUMENT`(`cred-set needs an interactive terminal`) | `cred-set` を、入力のできない環境(AI のツール・パイプ・スケジュール実行など)から呼んだ | 人が PowerShell の窓で、AI を動かすユーザーとして打つ |
 | `CONNECT_FAILED`(名前を解決できない) | `host` の名前が引けない | ①の名前の確認。DNS か hosts に登録する |
 | `CONNECT_FAILED`(TrustedHosts の文言) | 手元の TrustedHosts に名前がない | ① |
 | `CONNECT_FAILED`(応答がない・タイムアウト・接続できない) | VM の WinRM が動いていない、またはファイアウォール | ⑤-1〜⑤-3。`Test-NetConnection <host> -Port 5985` で確かめる |

@@ -235,7 +235,11 @@ function Invoke-Deploy($cfg, [string]$targetName, [switch]$Force) {
             }
             Start-Sleep -Seconds 5
         }
-        if (-not $verified) { throw "DEPLOY_VERIFY_FAILED: the endpoint on $targetName did not report $localVersion ($last)" }
+        if (-not $verified) {
+            $hint = ''
+            if ($res.restart_scheduled) { $hint = " The endpoint registration and WinRM restart ran as a scheduled task on $targetName; see C:\ProgramData\PmsRemote\state\restart-winrm.log there." }
+            throw "DEPLOY_VERIFY_FAILED: the endpoint on $targetName did not report $localVersion ($last).$hint"
+        }
         $res.status = 'deployed'
         $res.message = $ir.message
         Write-Log "deploy ${targetName}: done ($($ir.message))"
@@ -271,12 +275,38 @@ function Invoke-DeployCommand($cfg, [string]$targetName, [switch]$Force) {
 
 # --- cred-set --------------------------------------------------------------------
 
-function Invoke-CredSetCommand([string]$ref) {
+function ConvertFrom-SecureStringPlain([System.Security.SecureString]$s) {
+    $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
+}
+
+function Invoke-CredSetCommand([string]$ref, [string]$userName) {
     # 資格情報を参照名で保存する(C-3。DPAPI により保存したユーザーと PC でしか復号できない)。対話で入力する
-    if (-not $ref) { throw 'INVALID_ARGUMENT: usage: pms-remote.ps1 cred-set <reference name>' }
+    # Get-Credential は使わない。Windows PowerShell 5.1 では GUI の入力画面(CredUI)を出すため、
+    # 画面を出せない端末(VS Code の端末・SSH など)では何も聞かずに $null が返る。入力は端末の中で完結させる
+    if (-not $ref) { throw 'INVALID_ARGUMENT: usage: pms-remote.ps1 cred-set <reference name> [-UserName <computer>\<user>]' }
     $path = Get-CredentialPath $ref
-    $c = Get-Credential -Message "PmsRemote: credential '$ref'"
-    if (-not $c) { throw 'INVALID_ARGUMENT: no credential was entered' }
+    if ([Console]::IsInputRedirected) {
+        throw 'INVALID_ARGUMENT: cred-set needs an interactive terminal (the password is typed in). Run it yourself in a PowerShell window, as the user that runs the AI and the tests'
+    }
+    if (-not $userName) { $userName = Read-Host "PmsRemote '$ref': user name (<computer>\<user>)" }
+    $userName = $userName.Trim()
+    if (-not $userName) { throw 'INVALID_ARGUMENT: no user name was entered' }
+    if ($userName -notmatch '^[^\\@\s]+\\[^\\@\s]+$' -and $userName -notmatch '^[^\\@\s]+@[^\\@\s]+$') {
+        throw "INVALID_ARGUMENT: user name must be <computer>\<user> (e.g. PMS-TEST-01\pmsremote): '$userName'"
+    }
+    if ($userName.StartsWith('.\')) {
+        throw "INVALID_ARGUMENT: write the remote computer name instead of '.' (e.g. PMS-TEST-01\pmsremote): '$userName'"
+    }
+    $pw = Read-Host "PmsRemote '$ref': password for $userName" -AsSecureString
+    if ($pw.Length -eq 0) { throw 'INVALID_ARGUMENT: no password was entered' }
+    # cred-set はパスワードの正しさを確かめないため、打ち間違いだけは2回入力で防ぐ
+    $pw2 = Read-Host "PmsRemote '$ref': password again" -AsSecureString
+    if ((ConvertFrom-SecureStringPlain $pw) -cne (ConvertFrom-SecureStringPlain $pw2)) {
+        throw 'INVALID_ARGUMENT: the two passwords do not match. Nothing was saved'
+    }
+    $c = New-Object System.Management.Automation.PSCredential($userName, $pw)
     $dir = Split-Path -Parent $path
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     $c | Export-Clixml -LiteralPath $path

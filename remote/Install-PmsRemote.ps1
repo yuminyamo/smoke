@@ -160,7 +160,7 @@ try {
     Step 'グループ作成と ACL 付与'
     foreach ($g in @($ReadGroup, $ChangeGroup)) {
         if (-not (Get-LocalGroup -Name $g -ErrorAction SilentlyContinue)) {
-            New-LocalGroup -Name $g -Description "May connect to the PmsRemote JEA endpoint ($g)" | Out-Null
+            New-LocalGroup -Name $g -Description "Connects to PmsRemote JEA ($g)" | Out-Null   # Description は 48 文字以内
             Act "group_created $g"
         }
     }
@@ -258,6 +258,8 @@ try {
     if ($prev -and $prev.PSObject.Properties['descriptor_hash']) { $prevDesc = [string]$prev.descriptor_hash }
     $exists = Get-PSSessionConfiguration -Name $EndpointName -ErrorAction SilentlyContinue
     $restart = $false
+    $isRemote = [bool](Get-Variable -Name PSSenderInfo -ErrorAction SilentlyContinue)
+    $registerLater = $false
     if (-not $exists -or $prevDesc -ne $descHash) {
         $pssc = Join-Path $BaseDir "$EndpointName.pssc"
         $p = @{
@@ -270,9 +272,15 @@ try {
         if ($runAsGroups.Count -gt 0) { $p.RunAsVirtualAccountGroups = $runAsGroups }
         New-PSSessionConfigurationFile @p
         if (-not (Test-PSSessionConfigurationFile -Path $pssc)) { throw "CONFIG_INVALID: invalid session configuration file: $pssc" }
-        if ($exists) { Unregister-PSSessionConfiguration -Name $EndpointName -NoServiceRestart -Force }
-        Register-PSSessionConfiguration -Name $EndpointName -Path $pssc -NoServiceRestart -Force | Out-Null
-        Act 'endpoint_registered'
+        if ($isRemote) {
+            # リモートから実行されている。エンドポイントの登録・解除は、-NoServiceRestart を付けても
+            # 実行中のリモートセッションを切るため、登録と WinRM の再起動をまとめて後のタスクに回す(下の再起動の節)
+            $registerLater = $true
+        } else {
+            if ($exists) { Unregister-PSSessionConfiguration -Name $EndpointName -NoServiceRestart -Force }
+            Register-PSSessionConfiguration -Name $EndpointName -Path $pssc -NoServiceRestart -Force | Out-Null
+            Act 'endpoint_registered'
+        }
         $restart = $true
     }
 
@@ -287,14 +295,42 @@ try {
 
     # WinRM の再起動(登録を有効にするため)
     if ($restart) {
-        if (Get-Variable -Name PSSenderInfo -ErrorAction SilentlyContinue) {
-            # リモートから実行されている。今すぐ再起動するとこのセッションが切れるので、10 秒後のタスクにする
-            $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -NonInteractive -Command "Restart-Service -Name WinRM -Force"'
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)
-            Register-ScheduledTask -TaskName 'PmsRemote-RestartWinRM' -Action $action -Trigger $trigger `
+        if ($isRemote) {
+            # リモートから実行されている。今すぐ登録・再起動するとこのセッションが切れるので、10 秒後のタスクにする。
+            # この結果を返したあとにタスクが動き、CLI の deploy は再起動を待ってから窓口の版を確かめる
+            $taskScript = Join-Path $BaseDir 'restart-winrm.ps1'
+            $taskLog = Join-Path $StateDir 'restart-winrm.log'
+            $body = @(
+                '$ErrorActionPreference = ''Stop'''
+                "`$log = '$taskLog'"
+                'Start-Sleep -Seconds 10   # この結果が呼び出し側に届くのを待つ'
+                'try {'
+            )
+            if ($registerLater) {
+                $body += @(
+                    "    if (Get-PSSessionConfiguration -Name '$EndpointName' -ErrorAction SilentlyContinue) { Unregister-PSSessionConfiguration -Name '$EndpointName' -NoServiceRestart -Force }"
+                    "    Register-PSSessionConfiguration -Name '$EndpointName' -Path '$pssc' -NoServiceRestart -Force | Out-Null"
+                )
+            }
+            $body += @(
+                '    Restart-Service -Name WinRM -Force'
+                '    "$((Get-Date).ToString(''o'')) ok" | Out-File -LiteralPath $log -Append -Encoding utf8'
+                '} catch {'
+                '    "$((Get-Date).ToString(''o'')) FAILED: $($_.Exception.Message)" | Out-File -LiteralPath $log -Append -Encoding utf8'
+                '    # 配置の記録は登録済みの前提で先に書いてある。消して、次の deploy で登録をやり直させる'
+                "    Remove-Item -LiteralPath '$InstallInfo' -Force -ErrorAction SilentlyContinue"
+                '}'
+            )
+            [System.IO.File]::WriteAllText($taskScript, ($body -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+            $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$taskScript`""
+            # 時刻のトリガーは使わない。チェックポイントから戻した直後の VM は時計が戻っていて、時刻同期で
+            # 先へ飛ぶと予約時刻が過去になり、タスクが動かないため。トリガーなしで登録してすぐ起動し、スクリプト側で待つ
+            Register-ScheduledTask -TaskName 'PmsRemote-RestartWinRM' -Action $action `
                 -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+            Start-ScheduledTask -TaskName 'PmsRemote-RestartWinRM'
             $out.restart_scheduled = $true
-            Act 'winrm_restart_scheduled'
+            if ($registerLater) { Act 'endpoint_registration_scheduled' }
+            Act "winrm_restart_scheduled (log: $taskLog)"
         } else {
             Restart-Service -Name WinRM -Force
             Act 'winrm_restarted'

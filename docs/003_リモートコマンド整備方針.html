@@ -355,7 +355,7 @@ tests/external/remote.ts                 <span class="c">テストコード用�
 <li><b>用途と重さを決める</b>(1.1、S-4)。Read か Change か</li>
 <li><b>実行場所を決める</b>(どのマシンで動くか)。新しい種類のマシンなら、ロール <code>&lt;種別&gt;Read</code> / <code>&lt;種別&gt;Change</code> と機能のファイルを足す</li>
 <li><b>関数を設計する</b>(3章)。引数は F-1 の範囲だけにする。対象はリモート側の設定のセクションに置く。ファイルを返すなら成果物(F-7)にする</li>
-<li><b>機能のファイルに関数を書き、ロール(.psrc)の <code>VisibleFunctions</code> に足す</b>。Read と Change を混ぜない</li>
+<li><b>機能のファイルに関数を書き、ロール(.psrc)の <code>VisibleFunctions</code> に足す</b>。Read と Change を混ぜない。窓口の中では、モジュールの自動読み込みが効かず(基本のスナップイン以外のモジュールは .psrc の <code>ModulesToImport</code> に足す)、Utility のスクリプト関数(<code>Get-FileHash</code>・<code>Import-PowerShellDataFile</code> など)は使えない(<code>remote/module/PmsRemote/PmsRemote.psm1</code> の冒頭)。足した関数は、窓口経由で一度呼んで確かめる</li>
 <li><b>設定の原本</b> <code>remote/targets/&lt;接続先名&gt;/config.psd1</code> にセクションを足す。準備が要るなら <code>Initialize-Pms&lt;機能&gt;</code> を書く(D-4)</li>
 <li><b>版を上げる</b>(5.4。通常はマイナー)。<code>config/remote-targets.json</code> の <code>expectedVersion</code> も上げる</li>
 <li><b>CLI 本体にサブコマンドを足す</b>。新しいエラー区分を終了コードの表に足す(6.2)</li>

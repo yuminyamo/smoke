@@ -12,7 +12,8 @@
     info          -Target <名前>                         版・ロール・モジュールと設定がリポジトリと同じかを返す
     check-target  -Target <名前>                         接続先の一度きりの前提(WinRM・管理者・パスワード無期限など)を確かめる
     deploy        -Target <名前> [-Force]                共通インストーラを接続先へ送り込んで実行する(配置用の資格情報を使う)
-    cred-set      <参照名>                                資格情報を参照名で保存する(対話)
+    cred-set      <参照名> [-UserName <コンピューター名>\<ユーザー名>]
+                                                         資格情報を参照名で保存する(端末で対話入力。パスワードは2回)
     restore       [-Purpose ...] [-FlowId ...] [-SkipReadiness] [-InfoOnly]
                                                          ゴールデンイメージの復元(復元後の配置・起動確認を含む)
     logs-collect  -From <時刻> -To <時刻> -OutDir <dir> [-InfoOnly]
@@ -45,7 +46,9 @@ param(
     [string]$To = '',
     [string]$OutDir = '',
     # deploy
-    [switch]$Force
+    [switch]$Force,
+    # cred-set
+    [string]$UserName = ''
 )
 
 Set-StrictMode -Version Latest
@@ -62,7 +65,7 @@ try {
         'info'         { Invoke-InfoCommand (Read-RemoteConfig $ConfigPath) $Target }
         'check-target' { Invoke-CheckTargetCommand (Read-RemoteConfig $ConfigPath) $Target }
         'deploy'       { Invoke-DeployCommand -cfg (Read-RemoteConfig $ConfigPath) -targetName $Target -Force:$Force }
-        'cred-set'     { Invoke-CredSetCommand $Name }
+        'cred-set'     { Invoke-CredSetCommand $Name $UserName }
         'restore'      { Invoke-RestoreCommand -cfg (Read-RemoteConfig $ConfigPath) -purpose $Purpose -flowId $FlowId -SkipReadiness:$SkipReadiness -InfoOnly:$InfoOnly -targetOverride $Target }
         'logs-collect' { Invoke-LogsCollectCommand -cfg (Read-RemoteConfig $ConfigPath) -from $From -to $To -outDir $OutDir -InfoOnly:$InfoOnly -targetOverride $Target }
         'logs-ids'     { Invoke-LogsIdsCommand (Read-RemoteConfig $ConfigPath) $OutDir }

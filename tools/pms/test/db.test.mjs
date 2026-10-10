@@ -6,10 +6,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { makeRepo, write, read, exists, pms, SECRET } from '../test-support/helpers.mjs';
+import { makeRepo, write, read, exists, pms, SECRET, PMS_DIR } from '../test-support/helpers.mjs';
 import { selectOnly, dbConnection } from '../lib/db.mjs';
 
-const STUB_SQLCMD = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'test-support', 'stub-sqlcmd.mjs');
+// パスは fileURLToPath で作った PMS_DIR から組み立てる(URL の pathname は Windows で /C:/… になり、path.resolve が C:\C:\… にする)
+const STUB_SQLCMD = path.join(PMS_DIR, 'test-support', 'stub-sqlcmd.mjs');
 const DB_PASSWORD = 'Db-Passw0rd#1';
 
 /** db.* の環境情報を足したリポジトリ。attrs で共有の設定の属性を足す(null は消す) */
@@ -194,7 +195,7 @@ test('DB の接続の行: pms db の使い方・接続先・ログインの方�
 test('env.mjs set: 任意キー db.password は --kind なしでも secret として各自の設定に保存する', async () => {
   const { spawnSync } = await import('node:child_process');
   const root = repo();
-  const env = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'env', 'env.mjs');
+  const env = path.join(PMS_DIR, '..', 'env', 'env.mjs');
   const r = spawnSync(process.execPath, [env, '--root', root, 'set', 'db.password', 'x-pass-1'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(JSON.parse(r.stdout).kind, 'secret');

@@ -17,6 +17,9 @@ export const STUB = path.join(here, 'stub-playwright-cli.mjs');
 export const SECRET = 'S3cret-Passw0rd!';
 export const ADMIN_USER = 'e2e-admin01';
 export const NOW = '2026-10-07T10:00:00+09:00';
+// NOW は日本時間。pms は時刻・台帳の日付をマシンのタイムゾーンで書くため、テストのプロセスと、そこから起こす pms・lint などの
+// 子プロセス(process.env を引き継ぐ)のタイムゾーンを NOW に合わせる(UTC のマシンでは時刻の表記が、米国のマシンでは日付がずれる)
+process.env.TZ = 'Asia/Tokyo';
 
 export const SCENARIOS = `---
 review_status: unreviewed

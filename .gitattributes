@@ -2,6 +2,7 @@
 procedure/** text eol=lf
 .github/skills/pms-*/** text eol=lf
 .kiro/skills/pms-*/** text eol=lf
+.claude/skills/pms-*/** text eol=lf
 tools/build-skills/** text eol=lf
 # git のフックは sh が実行するため LF に固定する(CRLF だと Windows の Git で動かない)
 tools/git-hooks/** text eol=lf

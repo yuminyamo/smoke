@@ -75,7 +75,7 @@ export async function run(ctx, opt) {
     const q = store.loadQueue(opt.flow);
     const c = peek(q, phases);
     if (!c) return { code: 0, out: { state: 'dry-run', flow: opt.flow, card: null, message: '出すカードがない(pms report と lint に進む)' } };
-    const t = cardType(ctx, c.kind);
+    const t = cardType(ctx, c.kind, name);
     const cardFile = paths.card(opt.flow, c.id);
     const cmd = expandCommand(rc, { prompt: promptOf(opt.flow, c.id, cardFile), agent: t.agent, model: t.model, card_file: cardFile, flow: opt.flow, card: c.id }, [...(rc.deny ?? []), ...t.deny]);
     return { code: 0, out: { state: 'dry-run', flow: opt.flow, card: c.id, kind: c.kind, target: targetOf(c), runner: name, command: cmd, stdin: rc.stdin === 'prompt', timeoutSec: timeoutMs / 1000, env: { PMS_RUNNER: 'b2' } } };
@@ -118,7 +118,7 @@ export async function run(ctx, opt) {
 
     // カードを1枚、新しいセッションで行わせる
     const card = nx.out;
-    const t = cardType(ctx, card.kind);
+    const t = cardType(ctx, card.kind, name);
     const vars = { prompt: promptOf(opt.flow, card.card, card.card_file), agent: t.agent, model: t.model, card_file: card.card_file, flow: opt.flow, card: card.card };
     const cmd = expandCommand(rc, vars, [...(rc.deny ?? []), ...t.deny]);
     const started = timestamp();

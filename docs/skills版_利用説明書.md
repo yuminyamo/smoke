@@ -1,6 +1,6 @@
 # skills版 利用説明書
 
-PMS 回帰テスト作成の手順書を、GitHub Copilot と Kiro の skills として使えるようにした一式の説明書です。
+PMS 回帰テスト作成の手順書を、GitHub Copilot・Kiro・Claude Code の skills として使えるようにした一式の説明書です。
 
 - **第1部 使う人向け** — 回帰テストを作るメンバーが読む部分です。10分で読めます
 - **第2部 管理者向け** — 導入・手順書の改訂・人の判断が必要な場面の対応をする人が読む部分です
@@ -24,7 +24,7 @@ AIに対象の機能を伝えるだけで、次のことを手順書どおりに
 ## 2. 準備
 
 - このリポジトリを取得します(skills はリポジトリに含まれています)
-- VS Code の GitHub Copilot(エージェントモード)または Kiro で、リポジトリのルートを開きます
+- VS Code の GitHub Copilot(エージェントモード)・Kiro・Claude Code のいずれかで、リポジトリのルートを開きます
 - 作業を始める前に、他のメンバーの変更を取り込みます(`git pull`)
 
 ## 3. 使い方
@@ -93,12 +93,13 @@ AIに対象の機能を伝えるだけで、次のことを手順書どおりに
 - 2回目は**新しいチャット**で頼むのがおすすめです(1回目のやり取りに引きずられず、記録だけを元にテストを作らせるため)
 - 途中で中断しても、`F-xxx の続き` で再開できます(進み具合はファイルに残っています)
 - シナリオを作ったあとの前提状態の準備(ログイン済みにする・テスト用デバイスを登録する など)と、画面での確認(探索)は、進行役のプログラム(`tools/pms/pms.mjs`)が「カード」に分けて行います(前提状態の準備は proc-v017、探索は proc-v018 以降)。**端末で `node tools/pms/pms.mjs run --flow F-xxx` を実行すると、進行役がカードを1枚ずつ、新しいAIのセッション(Copilot CLI か Kiro CLI)に行わせます。** AIが途中で止まっても進行役が同じカードをやり直させ、提出されたかどうかは進行役が記録で確かめます。画面の操作・記録・報告書の数値はプログラムが作るので、AIが記録を書き忘れることはありません。終わったらチャットで「F-xxx の続き」と伝えます
+- `pms run` が使う AI は、`config/pms.json` の `default_runner` で決まります。その回だけ変えるときは `--runner copilot`・`--runner kiro`・`--runner claude` を付けます(例 `node tools/pms/pms.mjs run --flow F-xxx --runner claude`)
 - `pms run` は時間がかかります(1枚の上限は既定で15分)。途中で止めたいときは Ctrl+C で止め、もう一度 `pms run` を実行すれば続きから行います。進み具合は `node tools/pms/pms.mjs status --flow F-xxx` で見られます
 - **進め方は2つから選べます**(proc-v019 以降)。ふだんは**端末で進める**(`pms run`。既定)を使います。人がそばにいなくても進み、AIの会話が長くならないためです。**チャットで進める**は、チャットのエージェントを `pms-runner` に切り替えて「F-xxx を進めて」と伝える方法です。次のときに使います
   - AIの動きを見ながら、おかしければその場で止めたいとき(初めての画面を探索するとき・カードの中身を作り込むとき)
   - 途中で人の判断(環境の情報が足りない・許可が要る操作など)が要りそうで、その場で答えたいとき
-  - Copilot CLI・Kiro CLI を使えないとき
-- エージェントの切り替え方: VS Code はチャットの **Agent のドロップダウン**で `pms-runner` を選びます。Kiro はチャットの入力欄の行にある**エージェントの選択**で `pms-runner` を選びます。終わったら元のエージェントに戻し、`/pms-regression F-xxx の続き` と伝えます(報告書と記録の検査はそこで行います)
+  - Copilot CLI・Kiro CLI・Claude Code の CLI を使えないとき
+- エージェントの切り替え方: VS Code はチャットの **Agent のドロップダウン**で `pms-runner` を選びます。Kiro はチャットの入力欄の行にある**エージェントの選択**で `pms-runner` を選びます。Claude Code は端末で `claude --agent pms-runner` を起動します(Claude Code ではサブエージェントがサブエージェントを呼べないため、チャットの途中で切り替えるのではなく、`pms-runner` をメインにして起動します)。終わったら元のエージェントに戻し、`/pms-regression F-xxx の続き` と伝えます(報告書と記録の検査はそこで行います)
 - チャットで進めていて止まった(「続けますか」と聞かれた・返事が途中で終わった)ときは、`pms-runner` に「続けて」と伝えれば続きから進みます。進み具合はファイルにあるので、やり直しにはなりません。どちらの進め方でも、記録・検査・報告書は同じです
 - IDE でサブエージェントを使えない(`pms-runner` が一覧に出ない・別のAIを呼べない)ときは、`/pms-regression F-xxx の続き。pms-runner を使えない` と伝えてください。チャットの中でカードを順に行います(時間がかかり、長い会話になります)
 - コード生成の前とフローの完了の前に、AIが記録を自動で検査します(lint)。決まりを満たしていない箇所が見つかると、「作業10で直します」などと伝えたうえで、AIが自分で前の作業に戻って直します。止まらないので、そのままで構いません
@@ -141,7 +142,7 @@ AIは止まった理由と、誰に何を頼めばよいかを伝えてきます
 
 ## 6. してはいけないこと
 
-- `procedure/` と、`.github/skills/pms-*`・`.kiro/skills/pms-*` のファイルを**編集しない**(手順書です。変更は管理者が行います)
+- `procedure/` と、`.github/skills/pms-*`・`.kiro/skills/pms-*`・`.claude/skills/pms-*` のファイルを**編集しない**(手順書です。変更は管理者が行います)
 - AIが作った成果物の先頭にある `review_status` を書き換えない(レビューした管理者が書き換えます)
 - AIに「期待結果を直して」「比較を緩めて」と頼まない(不具合を見逃すテストになります。おかしいと思ったら管理者へ)
 - コード生成(2回目)の途中で、AIに頼まれても画面を手で操作してデータを作らない(テストコードが作らないデータに頼ったテストは、環境を戻したあとに失敗します)
@@ -199,8 +200,12 @@ skills版/
     prohibited-operations.md      禁止操作リスト(未記入のものを初期配置。記入は管理者)
   .github/skills/pms-*/           生成物(Copilot 用)。直接編集しない
   .kiro/skills/pms-*/             生成物(Kiro 用)。直接編集しない
+  .claude/skills/pms-*/           生成物(Claude Code 用)。直接編集しない
   .github/agents/pms-card-*       生成物(カードの種類ごとのエージェント。Copilot 用)。直接編集しない
   .kiro/agents/pms-card-*         生成物(同上。Kiro 用)。直接編集しない
+  .claude/agents/pms-card-*       生成物(同上。Claude Code 用)。直接編集しない
+  .github/skills/<外部操作 skill>/  原本(restore-golden-image・collect-server-logs。人間が整備する)
+  .kiro/skills/・.claude/skills/<外部操作 skill>/  原本の写し(生成スクリプトが写す)。直接編集しない
 ```
 
 生成される skill は8つです。
@@ -218,16 +223,16 @@ skills版/
 
 作業ごとの skill の中身は、`SKILL.md`(stages.md の該当節と読み込み指示)と `references/`(00_common.md・vocab.yaml・参照付録・記入用テンプレート)です。これは、これまで手で組み立てていた「00_common.md + vocab.yaml + stages.md の該当節と参照付録」そのものです。`pms-10-explore` には、加えて `references/methods/` に全方式の方式ファイルが入ります(AIはフローの記録が指す1つだけを読みます)。`kb/00_索引.md` と flow.md は作業場所のデータなので同梱せず、skill の起動時に読ませます。
 
-加えて、カードの種類ごとのエージェント(`pms-card-setup-build` など7つ)と、チャットで進めるときの入口のエージェント `pms-runner` を、Copilot 用(`.github/agents/`)と Kiro 用(`.kiro/agents/`)に生成します(正本はどちらも `procedure/cards/agents.yaml`)。カードのエージェントは、`pms run` がカードごとに起こすセッションと、`pms-runner` が呼ぶサブエージェントの両方で使い、本文はどれも「カードを読み、指示どおりに行い、提出する」という短い指示です。`pms-runner` の本文は「`pms next` を呼び、出たカードをカードのエージェントに渡し、また `pms next` を呼ぶ」という5行の手順だけで、呼べるのはカードのエージェントだけです。
+加えて、カードの種類ごとのエージェント(`pms-card-setup-build` など7つ)と、チャットで進めるときの入口のエージェント `pms-runner` を、Copilot 用(`.github/agents/`)・Kiro 用(`.kiro/agents/`)・Claude Code 用(`.claude/agents/`)に生成します(正本はどれも `procedure/cards/agents.yaml`)。手順書を直して `node tools/build-skills/build-skills.mjs` を1回実行すれば、3つの生成先の skills とエージェントがまとめて作り直されます。外部操作 skill(`restore-golden-image`・`collect-server-logs`)は原本 `.github/skills/<名前>/` だけを直し、同じコマンドで Kiro 用・Claude Code 用に写します。カードのエージェントは、`pms run` がカードごとに起こすセッションと、`pms-runner` が呼ぶサブエージェントの両方で使い、本文はどれも「カードを読み、指示どおりに行い、提出する」という短い指示です。`pms-runner` の本文は「`pms next` を呼び、出たカードをカードのエージェントに渡し、また `pms next` を呼ぶ」という5行の手順だけで、呼べるのはカードのエージェントだけです。
 
 ## 8. 導入手順
 
-1. **リポジトリに置く。** `skills版/` の中身(`procedure/`・`tools/`・`config/`・`work/_common/prohibited-operations.md`・`.github/`・`.kiro/`・`.gitattributes`)を、回帰テストのリポジトリのルートに置きます。`kb/`・`work/`・`tests/` などの作業場所と同じ階層です。**すでに記入済みの禁止操作リストがある場合は、`work/_common/prohibited-operations.md` を上書きしないでください**(`config/environments.json`・`config/environments.local.json` がすでにある場合も上書きしない)
+1. **リポジトリに置く。** `skills版/` の中身(`procedure/`・`tools/`・`config/`・`work/_common/prohibited-operations.md`・`.github/`・`.kiro/`・`.claude/`・`.gitattributes`)を、回帰テストのリポジトリのルートに置きます。`kb/`・`work/`・`tests/` などの作業場所と同じ階層です。**すでに記入済みの禁止操作リストがある場合は、`work/_common/prohibited-operations.md` を上書きしないでください**(`config/environments.json`・`config/environments.local.json` がすでにある場合も上書きしない)
 2. **生成できることを確かめる。** Node.js 18 以上で次を実行します(外部パッケージは不要です)
    ```
    node tools/build-skills/build-skills.mjs --check
    ```
-   `skills_in_sync: OK` と出れば、同梱の生成物は正本と一致しています。使わないツールの生成物は消して構いません(例: Kiro を使わないなら `.kiro/skills/pms-*`。この場合 `skills.config.json` の `targets` からも外します)
+   `skills_in_sync: OK` と出れば、同梱の生成物は正本と一致しています。使わないツールの生成物は消して構いません(例: Kiro を使わないなら `.kiro/skills/pms-*`・`.kiro/agents/`。この場合 `skills.config.json` の `targets` からも外します。外さないと、次の生成でまた作られ、`--check` は欠けを NG にします)
 3. **コミットしてタグを付ける。** 正本と生成物を同じコミットに含め、`procedure/vocab.yaml` の `meta.procedure_version` と同じ名前のタグ(例 `proc-v010`)を付けます
 4. **コミットの前の検査を有効にする。** 手順書を直したのに skills を再生成し忘れたまま(または skills を直接編集したまま)コミットするのを防ぎます。**各メンバーが自分のリポジトリで1回**実行します
    ```
@@ -260,11 +265,12 @@ skills版/
    ```
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
 10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`)。`sqlcmd` で呼べないときは `db_cli` を直します
-11. **AI の CLI を導入する**(proc-v018 以降。`pms run` が使う)。Copilot CLI(`copilot`)か Kiro CLI(`kiro-cli`)を導入して認証し、組織の設定で利用が許可されていることを管理者が確かめます(Copilot CLI はトークン `COPILOT_GITHUB_TOKEN` などでも認証できます。Kiro CLI の非対話の実行には `KIRO_API_KEY` が要ります)。`config/pms.json` に、見本 `config/pms.sample.json` の `runner`・`default_runner`・`cardTypes` を写し、使うモデル(`cardTypes.<種類>.model`)と1枚の上限時間(`runner.<名前>.timeoutSec`)を決めます。呼び出しの雛形は公式のドキュメントで確かめたフラグで書いてありますが、実物では確かめていません。`node tools/pms/pms.mjs run --flow <フローID> --dry-run` で、起こすコマンドを実行せずに確かめられます(`tools/pms/README.md` 13章の「実物で確かめること」)。カードの種類ごとのエージェントは `.github/agents/`・`.kiro/agents/` に生成済みです。課金の数え方(AI credits か premium requests か)は組織の契約で確かめてください(カード1枚が1回の依頼になります)
-12. **チャットで進める準備をする**(proc-v019 以降。`pms-runner` を使う人がいるとき)。`.github/agents/pms-runner.agent.md`・`.kiro/agents/pms-runner.json` と `pms-card-*` は生成済みなので、置くだけで使えます(直接編集しない)。管理者が次を確かめます
+11. **AI の CLI を導入する**(proc-v018 以降。`pms run` が使う)。Copilot CLI(`copilot`)・Kiro CLI(`kiro-cli`)・Claude Code の CLI(`claude`)のどれかを導入して認証し、組織の設定で利用が許可されていることを管理者が確かめます(Copilot CLI はトークン `COPILOT_GITHUB_TOKEN` などでも認証できます。Kiro CLI の非対話の実行には `KIRO_API_KEY` が要ります。Claude Code は `claude` でログインするか `ANTHROPIC_API_KEY` を設定します)。使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。`config/pms.json` に、見本 `config/pms.sample.json` の `runner`・`default_runner`・`cardTypes` を写し、使うモデル(`cardTypes.<種類>.model`)と1枚の上限時間(`runner.<名前>.timeoutSec`)を決めます。呼び出しの雛形は公式のドキュメントで確かめたフラグで書いてありますが、実物では確かめていません。`node tools/pms/pms.mjs run --flow <フローID> --dry-run` で、起こすコマンドを実行せずに確かめられます(`tools/pms/README.md` 13章の「実物で確かめること」)。カードの種類ごとのエージェントは `.github/agents/`・`.kiro/agents/`・`.claude/agents/` に生成済みです。課金の数え方(AI credits か premium requests か)は組織の契約で確かめてください(カード1枚が1回の依頼になります)
+12. **チャットで進める準備をする**(proc-v019 以降。`pms-runner` を使う人がいるとき)。`.github/agents/pms-runner.agent.md`・`.kiro/agents/pms-runner.json`・`.claude/agents/pms-runner.md` と `pms-card-*` は生成済みなので、置くだけで使えます(直接編集しない)。管理者が次を確かめます
    - VS Code: チャットの Agent のドロップダウンに `pms-runner` が出るか。組織の設定でカスタムエージェントとサブエージェントが許可されているか
    - モデル: カードのエージェントのモデル(`procedure/cards/agents.yaml` の `kinds.<種類>.model`。既定 `gpt-6-luna`)が、利用者の Copilot で選べるか。サブエージェントは呼ばれたエージェントのモデルで動きます。変えるときは `agents.yaml` を直して skills を再生成します(9.)。`config/pms.json` の `cardTypes.<種類>.model` は `pms run` だけに効きます
    - Kiro: エージェントの選択に `pms-runner` が出るか。**Workflows を有効にしている場合は、`pms-runner` を使うあいだ無効にします**(有効だとサブエージェントがバックグラウンドで動き、終わる前に次のカードを取りに行くことがあります。13. の既知の制約)
+   - Claude Code: `claude --agent pms-runner` で起動し、カードのエージェント(`pms-card-*`)をサブエージェントとして呼べるか。カードのエージェントのモデルは `agents.yaml` の `kinds.<種類>.claude_model`(例 `sonnet`。なければ呼び出し元と同じモデル)
 13. **動作を確かめる**(F-001 の前に)
    - 入口: `/pms-regression いまどうなってる?` で、フローがないことを答えるか
    - 読み込み: 作業 skill が `references/00_common.md` と `vocab.yaml` を実際に読んでいるか(AIの読み込みの表示で確かめる)
@@ -322,7 +328,7 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 - 結果は規則ごとに `OK` / `NG` / `--`(未実行)で出ます。`NG` の下に、どのファイルの何が問題かが出ます
 - **ERROR が1件でもあれば、次の作業に進めません**(00 ■lint)。作業10の成果物で ERROR が出たら、`/pms-regression F-003 の続き` の前に、指摘の内容をAIに伝えて作業10で直させてください(例: 「lint の requires_covered で S-DEVICE-REGISTERED が setup-log にないと言われた。作業10で整備して記録して」)
 - 終了コードは 0 = ERROR なし / 1 = ERROR あり / 2 = lint を実行できない(引数の誤り、正本が読めない等)。スクリプトや CI から使うときは `--json` で結果を機械可読にできます
-- `env_value_leak` は、パスワードなどの秘密情報の値が記録やテストコード、skills(`.github/skills/`・`.kiro/skills/`。proc-v020 以降)に書かれていないかを確かめます(各自の `config/environments.local.json` の値を探すので、その値を知っている各自の環境で意味を持ちます。指摘には値そのものは出しません)。`env_value_hardcoded`(WARNING)は、テストコードに URL などの接続先が直接書かれていないかを確かめます
+- `env_value_leak` は、パスワードなどの秘密情報の値が記録やテストコード、skills(`.github/skills/`・`.kiro/skills/`・`.claude/skills/`。proc-v020 以降。`.claude/` は proc-v026 以降)に書かれていないかを確かめます(各自の `config/environments.local.json` の値を探すので、その値を知っている各自の環境で意味を持ちます。指摘には値そのものは出しません)。`env_value_hardcoded`(WARNING)は、テストコードに URL などの接続先が直接書かれていないかを確かめます
 - `env_restored`(復元の記録の検査)は PowerShell と skill `restore-golden-image` が必要です。どちらかがない環境では「未実行」と出ます(ERROR にはしません。ERROR として扱いたいときは `--strict`)
 
 **lint はいつ実行されるか**(00 ■lint 実行の契機)。管理者が毎回手で実行する必要はありません。
@@ -379,7 +385,7 @@ node tools/lint/lint.mjs --list                     規則の一覧と実装状�
 
 ## 13. 既知の制約
 
-- skills の仕組みは Copilot・Kiro ともに比較的新しく、仕様が変わることがあります。動作確認(8. の13)は、ツールの更新後にも行ってください
+- skills の仕組みは Copilot・Kiro・Claude Code ともに比較的新しく、仕様が変わることがあります。動作確認(8. の13)は、ツールの更新後にも行ってください
 - 依頼の内容による自動起動は確実ではありません。使う人には `/pms-regression` を付けるよう案内してください
 - 作業 skill は `references/` のファイルを読む指示を持っていますが、実際に読むかはAIに依存します。8. の13で確かめてください
 - lint は42規則のうち20規則を実装済みです(`node tools/lint/lint.mjs --list`)。`explore_act_linked`(探索の記録と操作の記録の一致)・`requires_covered`(セットアップの抜け)・`setup_steps_recorded`(セットアップの操作列とロケータの抜け)・`act_log_linked`(セットアップの記録と操作の記録の一致)・`phase_a_queue_complete`(前提状態の準備のカードの終わり)・`requires_in_state_set`(初期状態セットにない状態)・`blocked_recorded`(blocked の記録の抜け)・`health_recorded`(健全性シグナルの記録)・`env_value_leak`(秘密情報の書き込み)・`env_value_hardcoded`(接続先の直書き)・`status_yaml_valid`・`procedure_version_present`・`operation_registered`・`ext_demand_linked`・`verdict_enum`・`reason_code_enum`・`no_temp_locator` と、既存の `skills_in_sync`・`env_restored`・`prohibition_recheck` です。作業20の突合・生成コードの静的検査・保護ブロックの検査(`protected_unchanged`)などは未実装です

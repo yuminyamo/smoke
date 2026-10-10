@@ -83,8 +83,8 @@
 | `pms pwcli` | **カードを使わない作業・工程の画面操作。** `node tools/pms/pms.mjs pwcli -- <playwright-cli の引数>` の形で、引数をそのまま playwright-cli に渡す(例 `pwcli -- fill e5 <env:pms.password>`・`pwcli -- snapshot`)。`<env:キー>` だけの引数を値に置き換え、出力(fill の値・snapshot の入力済みの値)の秘密情報を `<env:キー>` に戻して返す。カード・`--flow` は要らず、記録は書かない。`--session <名前>` でセッションを分けられる(なければ playwright-cli の既定のセッション) |
 | `pms db` | **DB への `SELECT`(カードでもカードを使わない作業でも)。** `node tools/pms/pms.mjs db [--flow F --card C --intent "<確かめること>"] -- "<SELECT 文>"`。接続先・ログイン・サーバ証明書の扱いは環境情報から決め(■DB への接続)、実行の前に接続先(サーバ名・DB名・ログイン名)を確かめて出力に返す。SELECT 以外の文は実行しない。カードを付ければ記録(`work/<feature_code>/exploration/db-log.jsonl`)に1行書く。`--check` は接続先の確認だけをする(作業10の工程0) |
 | `pms queue build` / `pms next` | 対象シナリオの `requires`(フェーズA)とステップの表(パートC)からカードを作り(タスクキュー)、1枚ずつ出す。出したカードが提出されないまま `next` が呼ばれたら、同じカードを出し直す。全部終われば `done`、人間の判断が要れば `STOP` を返す。カードの出力には、カードを渡すエージェントの名前(`agent`)と依頼文(`prompt`)が入る |
-| 入口のエージェント `pms-runner` | **実行形態 B1(副経路)。** IDE のチャット(VS Code + Copilot・Kiro)で選ぶエージェント。`pms next` を呼び、出たカードを、カードの種類のエージェント(出力の `agent`)にサブエージェントとして渡し(出力の `prompt`。カードの本文はファイルのパスで渡す)、返事の内容にかかわらずまた `pms next` を呼ぶ。自分ではカードの作業をしない。done・STOP なら利用者に伝えて終わる。正本 `procedure/cards/agents.yaml` の `runner` から生成する |
-| `pms run` | **実行形態 B2(主な経路)。** カードを1枚ずつ、新しいAIのセッション(Copilot CLI・Kiro CLI)で行わせる。セッションには、カードの種類ごとのエージェントとモデルを指定し、カードのファイルのパスを渡す。終わったら、キューで合格したかを確かめる(AIの「できました」ではなく提出の記録で決める)。合格していなければ同じカードを出し直し、上限を超えたら STOP。1枚ごとに上限時間を設け、セッションの出力を保存する(秘密情報の値は伏せる)。全部終われば `pms report` と完了前の lint を行う。CLI の呼び出し方は `config/pms.json` の `runner` に書く(コードに CLI のフラグを書かない) |
+| 入口のエージェント `pms-runner` | **実行形態 B1(副経路)。** IDE のチャット(VS Code + Copilot・Kiro)で選ぶエージェント。Claude Code では、メインのエージェントとして起動する(`claude --agent pms-runner`。Claude Code のサブエージェントはサブエージェントを呼べないため)。`pms next` を呼び、出たカードを、カードの種類のエージェント(出力の `agent`)にサブエージェントとして渡し(出力の `prompt`。カードの本文はファイルのパスで渡す)、返事の内容にかかわらずまた `pms next` を呼ぶ。自分ではカードの作業をしない。done・STOP なら利用者に伝えて終わる。正本 `procedure/cards/agents.yaml` の `runner` から生成する |
+| `pms run` | **実行形態 B2(主な経路)。** カードを1枚ずつ、新しいAIのセッション(Copilot CLI・Kiro CLI・Claude Code の CLI。`--runner copilot|kiro|claude` で選ぶ)で行わせる。セッションには、カードの種類ごとのエージェントとモデル(CLI ごとの値。`procedure/cards/agents.yaml` の `model`・`kiro_model`・`claude_model`)を指定し、カードのファイルのパスを渡す。終わったら、キューで合格したかを確かめる(AIの「できました」ではなく提出の記録で決める)。合格していなければ同じカードを出し直し、上限を超えたら STOP。1枚ごとに上限時間を設け、セッションの出力を保存する(秘密情報の値は伏せる)。全部終われば `pms report` と完了前の lint を行う。CLI の呼び出し方は `config/pms.json` の `runner` に書く(コードに CLI のフラグを書かない) |
 | `pms report` | 作業10の報告書の数値・一覧と status.yaml を記録から作る。所見の欄だけを、カード `report.findings` の出力から写す |
 | `pms stats` | カードの種類・実行形態(`vocab.pms_runner`)ごとの初回合格率・提出の回数・不合格の区分・出し直し・STOP と、記録の必須欄の充足率 |
 | カード | 1枚1判断の依頼文(やること・入力・規則・出力・合格した記入例・終わったら)。種類は `vocab.pms_card_kind`。テンプレートは `procedure/cards/<種類>.md`、出力の schema は `procedure/schemas/<種類>.out.json`(手順書の一部として版の管理を受ける)。**規則は、本書と `stages.md` の規則IDの付いた行(書式 `vocab.id_format.rule`)から pms が差し込む。** テンプレートに規則の文章を書き写さない。保護ブロックは、ブロックごと文言を変えずに差し込む |
@@ -117,8 +117,8 @@
 
 | 実行形態 | 仕組み | 向く場面 |
 |---|---|---|
-| **B2 スクリプト(主・既定)** | 利用者が端末で `pms run` を実行する。`pms run` がカードごとに新しいセッション(Copilot CLI・Kiro CLI)を起こし、終わったら捨てる。全部終われば `pms report` と完了前の lint まで行う | 通常の実行・無人の実行。会話の継続確認とコンパクションが原理的に起きない。セッションで playwright-cli の直接の呼び出しなどを使用禁止にできる |
-| B1 IDE 内(副) | 利用者がチャットのエージェントを `pms-runner` に切り替えて「F-003 を進めて」と伝える。`pms-runner` が `pms next` のカードを1枚ずつサブエージェント(カードの種類のエージェント)に渡す。サブエージェントは会話を引き継がず、カードごとに捨てられる。全部終わったら、入口 skill が `pms report` と完了前の lint を行う | カードのテンプレートを作り込むとき・初めての画面を探索するとき(AIの動きを見ながら止められる)。途中の人間の判断(環境情報の不足・要許可操作など)にチャットでその場で答えたいとき。Copilot CLI・Kiro CLI を使えない人・環境 |
+| **B2 スクリプト(主・既定)** | 利用者が端末で `pms run` を実行する。`pms run` がカードごとに新しいセッション(Copilot CLI・Kiro CLI・Claude Code の CLI)を起こし、終わったら捨てる。全部終われば `pms report` と完了前の lint まで行う | 通常の実行・無人の実行。会話の継続確認とコンパクションが原理的に起きない。セッションで playwright-cli の直接の呼び出しなどを使用禁止にできる |
+| B1 IDE 内(副) | 利用者がチャットのエージェントを `pms-runner` に切り替えて「F-003 を進めて」と伝える。`pms-runner` が `pms next` のカードを1枚ずつサブエージェント(カードの種類のエージェント)に渡す。サブエージェントは会話を引き継がず、カードごとに捨てられる。全部終わったら、入口 skill が `pms report` と完了前の lint を行う | カードのテンプレートを作り込むとき・初めての画面を探索するとき(AIの動きを見ながら止められる)。途中の人間の判断(環境情報の不足・要許可操作など)にチャットでその場で答えたいとき。Copilot CLI・Kiro CLI・Claude Code の CLI を使えない人・環境 |
 
 **フックを使わずに正しさを保つ仕組み**(B1。フックは使わない。使うかどうかは、B1 の計測(`pms stats` の実行形態 `b1`)で直接の呼び出しによる差し戻し・出し直し・入口が止まった回数が目立つ場合に、手順書の改訂として決める):
 
@@ -141,7 +141,7 @@
 | `node tools/pms/pms.mjs pwcli` | 記録(`pms act`)を通らない画面操作を、カードのセッションで実行できないようにする |
 | 手順書(`procedure/`)・skills・エージェントの定義への書き込み | 実行中に手順を書き換えない(■手順改善シグナル) |
 
-カードの種類ごとのエージェント(Copilot は `.github/agents/pms-card-<種類>.agent.md`、Kiro は `.kiro/agents/pms-card-<種類>.json`)と入口のエージェント(`pms-runner.agent.md`・`pms-runner.json`)は、正本 `procedure/cards/agents.yaml` から skills と同じく生成する(直接編集しない。lint `skills_in_sync`)。カードのエージェントは、B2 では `pms run` が起こすセッションのエージェントとして、B1 では `pms-runner` が呼ぶサブエージェントとして、同じものを使う。本文はどの種類も同じ短い指示(カードを読み、指示どおりに行い、`pms submit` で提出する。不合格なら理由だけを直して再提出する。カードの外の作業をしない)である。`pms-runner` が呼べるサブエージェントはカードのエージェントだけに絞り、本文は5行の手順だけにする(どのモデルでも守れる短さにするため)。
+カードの種類ごとのエージェント(Copilot は `.github/agents/pms-card-<種類>.agent.md`、Kiro は `.kiro/agents/pms-card-<種類>.json`、Claude Code は `.claude/agents/pms-card-<種類>.md`)と入口のエージェント(`pms-runner.agent.md`・`pms-runner.json`・`pms-runner.md`)は、正本 `procedure/cards/agents.yaml` から skills と同じく生成する(直接編集しない。lint `skills_in_sync`)。カードのエージェントは、B2 では `pms run` が起こすセッションのエージェントとして、B1 では `pms-runner` が呼ぶサブエージェントとして、同じものを使う。本文はどの種類も同じ短い指示(カードを読み、指示どおりに行い、`pms submit` で提出する。不合格なら理由だけを直して再提出する。カードの外の作業をしない)である。`pms-runner` が呼べるサブエージェントはカードのエージェントだけに絞り、本文は5行の手順だけにする(どのモデルでも守れる短さにするため)。
 
 ---
 
@@ -521,7 +521,9 @@ waitUntil(condition, options)
 
 2. **資格情報(パスワード・接続文字列・API キーなど)の値を skill に書かないこと。** SKILL.md・同梱の実行体・参照ファイルのどこにも値を持たず、検証環境の情報(`tools/env/env.mjs`。■検証環境の情報)か、リモートコマンドの資格情報の参照名(値は各自のパソコンに暗号化して保存する。`docs/003_リモートコマンド整備方針.html`)から受け取る
 
-理由: skill は git で配られ、AIも人間も全文を読む。値を書くと、配った先・履歴・AIのセッションの記録のすべてに残る。lint `env_value_leak` が、各自の設定にある秘密情報の値を生成先の skills(`.github/skills/`・`.kiro/skills/`)からも探す。
+理由: skill は git で配られ、AIも人間も全文を読む。値を書くと、配った先・履歴・AIのセッションの記録のすべてに残る。lint `env_value_leak` が、各自の設定にある秘密情報の値を生成先の skills(`.github/skills/`・`.kiro/skills/`・`.claude/skills/`)からも探す。
+
+- **外部操作 skill の原本は `.github/skills/<名前>/` に1つだけ置き、人間はそこだけを直す。** Kiro 用(`.kiro/skills/`)と Claude Code 用(`.claude/skills/`)は、`tools/build-skills/build-skills.mjs` が原本をそのまま写す(対象の skill は `procedure/skills.config.json` の `external_skills.names`)。写しを直接直さない(lint `skills_in_sync` が原本との食い違いを検出する)。外部操作 skill を足したら `external_skills.names` にも足す
 
 - 条件の確認は、**作業10(skill を使って操作を確立するとき)と作業20(コード生成の前)**で行う
 - 条件1を満たさない skill は「使える skill がない」と同じに扱い、外部操作需要リストに不足の区分 `実行体なし` で記録する
@@ -870,7 +872,7 @@ lint の違反・人間の指摘・回帰実行の切り分けに由来するシ
 - 作業20は開始時に、flow.md に記録された版と現在の版が一致することを確認する。食い違ったら報告書に書き、手順改善シグナル(種別 `実行不能`)として記録する
 - **撤回も新しい版として配備する**(版番号は戻さず進める)。版と中身を1対1に保ち、指標を版に帰属できるようにするためである
 - 手順書を skills 形式で配備する場合も、この規約に従う(版を skill に同梱する)
-- **skills は正本(`procedure/`)から生成する。** 手順書を改訂したら、版を上げたうえで `tools/build-skills/` の生成スクリプトを実行し、正本と生成した skill を同じコミットに含めてタグを付ける。**skill を直接編集しない**(lint `skills_in_sync`)。skill 内の手順版は、正本の `vocab.meta.procedure_version` から生成時に刻まれる
+- **skills は正本(`procedure/`)から生成する。** 手順書を改訂したら、版を上げたうえで `tools/build-skills/` の生成スクリプトを実行し、正本と生成した skill を同じコミットに含めてタグを付ける。生成スクリプトは、`procedure/skills.config.json` の `targets` にある全ての生成先(GitHub Copilot `.github/`・Kiro `.kiro/`・Claude Code `.claude/`)の skills とエージェントを1回で作り直し、外部操作 skill の写し(■外部操作 skill の条件)も原本に合わせる。生成先を足す・外すときは `targets` を直す(手で写さない)。**skill を直接編集しない**(lint `skills_in_sync`)。skill 内の手順版は、正本の `vocab.meta.procedure_version` から生成時に刻まれる
 
 ## ■ 手順改訂の統制(区分・保護ブロック・人間の明示的な指示)
 
@@ -1014,14 +1016,19 @@ tools/lint/lint.mjs                   # lint のランナー(実装済みの規�
 tools/git-hooks/pre-commit            # コミットの前の lint(skills_in_sync)。git config core.hooksPath tools/git-hooks で有効にする
 .github/skills/pms-*/                 # 生成物(GitHub Copilot 用)。直接編集しない
 .kiro/skills/pms-*/                   # 生成物(Kiro 用)。直接編集しない
+.claude/skills/pms-*/                 # 生成物(Claude Code 用)。直接編集しない
 .github/agents/pms-card-*.agent.md    # 生成物(カードの種類ごとのエージェント。Copilot 用。正本 procedure/cards/agents.yaml)。直接編集しない
 .kiro/agents/pms-card-*.json          # 生成物(同上。Kiro 用)。直接編集しない
+.claude/agents/pms-card-*.md          # 生成物(同上。Claude Code 用)。直接編集しない
 .github/agents/pms-runner.agent.md    # 生成物(入口のエージェント。IDE 内のループ B1。正本 procedure/cards/agents.yaml の runner)。直接編集しない
 .kiro/agents/pms-runner.json          # 生成物(同上。Kiro 用)。直接編集しない
-.github/skills/restore-golden-image/  # 外部操作 skill(ゴールデンイメージ復元。人間が整備。生成の対象外)
-.kiro/skills/restore-golden-image/    # 同上(Kiro 用)
-.github/skills/collect-server-logs/   # 外部操作 skill(ログ収集。人間が整備。生成の対象外)
-.kiro/skills/collect-server-logs/     # 同上(Kiro 用)
+.claude/agents/pms-runner.md          # 生成物(同上。Claude Code 用。claude --agent pms-runner で起動する)。直接編集しない
+.github/skills/restore-golden-image/  # 外部操作 skill(ゴールデンイメージ復元。人間が整備する原本。生成の対象外)
+.kiro/skills/restore-golden-image/    # 原本の写し(Kiro 用。build-skills.mjs が写す。直接編集しない)
+.claude/skills/restore-golden-image/  # 原本の写し(Claude Code 用。同上)
+.github/skills/collect-server-logs/   # 外部操作 skill(ログ収集。人間が整備する原本。生成の対象外)
+.kiro/skills/collect-server-logs/     # 原本の写し(Kiro 用。build-skills.mjs が写す。直接編集しない)
+.claude/skills/collect-server-logs/   # 原本の写し(Claude Code 用。同上)
 config/
   remote-targets.json                 # リモートコマンドのクライアント設定(接続先・資格情報の参照名・期待する版・復元・ログの書式)
   pms.json                            # 進行役の設定(各自。git に入れない。例: pms.sample.json)
@@ -1207,10 +1214,10 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `procedure_untouched_by_flow` | ERROR | 作業01 / 02 / 10 / 15 / 20 / 30 の成果物の変更に、手順書(`procedure/` 配下・生成した skills)の変更が含まれない |
 | `protected_unchanged` | ERROR | 保護ブロックの内容のハッシュが `lint/protected-baseline.yaml` と一致する。基準の更新は、人間の直接改訂または明示的な指示による改訂(000 改訂履歴に記録があるもの)に限る |
 | `imp_tier_valid` | ERROR | 作業40が自律的に適用した差分について、位置と文言から再計算した区分が区分Aであり、手順改善台帳の記録と一致する(解禁前は、人間の採用がない差分がない) |
-| `skills_in_sync` | ERROR | 生成した skills が、正本から再生成した結果と一致する(手編集がない)。skill に同梱された保護ブロックが正本と一字一句一致する。実装: `node tools/build-skills/build-skills.mjs --check`(`tools/lint/lint.mjs` からも呼ぶ) |
+| `skills_in_sync` | ERROR | 生成した skills とエージェントが、正本から再生成した結果と一致する(手編集がない。生成先は `procedure/skills.config.json` の `targets` の全て)。外部操作 skill の写しが原本(`.github/skills/<名前>/`)と一致する。skill に同梱された保護ブロックが正本と一字一句一致する。実装: `node tools/build-skills/build-skills.mjs --check`(`tools/lint/lint.mjs` からも呼ぶ) |
 | `env_restored` | ERROR | 作業10・20の status.yaml に `env_restore.restore_id` があり、復元記録(`work/_common/env-restore-log.jsonl`)に成功として存在し、目的が作業と一致し、他の作業と重複せず、起動確認の方法(`readiness`)が復元記録と矛盾しない(起動確認テストがなかった復元は `human`)。実装: skill `restore-golden-image` 同梱の `Test-EnvRestoreMarker.ps1`(`tools/lint/lint.mjs` からも呼ぶ。PowerShell がない環境では未実行と表示する) |
 | `prohibition_recheck` | ERROR | 作業20の開始前に、作業10の status.yaml の `prohibited_ops.digest` と現在の禁止操作リストが照合されている。`blocked_by_prohibition` があるのに版が変わっていれば作業20を起動しない(作業10のパートPへ戻す)。実装: `node tools/checks/prohibited-ops.mjs --compare <作業10の status.yaml>`(終了コード 0 / 3 / 2)。`tools/lint/lint.mjs` は、作業20の前のフローではこれを呼び、作業20まで進んだフローでは作業20の status.yaml の `prohibition_check: ok` を確かめる |
-| `env_value_leak` | ERROR | 検証環境の情報の秘密情報(種類 `secret`)の値が、成果物(`work/`・`kb/`・`logs/`・`tests/`・`traceability/`)と skills(`procedure/skills.config.json` の生成先。`.github/skills/`・`.kiro/skills/`。■外部操作 skill の条件2)に書かれていない。設定ファイルの形が正しい。実装: `tools/lint/lint.mjs`(値は `tools/env/` と同じ読み方で読む。6文字未満の値は探さない) |
+| `env_value_leak` | ERROR | 検証環境の情報の秘密情報(種類 `secret`)の値が、成果物(`work/`・`kb/`・`logs/`・`tests/`・`traceability/`)と skills(`procedure/skills.config.json` の生成先。`.github/skills/`・`.kiro/skills/`・`.claude/skills/`。■外部操作 skill の条件2)に書かれていない。設定ファイルの形が正しい。実装: `tools/lint/lint.mjs`(値は `tools/env/` と同じ読み方で読む。6文字未満の値は探さない) |
 | `env_value_hardcoded` | WARNING | テストコード(`tests/`)に、検証環境の情報の接続先(種類 `endpoint`)の値がそのまま書かれていない(`envValue` で読む)。実装: `tools/lint/lint.mjs` |
 | `requires_in_state_set` | ERROR | 作業10の対象シナリオ(探索記録のあるもの)の `requires` の全状態が初期状態セット(`vocab.initial_state_set` と、状態需要リストで状態が `採用` / `整備済` の行)にある。申し送り台帳の想定手段が参照する需要ID(`SD-...`)が状態需要リストにある。状態需要リストの需要IDが重複しない。状態需要リストのファイルがあれば、「## 台帳」の節に列 需要ID の表がある(テンプレート96の形)。実装: `tools/lint/lint.mjs` |
 | `requires_covered` | ERROR | 作業10: 対象の全シナリオ(`blocked` を含む)の `requires` の全状態が setup-log にある。作業20: コード化した全シナリオの `requires` の全状態に、established check を持つ fixture がある(`S-CLEAN-ENV` は復元そのものなので除く)。実装: `tools/lint/lint.mjs` |

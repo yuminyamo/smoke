@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// stub-ai-cli.mjs — テスト用の AI の CLI(Copilot CLI・Kiro CLI)の偽物。pms run がカードごとに起こす
+// stub-ai-cli.mjs — テスト用の AI の CLI(Copilot CLI・Kiro CLI・Claude Code の CLI)の偽物。pms run がカードごとに起こす
 //
 // 引数: <card_file> <card> <flow>(config/pms.json の runner.command で渡す)。標準入力の依頼文は読み捨てる。
 // ふるまいは環境変数 PMS_STUB_AI のスクリプト(ES モジュール)の default export が決める:

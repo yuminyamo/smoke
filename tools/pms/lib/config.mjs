@@ -56,7 +56,8 @@ export const DEFAULTS = {
   // pms run の既定の CLI(--runner を省いたとき)
   default_runner: 'copilot',
   // カードの種類ごとのエージェントとモデル・追加の使用禁止({"explore.step": {"agent": "...", "model": ["..."], "deny": ["..."]}})。
-  // 書かなかった種類は procedure/cards/agents.yaml の値を使う
+  // CLI ごとに変えるときは runners.<CLI の名前> に同じ形で書く({"explore.step": {"runners": {"claude": {"model": "sonnet", "deny": ["Bash(npx *)"]}}}})。
+  // 書かなかった種類は procedure/cards/agents.yaml の値を使う(lib/agents.mjs の cardType)
   cardTypes: {},
 };
 
@@ -101,6 +102,12 @@ export function loadConfig(root) {
   }
   if (typeof cfg.default_runner !== 'string') throw new UsageError(`${CONFIG_FILE} の default_runner は文字列でなければなりません`);
   if (!cfg.cardTypes || typeof cfg.cardTypes !== 'object' || Array.isArray(cfg.cardTypes)) throw new UsageError(`${CONFIG_FILE} の cardTypes はオブジェクトでなければなりません`);
+  for (const [kind, t] of Object.entries(cfg.cardTypes)) {
+    if (kind.startsWith('_') || t?.runners == null) continue;
+    if (typeof t.runners !== 'object' || Array.isArray(t.runners) || !Object.values(t.runners).every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
+      throw new UsageError(`${CONFIG_FILE} の cardTypes.${kind}.runners は CLI の名前 → {agent, model, deny} のオブジェクトでなければなりません`);
+    }
+  }
   for (const [name, op] of Object.entries(cfg.ops)) {
     if (!op || typeof op !== 'object' || (!isCmd(op.cli) && typeof op.run_code !== 'string')) {
       throw new UsageError(`${CONFIG_FILE} の ops.${name} には cli(引数の配列)か run_code(Playwright のメソッド呼び出し)が要ります`);

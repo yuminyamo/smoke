@@ -14,7 +14,7 @@
 
   "default_runner": "copilot",
   "runner": {
-    "_comment": "pms run がカードごとに起こす AI の CLI。{prompt}(短い依頼文。カードの本文はファイルのパスで渡す){agent}{model}{card_file}{flow}{card} を置き換え、要素 \"{deny}\" は deny と cardTypes.<種類>.deny の各パターンを deny_arg の形に広げる。CLI のフラグは公式のリファレンスで確かめて直す(tools/pms/README.md 9章)",
+    "_comment": "pms run がカードごとに起こす AI の CLI。{prompt}(短い依頼文。カードの本文はファイルのパスで渡す){agent}{model}{card_file}{flow}{card} を置き換え、要素 \"{deny}\" は deny と cardTypes.<種類>.deny の各パターンを deny_arg の形に広げる。CLI のフラグは公式のリファレンスで確かめて直す(tools/pms/README.md 13章)。--runner で copilot / kiro / claude を選ぶ(省けば default_runner)",
     "copilot": {
       "command": ["copilot", "-p", "{prompt}", "--agent", "{agent}", "--model", "{model}", "--no-ask-user", "--output-format", "json", "--allow-all-tools", "{deny}"],
       "deny_arg": ["--deny-tool", "{pattern}"],
@@ -23,7 +23,7 @@
         "shell(npx playwright-cli:*)", "shell(npx @playwright/cli:*)",
         "shell(node tools/env/env.mjs get:*)", "shell(node tools/pms/pms.mjs pwcli:*)",
         "shell(sqlcmd)", "shell(sqlcmd:*)",
-        "write(procedure/**)", "write(.github/skills/**)", "write(.github/agents/**)", "write(.kiro/skills/**)", "write(.kiro/agents/**)"
+        "write(procedure/**)", "write(.github/skills/**)", "write(.github/agents/**)", "write(.kiro/skills/**)", "write(.kiro/agents/**)", "write(.claude/skills/**)", "write(.claude/agents/**)"
       ],
       "stdin": null,
       "timeoutSec": 900,
@@ -32,7 +32,7 @@
       "fatal_exit_codes": [2]
     },
     "kiro": {
-      "_comment": "使用禁止は生成したエージェント(.kiro/agents/pms-card-*.json の permissions)に書いてある。モデルを固定するときは \"--model\", \"{model}\" を足し、cardTypes.<種類>.model に Kiro のモデルIDを書く。認証は環境変数 KIRO_API_KEY",
+      "_comment": "使用禁止は生成したエージェント(.kiro/agents/pms-card-*.json の permissions)に書いてある。モデルを固定するときは \"--model\", \"{model}\" を足し、procedure/cards/agents.yaml の kinds.<種類>.kiro_model(または cardTypes.<種類>.runners.kiro.model)に Kiro のモデルIDを書く。認証は環境変数 KIRO_API_KEY",
       "command": ["kiro-cli", "chat", "--no-interactive", "--agent", "{agent}", "--trust-all-tools", "--output-format", "stream-json"],
       "deny_arg": [],
       "deny": [],
@@ -40,11 +40,25 @@
       "timeoutSec": 900,
       "heartbeatSec": 30,
       "stallWarnSec": 180
+    },
+    "claude": {
+      "_comment": "Claude Code の CLI(非対話の -p。依頼文は標準入力)。エージェントは .claude/agents/pms-card-*.md、モデルは procedure/cards/agents.yaml の kinds.<種類>.claude_model。使用禁止は生成したエージェントの disallowedTools に書いてあり、ここの deny で CLI にも重ねて渡す(--disallowedTools は --allowedTools より優先する)。-p では確認の要る道具が使えないため、編集は --permission-mode acceptEdits、シェルは --allowedTools Bash で許す。認証は claude へのログインか環境変数 ANTHROPIC_API_KEY。Windows で起動できない(ENOENT)ときは command の先頭を claude.exe の絶対パスにする",
+      "command": ["claude", "-p", "--agent", "{agent}", "--model", "{model}", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--allowedTools", "Bash", "{deny}"],
+      "deny_arg": ["--disallowedTools", "{pattern}"],
+      "deny": [
+        "Bash(playwright-cli *)", "Bash(npx playwright-cli *)", "Bash(npx @playwright/cli *)",
+        "Bash(node tools/env/env.mjs get *--reveal*)", "Bash(node tools/pms/pms.mjs pwcli *)", "Bash(sqlcmd *)",
+        "Edit(procedure/**)", "Edit(.github/skills/**)", "Edit(.github/agents/**)", "Edit(.kiro/skills/**)", "Edit(.kiro/agents/**)", "Edit(.claude/skills/**)", "Edit(.claude/agents/**)"
+      ],
+      "stdin": "prompt",
+      "timeoutSec": 900,
+      "heartbeatSec": 30,
+      "stallWarnSec": 180
     }
   },
   "cardTypes": {
-    "_comment": "カードの種類ごとのエージェント・モデル・追加の使用禁止(Copilot の --deny-tool の形)。書かなかった項目は procedure/cards/agents.yaml の値",
-    "setup.build": { "model": ["gpt-6-luna"], "deny": ["shell(npx:*)"] },
-    "explore.step": { "model": ["gpt-6-luna"], "deny": ["shell(npx:*)"] }
+    "_comment": "カードの種類ごとのエージェント・モデル・追加の使用禁止。使用禁止のパターンとモデルの名前は CLI ごとに書き方が違うため、runners.<CLI の名前> に書く(runners の外の deny は runners に deny を書かなかった CLI すべてに効く。runners の外の model は、runners にも agents.yaml の kinds.<種類>.<CLI>_model にもモデルがない CLI に効く)。書かなかった項目は procedure/cards/agents.yaml の値(tools/pms/README.md 10章)",
+    "setup.build": { "runners": { "copilot": { "model": ["gpt-6-luna"], "deny": ["shell(npx:*)"] }, "claude": { "deny": ["Bash(npx *)"] } } },
+    "explore.step": { "runners": { "copilot": { "model": ["gpt-6-luna"], "deny": ["shell(npx:*)"] }, "claude": { "deny": ["Bash(npx *)"] } } }
   }
 }

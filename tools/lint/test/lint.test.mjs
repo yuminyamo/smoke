@@ -787,21 +787,23 @@ test('env_value_leak: 秘密情報の値が成果物にあれば ERROR(値は指
   assert.match(note, /6 文字未満の秘密情報 1 件は探していません/);
 });
 
-test('env_value_leak: skills(生成先の .github/skills・.kiro/skills)に秘密情報の値があれば ERROR(proc-v020。値は指摘に出さない)', () => {
+test('env_value_leak: skills(生成先の .github/skills・.kiro/skills・.claude/skills)に秘密情報の値があれば ERROR(proc-v020。.claude は proc-v026。値は指摘に出さない)', () => {
   const root = makeRepo({
     'config/environments.json': ENV_SHARED,
     'config/environments.local.json': ENV_LOCAL,
     '.github/skills/print-job/SKILL.md': '# 印刷指示\n\nログインのパスワードは Zq9!pass-word を使う\n',
     '.kiro/skills/print-job/scripts/print.ps1': '$user = "printer"\n',
+    '.claude/skills/print-job/scripts/print.ps1': '$pass = "Zq9!pass-word"\n',
   });
   const res = lint(root);
   assert.equal(res.code, 1);
   const f = findings(res, 'env_value_leak');
-  assert.equal(f.length, 1, f.join('\n'));
+  assert.equal(f.length, 2, f.join('\n'));
   assertHas(f, /\.github\/skills\/print-job\/SKILL\.md: 秘密情報\(環境 vm01 の pms\.password\)の値が skill に書かれています/);
+  assertHas(f, /\.claude\/skills\/print-job\/scripts\/print\.ps1: 秘密情報\(環境 vm01 の pms\.password\)の値が skill に書かれています/);
   assert.ok(!res.stdout.includes('Zq9!pass-word'), '指摘に値を出さない');
   const note = res.json.results.find((r) => r.rule === 'env_value_leak').notes.join('\n');
-  assert.match(note, /skills\(\.github\/skills\/\.kiro\/skills\)から探しました/);
+  assert.match(note, /skills\(\.github\/skills\/\.kiro\/skills\/\.claude\/skills\)から探しました/);
 });
 
 test('env_value_leak: 設定ファイルの形の誤りは ERROR。env_value_hardcoded: テストコードの接続先の直書きは WARNING', () => {

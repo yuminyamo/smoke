@@ -22,10 +22,10 @@ export function fmtDur(ms) {
   return s < 60 ? `${s}秒` : `${Math.floor(s / 60)}分${String(s % 60).padStart(2, '0')}秒`;
 }
 
-/** オブジェクトを浅い順にたどり、pred(キー, 値, 親, 親のキー) に合う最初の値を返す(深さ4まで) */
+/** オブジェクトを浅い順にたどり、pred(キー, 値, 親, 親のキー) に合う最初の値を返す(深さ6まで。Claude Code の stream-json は message.content[].input.command にある) */
 function find(o, pred) {
   let level = [[o, '']];
-  for (let d = 0; d < 4 && level.length; d++) {
+  for (let d = 0; d < 6 && level.length; d++) {
     const nextLevel = [];
     for (const [obj, pk] of level) {
       for (const [k, v] of Object.entries(obj)) {

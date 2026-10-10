@@ -3,7 +3,7 @@
 //
 //   node tools/build-skills/build-skills.mjs            生成する(全ターゲット)
 //   node tools/build-skills/build-skills.mjs --check    生成物が正本と一致するか検査する(lint skills_in_sync)
-//   オプション: --target <id>  特定のターゲットだけ(copilot / kiro)
+//   オプション: --target <id>  特定のターゲットだけ(copilot / kiro / claude)
 //               --root <dir>   リポジトリのルート(既定: このスクリプトの2階層上)
 //
 // 依存: Node.js 18 以上のみ(外部パッケージ不要)。
@@ -15,6 +15,8 @@
 // カードの種類ごとのエージェント(正本 procedure/cards/agents.yaml。00_common.md ■進行役と記録の道具)も生成する。
 // 各ターゲットの agents_dir の中の <prefix>*(例 pms-card-*)だけを作り直し、ほかのエージェントには触れない。
 // 同じ正本の runner から、入口のエージェント(IDE 内のループ B1。例 pms-runner)も生成する(agents_dir の中のその名前のファイルだけを作り直す)。
+// 外部操作 skill(人間が整備する。生成の対象外)は、設定の external_skills.source にある原本を、ほかのターゲットの skills
+// ディレクトリへそのまま写す(external_skills.names の skill だけ。--check は写しが原本とバイト単位で一致するかを検査する)。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,6 +80,8 @@ if (targets.length === 0) fail(`ターゲット ${opt.target} は設定にあり
 const output = new Map(); // リポジトリ相対パス → 内容
 const managedDirs = [];   // 作り直す skill ディレクトリ(リポジトリ相対)
 const managedAgents = []; // 作り直すエージェント: { dir, prefix, names }(<prefix>* と、names のどれかで始まるファイル)
+const mirrored = new Map(); // 外部操作 skill の写し: リポジトリ相対パス → 内容(Buffer。原本のバイトのまま)
+const mirrorDirs = [];      // 作り直す外部操作 skill の写しのディレクトリ(リポジトリ相対)
 const sizeReport = [];
 const agentsDef = loadAgents();
 
@@ -88,6 +92,8 @@ for (const target of targets) {
   for (const sk of config.skills) buildWorkSkill(target, sk);
   // カードの種類ごとのエージェント
   if (agentsDef) buildAgents(target);
+  // 外部操作 skill の写し
+  mirrorExternalSkills(target);
 }
 
 // 生成物の保護ブロック検査
@@ -131,13 +137,24 @@ if (opt.check) {
     }
     for (const rel of onDisk) if (!output.has(rel)) diffs.push(`余分   ${rel}`);
   }
+  for (const dir of mirrorDirs) {
+    const abs = path.join(ROOT, dir);
+    const onDisk = fs.existsSync(abs) ? listFiles(abs).map((f) => path.posix.join(dir, f)) : [];
+    for (const rel of [...mirrored.keys()].filter((k) => k.startsWith(dir + '/'))) {
+      const p = path.join(ROOT, rel);
+      if (!fs.existsSync(p)) diffs.push(`なし   ${rel}`);
+      else if (!fs.readFileSync(p).equals(mirrored.get(rel))) diffs.push(`不一致 ${rel}`);
+    }
+    for (const rel of onDisk) if (!mirrored.has(rel)) diffs.push(`余分   ${rel}`);
+  }
   if (diffs.length) {
     console.error(`skills_in_sync: NG(${diffs.length} 件)— 生成物が正本(${VERSION})と一致しません。`);
     for (const d of diffs) console.error('  ' + d);
     console.error('正本(procedure/)を直してから、node tools/build-skills/build-skills.mjs で再生成してください。生成物は直接編集しないでください。');
+    if (mirrorDirs.length) console.error(`外部操作 skill は原本(${config.external_skills.source}/<名前>/)を直してから、同じコマンドで写してください。`);
     report(1, true);
   }
-  console.log(`skills_in_sync: OK — ${managedDirs.length} 個の skill と ${agentCount()} 個のエージェントが正本(${VERSION})と一致しています。`);
+  console.log(`skills_in_sync: OK — ${managedDirs.length} 個の skill と ${agentCount()} 個のエージェントが正本(${VERSION})と、外部操作 skill の写し ${mirrorDirs.length} 個が原本と一致しています。`);
   report(0, true);
 } else {
   for (const dir of managedDirs) fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
@@ -150,7 +167,13 @@ if (opt.check) {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, content, 'utf8');
   }
-  console.log(`生成しました — 手順版 ${VERSION} / ${managedDirs.length} 個の skill / エージェント ${agentCount()} 個`);
+  for (const dir of mirrorDirs) fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
+  for (const [rel, content] of mirrored) {
+    const p = path.join(ROOT, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, content);
+  }
+  console.log(`生成しました — 手順版 ${VERSION} / ${managedDirs.length} 個の skill / エージェント ${agentCount()} 個 / 外部操作 skill の写し ${mirrorDirs.length} 個`);
   for (const line of sizeReport) console.log('  ' + line);
   report(0);
 }
@@ -301,7 +324,7 @@ function workSkillHeader({ dir, sk, appendixFiles, tplFiles, methodFiles = [] })
 
 function frontmatter(target, { name, description, invocation, source }) {
   const L = ['---', `name: ${name}`, `description: ${yamlString(description)}`];
-  if (target.frontmatter === 'copilot' && invocation === 'manual') L.push('disable-model-invocation: true');
+  if ((target.frontmatter === 'copilot' || target.frontmatter === 'claude') && invocation === 'manual') L.push('disable-model-invocation: true');
   L.push('metadata:');
   L.push(`  procedure_version: ${VERSION}`);
   L.push(`  generated_from: ${yamlString(source)}`);
@@ -351,7 +374,7 @@ function loadAgents() {
 
 /** agents_dir の中のファイルが、生成の対象(作り直す・検査する)か */
 function isManagedAgent(a, file) {
-  return file.startsWith(a.prefix) || a.names.some((n) => file === `${n}.agent.md` || file === `${n}.json`);
+  return file.startsWith(a.prefix) || a.names.some((n) => file === `${n}.agent.md` || file === `${n}.json` || file === `${n}.md`);
 }
 
 function agentCount() {
@@ -374,6 +397,16 @@ function buildAgents(target) {
         `tools: [${(agentsDef.tools_copilot ?? []).map((t) => yamlString(String(t))).join(', ')}]`, '---', ''].join('\n');
       const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
       put(`${dir}/${name}.agent.md`, fm + notice + instruction);
+    } else if (target.frontmatter === 'claude') {
+      // Claude Code のサブエージェント(.claude/agents/<名前>.md)。使用禁止は disallowedTools に権限の規則の形で書く
+      const shell = [...(agentsDef.deny_shell ?? []), ...(k.deny_shell_extra ?? [])];
+      const disallowed = [...shell.map((p) => `Bash(${p})`), ...(agentsDef.deny_write ?? []).map((p) => `Edit(${p})`)];
+      const fm = ['---', `name: ${name}`, `description: ${yamlString(k.description)}`,
+        ...(k.claude_model ? [`model: ${k.claude_model}`] : []),
+        `tools: ${(agentsDef.tools_claude ?? []).join(', ')}`,
+        ...(disallowed.length ? [`disallowedTools: [${disallowed.map(yamlString).join(', ')}]`] : []), '---', ''].join('\n');
+      const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
+      put(`${dir}/${name}.md`, fm + notice + instruction);
     } else {
       const deny = (cap, list) => (list && list.length ? [{ capability: cap, match: list, effect: 'deny' }] : []);
       const shell = [...(agentsDef.deny_shell ?? []), ...(k.deny_shell_extra ?? [])];
@@ -404,6 +437,14 @@ function buildRunnerAgent(target, dir, r, cardNames) {
       `tools: ${list(r.tools_copilot ?? [])}`, `agents: ${list(cardNames)}`, 'disable-model-invocation: true', '---', ''].join('\n');
     const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(runner)/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
     put(`${dir}/${r.name}.agent.md`, fm + notice + instruction);
+  } else if (target.frontmatter === 'claude') {
+    // Claude Code: サブエージェントはサブエージェントを呼べないため、メインのエージェントとして起動する(claude --agent pms-runner)。
+    // 呼べるサブエージェントは Agent(<名前>, …) でカードのエージェントだけに絞る
+    const tools = (r.tools_claude ?? ['Bash', 'Agent']).map((t) => (t === 'Agent' ? `Agent(${cardNames.join(', ')})` : t));
+    const fm = ['---', `name: ${r.name}`, `description: ${yamlString(r.description)}`,
+      ...(r.claude_model ? [`model: ${r.claude_model}`] : []), `tools: ${tools.join(', ')}`, '---', ''].join('\n');
+    const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(runner)/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
+    put(`${dir}/${r.name}.md`, fm + notice + instruction);
   } else {
     const subagents = [`${agentsDef.prefix}*`];
     const allow = (cap, list) => (list && list.length ? [{ capability: cap, match: list, effect: 'allow' }] : []);
@@ -417,6 +458,26 @@ function buildRunnerAgent(target, dir, r, cardNames) {
       toolsSettings: { shell: { allowedCommands: r.allow_shell ?? [] }, subagent: { availableAgents: subagents, trustedAgents: subagents } },
     };
     put(`${dir}/${r.name}.json`, JSON.stringify(json, null, 2) + '\n');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// 外部操作 skill の写し
+// ════════════════════════════════════════════════════════
+
+/** 外部操作 skill(人間が整備する原本)を、原本のないターゲットの skills ディレクトリへそのまま写す */
+function mirrorExternalSkills(target) {
+  const ext = config.external_skills;
+  if (!ext || !Array.isArray(ext.names) || !ext.names.length) return;
+  if (typeof ext.source !== 'string' || !ext.source) { errors.push('skills.config.json の external_skills.source がありません'); return; }
+  if (path.posix.normalize(target.dir) === path.posix.normalize(ext.source)) return; // 原本そのもの
+  for (const name of ext.names) {
+    if (config.skills.some((s) => s.name === name) || config.router?.name === name) { errors.push(`external_skills の ${name} は生成する skill と同じ名前です`); continue; }
+    const srcAbs = path.join(ROOT, ext.source, name);
+    if (!fs.existsSync(path.join(srcAbs, 'SKILL.md'))) { errors.push(`外部操作 skill の原本 ${ext.source}/${name}/SKILL.md がありません`); continue; }
+    const dir = `${target.dir}/${name}`;
+    mirrorDirs.push(dir);
+    for (const f of listFiles(srcAbs)) mirrored.set(`${dir}/${f}`, fs.readFileSync(path.join(srcAbs, f)));
   }
 }
 

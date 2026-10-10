@@ -39,8 +39,8 @@
 | `remote/targets/<接続先名>/config.psd1` | リポジトリ(deploy が `%ProgramData%\PmsRemote\config.psd1` として配置) | リモート側の設定の原本。対象・ツール・マスクの指定などを固定する |
 | `tools/remote/pms-remote.ps1`(と `lib/`) | リポジトリ | CLI 本体 |
 | `config/remote-targets.json` | リポジトリ | クライアント設定(接続先・資格情報の参照名・期待する版・復元・ログの書式) |
-| `.kiro/skills/restore-golden-image/`・`.github/skills/` | リポジトリ | 外部操作 skill(復元。CLI の restore を呼ぶ入口・lint を同梱) |
-| `.kiro/skills/collect-server-logs/`・`.github/skills/` | リポジトリ | 外部操作 skill(ログ収集。CLI の logs-collect を呼ぶ入口を同梱) |
+| `.github/skills/restore-golden-image/`(原本)・`.kiro/skills/`・`.claude/skills/`(写し) | リポジトリ | 外部操作 skill(復元。CLI の restore を呼ぶ入口・lint を同梱)。直すのは原本だけ。写しは `node tools/build-skills/build-skills.mjs` が作る |
+| `.github/skills/collect-server-logs/`(原本)・`.kiro/skills/`・`.claude/skills/`(写し) | リポジトリ | 外部操作 skill(ログ収集。CLI の logs-collect を呼ぶ入口を同梱)。直すのは原本だけ(同上) |
 | `remote/tests/external/remote.ts` | リポジトリの `tests/external/` にコピー | テストコードから CLI を呼ぶヘルパー |
 | `remote/tests/global-setup.ts` | リポジトリの `tests/` にコピー | Playwright globalSetup(回帰の一括実行前の復元) |
 | `playwright.readiness.config.ts` | リポジトリのルート | 起動確認テストだけを実行する設定 |

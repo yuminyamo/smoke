@@ -242,10 +242,10 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 | `ops` | `{}` | 操作ごとの呼び出しの上書き(`{"press": {"cli": ["press", "{value}"]}}` など。`{ref}` `{value}` `{js_value}` `{locator}` を置き換える。`cli` か `run_code` のどちらか) |
 | `screenshot_args` | `["screenshot", "{ref}", "--filename={file}"]` | `pms act screenshot` の呼び出し(要素 `{ref}` は ref がなければ外す) |
 | `runner` | null | `pms run` が起こす AI の CLI(名前 → `{command, deny_arg, deny, stdin, timeoutSec, heartbeatSec, stallWarnSec, fatal_exit_codes}`。10章)。null なら `pms run` は終了コード 2 |
-| `default_runner` | `copilot` | `--runner` を省いたときの CLI |
-| `cardTypes` | `{}` | カードの種類ごとの `agent`・`model`(候補の配列。先頭を使う)・`deny`(その種類だけに足す使用禁止)。書かなかったものは `procedure/cards/agents.yaml` |
+| `default_runner` | `copilot` | `--runner` を省いたときの CLI(見本の名前は `copilot`・`kiro`・`claude`) |
+| `cardTypes` | `{}` | カードの種類ごとの `agent`・`model`(候補の配列。先頭を使う)・`deny`(その種類だけに足す使用禁止)。CLI ごとに変えるときは `runners.<CLI の名前>` に同じ形で書く(モデルの名前と使用禁止のパターンは CLI ごとに書き方が違うため)。書かなかったものは `procedure/cards/agents.yaml`(10章の2) |
 
-ファイルがなければ既定の値で動く。知らないキーは終了コード 2。**CLI のフラグはコードに書かず、`runner` に書く**(CLI の仕様が変わっても設定だけで直せるように)。見本 `config/pms.sample.json` の Copilot CLI・Kiro CLI の雛形は、2026-10-08 に公式のドキュメント(13章)で確かめたフラグで書いた。
+ファイルがなければ既定の値で動く。知らないキーは終了コード 2。**CLI のフラグはコードに書かず、`runner` に書く**(CLI の仕様が変わっても設定だけで直せるように)。見本 `config/pms.sample.json` の Copilot CLI・Kiro CLI の雛形は 2026-10-08 に、Claude Code の CLI の雛形は 2026-10-10 に、公式のドキュメント(13章)で確かめたフラグで書いた。
 
 ## 8. 実物の playwright-cli で確かめていないこと
 
@@ -296,7 +296,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 ## 10. `pms run`(段2。`lib/run.mjs`)
 
 1. `nextCard`(4章。`--phase` のフェーズだけ)で次のカードを取る。STOP → `{state: STOP, code, reason, message}` で終了コード 3(`message` は利用者向けの文面)
-2. カードの種類のエージェント・モデル(`cardType`: `config.cardTypes` → `procedure/cards/agents.yaml`。エージェントの名前は `pms-card-<種類の . と _ を - に>`)と使用禁止(`runner.<名前>.deny` + `cardTypes.<種類>.deny`)で、`runner.<名前>.command` を展開する。依頼文(`{prompt}`)は短い固定の文で、**カードの本文はファイルのパス(`{card_file}`)で渡す**(コマンドラインの長さに頼らない)。`stdin: "prompt"` なら依頼文を標準入力でも渡す
+2. カードの種類のエージェント・モデル(`cardType(ctx, 種類, CLI の名前)`。モデルは `cardTypes.<種類>.runners.<CLI>.model` → `agents.yaml` の `kinds.<種類>.<CLI>_model`(`kiro_model`・`claude_model`)→ `cardTypes.<種類>.model` → `kinds.<種類>.model` の順。エージェントの名前は `pms-card-<種類の . と _ を - に>`)と使用禁止(`runner.<名前>.deny` + `cardTypes.<種類>.runners.<CLI>.deny`(なければ `cardTypes.<種類>.deny`))で、`runner.<名前>.command` を展開する。依頼文(`{prompt}`)は短い固定の文で、**カードの本文はファイルのパス(`{card_file}`)で渡す**(コマンドラインの長さに頼らない)。`stdin: "prompt"` なら依頼文を標準入力でも渡す
 3. 子プロセスを `cwd = root`、環境変数 `PMS_RUNNER=b2`・`PMS_FLOW`・`PMS_CARD`・`PMS_ACTIVITY` で起動する(非同期の `spawn`。`timeoutSec` を超えたら SIGKILL で止め、未提出として扱う)。`pms run` 自身も `PMS_RUNNER=b2` にして、出したカードの履歴に残す
    - 進み具合(`lib/progress.mjs`): セッションの間、標準エラー出力に `[pms run] C-0009 3分05秒: <キーワード>` の形で出す。キーワードは、CLI の出力の JSON の行の道具の呼び出し(`toolName`・`tool_name`・`tool`、または `type` に tool を含む行の `name` と、`command`・`path` など)と、セッションの中で実行された pms のコマンド(pms.mjs が `PMS_ACTIVITY` のファイル `runs/C-<番号>-<回>.activity` に書く。`pms act click`・`pms submit 不合格` など。終わったら消す)。キーワードが変わったら3秒以上あけて出し、何も出していなければ `heartbeatSec`(既定 30)ごとに経過と最後の動きを出す。出力も pms のコマンドもない時間が `stallWarnSec`(既定 180)を超えたら「止まっている可能性」を出す(長いテストの実行中もこうなる。最後のキーワードで見分ける)。CLI の出力の形は実物で確かめていないため、キーワードが取れなくても経過と最後の動きの時刻は出す
 4. 出力(標準出力の JSONL)の後ろに `{"pms": {card, kind, runner, attempt, exit_code, signal, timed_out, started_at, ended_at, stderr}}` の1行を足し、秘密情報の値を伏せてから `runs/C-<番号>-<回>.jsonl` に保存する。キューの履歴に `session` を足す
@@ -325,6 +325,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 |---|---|---|
 | Copilot CLI | `-p PROMPT`(非対話で実行して終わる)・`--agent`・`--model`・`--no-ask-user`・`--output-format json`(JSONL)・`--allow-tool` / `--deny-tool`(例 `shell(git:*)`・`write(<パス>)`)・`--allow-all-tools`・`--available-tools`・`--excluded-tools`。終了コード 0 / 1(未完了)/ 2(引数の誤り)/ 130。認証は `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN`。カスタムエージェントの frontmatter は `name`・`description`・`tools`・`model`(文字列) | docs.github.com「GitHub Copilot CLI programmatic reference」「Custom agents configuration」 |
 | Kiro CLI | `kiro-cli chat --no-interactive`(依頼文は引数か標準入力)・`--agent`・`--model`・`--trust-all-tools` / `--trust-tools`・`--output-format stream-json`(V2・V3)。認証は `KIRO_API_KEY`(Pro 以上)。エージェントは `.kiro/agents/<名前>.json`(`name`・`description`・`prompt`・`tools`・`model`・`permissions`・`toolsSettings`)。`permissions.rules` の `deny` がほかの `allow` より優先する。`toolsSettings.shell.deniedCommands` は旧形式 | kiro.dev「Headless mode」「CLI commands」「Agent configuration reference」 |
+| Claude Code の CLI(2026-10-10) | `claude -p`(非対話で実行して終わる。依頼文は引数か標準入力)・`--agent <名前>`(`.claude/agents/<名前>.md` をメインのセッションのエージェントにする)・`--model`(別名 `sonnet`・`haiku`・`opus` かモデルID)・`--output-format stream-json`(`-p` では `--verbose` が要る。道具の呼び出しは `message.content[]` の `tool_use`)・`--permission-mode acceptEdits`・`--allowedTools` / `--disallowedTools`(権限の規則の形。例 `Bash(sqlcmd *)`・`Edit(procedure/**)`。拒否が許可より優先する)。`-p` では確認の要る道具は使えない(許可していなければ拒否される)。認証は `claude` へのログインか `ANTHROPIC_API_KEY` | docs.claude.com「CLI reference」「Headless mode」「Identity and Access Management」 |
 
 実物で確かめること(人間に頼む。違っていたら `config/pms.json` と `procedure/cards/agents.yaml` を直す):
 
@@ -333,7 +334,8 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 - `--agent` に、`.github/agents/pms-card-*.agent.md` のファイル名(`.agent.md` を除いた名前)を渡せるか
 - Kiro CLI の `permissions` と `toolsSettings` を同じエージェントに書いてよいか(旧形式を受け付けない版なら `toolsSettings` を外す)。Kiro のモデルIDを `kinds.<種類>.kiro_model` に書くか
 - 1枚 900 秒の上限が、探索のステップに足りるか(`runner.<名前>.timeoutSec`)
-- `--output-format json`(Copilot)・`stream-json`(Kiro)の行から、道具の呼び出しのキーワードが取れるか(`pms run` の進み具合。取れなければ `lib/progress.mjs` の `keywordOf` を直す)
+- Claude Code の CLI で、`-p` と `--agent` を併せて使えるか(エージェントの `tools`・`disallowedTools`・`model` がセッションに効くか)。`--disallowedTools` の空白を含むパターン(`Bash(node tools/env/env.mjs get *--reveal*)`)と `Edit(procedure/**)` が効くか。Windows で `claude` を起動できるか(npm で入れた `claude.cmd` は起動できないことがある。そのときは `command` の先頭を `claude.exe` の絶対パスにする)。`--runner claude --dry-run` で起こすコマンドを確かめてから、`--max-cards 1` で1枚だけ行わせて確かめる
+- `--output-format json`(Copilot)・`stream-json`(Kiro・Claude Code)の行から、道具の呼び出しのキーワードが取れるか(`pms run` の進み具合。取れなければ `lib/progress.mjs` の `keywordOf` を直す)
 
 ## 14. IDE 内のループ(段3。B1。入口のエージェント `pms-runner`)
 
@@ -346,7 +348,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 5. `done` なら `pms status` の要約を、`STOP` なら `message` を利用者に伝えて終わる。利用者が「続けて」と言えば 2 から(キューはファイルにある)
 6. 全部終わったら、入口 skill(`pms-regression`)が次の「続き」で `status` の `report_pending` を見て `pms report` を実行し、完了前の lint を行う(B2 では `pms run` が行うもの)
 
-入口のエージェントの本文は `procedure/cards/agents.yaml` の `runner.instruction`(5行の手順)。生成は `tools/build-skills/build-skills.mjs`(Copilot: `.github/agents/pms-runner.agent.md`、Kiro: `.kiro/agents/pms-runner.json`)。
+入口のエージェントの本文は `procedure/cards/agents.yaml` の `runner.instruction`(5行の手順)。生成は `tools/build-skills/build-skills.mjs`(Copilot: `.github/agents/pms-runner.agent.md`、Kiro: `.kiro/agents/pms-runner.json`、Claude Code: `.claude/agents/pms-runner.md`)。Claude Code のサブエージェントはサブエージェントを呼べないため、Claude Code では `claude --agent pms-runner` でメインのエージェントとして起動する(呼べるサブエージェントは `tools` の `Agent(pms-card-…)` に並べたカードのエージェントだけ)。
 
 ### 14.2 判断と根拠
 
@@ -364,6 +366,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 |---|---|---|
 | VS Code + Copilot | カスタムエージェントは `.github/agents/*.agent.md`。frontmatter の `agents`(サブエージェントとして呼べるエージェントの名前の一覧。`tools` に `agent` が要る)・`model`(文字列か候補の配列)・`tools`・`user-invocable`(エージェントの選択の一覧に出すか。既定 true)・`disable-model-invocation`(ほかのエージェントからサブエージェントとして呼ばせない。既定 false)。サブエージェントのモデルは、呼ぶ側が明示したモデル → **呼ばれたカスタムエージェントの `model`** → Auto → 会話のモデル の順。サブエージェントは会話の履歴を引き継がず、最後の結果だけを返す。入れ子は既定で無効(`chat.subagents.allowInvocationsFromSubagents`)。エージェントの切り替えはチャットの Agent のドロップダウン | code.visualstudio.com「Custom agents」「Subagents」 |
 | Kiro IDE | カスタムエージェントは `.kiro/agents/<名前>.json`(または `.md`)。IDE でもカスタムエージェントをサブエージェントとして呼べる。呼ぶ側の `tools` に `subagent`、呼べるエージェントは `toolsSettings.subagent.availableAgents`(glob)、確認なしで呼ぶのは `trustedAgents`。`permissions.rules` の `capability` に `subagent`。エージェントの切り替えは、チャットの入力欄の行のエージェントの選択。**Workflows を有効にしていると、カスタムエージェントへの委任がバックグラウンドの実行になる** | kiro.dev「Subagents」「Custom agents」「Agent configuration reference」「Agent selector」 |
+| Claude Code(proc-v026 で追加。2026-10-10) | サブエージェントは `.claude/agents/<名前>.md`(frontmatter の `name`・`description`・`tools`(カンマ区切り)・`disallowedTools`・`model`(省略すると呼び出し元と同じ))。サブエージェントはサブエージェントを呼べない。`claude --agent <名前>` でエージェントをメインのセッションとして起動でき、そのときは `tools` の `Agent(<名前>, …)` で呼べるサブエージェントを絞れる。skills は `.claude/skills/<名前>/SKILL.md`(`disable-model-invocation` が使える) | docs.claude.com「Subagents」「Agent Skills」 |
 
 実物で確かめること(人間に頼む。違っていたら `procedure/cards/agents.yaml` の `runner` と生成スクリプトを直す):
 
@@ -372,3 +375,4 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 - サブエージェントの端末で `PMS_RUNNER` が設定されず、提出の記録が `b1` になるか(`pms stats` で `b1` と `b2` が分かれるか)
 - Kiro IDE で、Workflows を有効にしているときに、入口がサブエージェントの終わりを待たずに `pms next` を呼ばないか。呼ぶと、同じカードが二重に出る(出し直しの回数が増え、上限で STOP になる)。待たない場合は、`pms-runner` を使うあいだ Workflows を無効にする(利用説明書の既知の制約)
 - Kiro IDE で、`permissions` の `allow` と `toolsSettings` の旧形式を併記した `pms-runner.json` を読めるか
+- Claude Code で、`claude --agent pms-runner` が `Agent(pms-card-…)` に並べたカードのエージェントだけを呼べるか。カードのエージェントの `disallowedTools`(`Bash(sqlcmd *)`・`Edit(procedure/**)` など)で、使用禁止のコマンドと書き込みが実際に拒まれるか。拒まれないときは、パターンの書き方(`Bash(sqlcmd:*)` など)を生成スクリプトで直す

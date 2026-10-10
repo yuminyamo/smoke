@@ -15,8 +15,21 @@
       "dir": ".kiro/skills",
       "frontmatter": "kiro",
       "agents_dir": ".kiro/agents"
+    },
+    {
+      "id": "claude",
+      "label": "Claude Code",
+      "dir": ".claude/skills",
+      "frontmatter": "claude",
+      "agents_dir": ".claude/agents"
     }
   ],
+
+  "external_skills": {
+    "_comment": "外部操作 skill(人間が整備する。生成の対象外。00_common.md ■外部操作 skill の条件)。原本は source/<名前>/ だけを直し、build-skills.mjs がほかのターゲットの dir へそのまま写す。--check(lint skills_in_sync)は写しが原本とバイト単位で一致するかを検査する",
+    "source": ".github/skills",
+    "names": ["restore-golden-image", "collect-server-logs"]
+  },
 
   "shared_references": {
     "common": "procedure/00_common.md",

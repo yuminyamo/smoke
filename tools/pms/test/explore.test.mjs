@@ -512,6 +512,8 @@ test('run: セッションの進み具合を標準エラー出力に出す(pms �
 test('run: CLI の出力の JSON の行から道具の呼び出しのキーワードを取り出す。pms のコマンドは PMS_ACTIVITY のファイルに書く', () => {
   assert.equal(keywordOf('{"type":"tool.execution_start","data":{"toolName":"bash","arguments":{"command":"npx playwright test tests/specs/a.spec.ts"}}}'), 'bash npx playwright test tests/specs/a.spec.ts');
   assert.equal(keywordOf('{"type":"tool_use","name":"fs_write","input":{"path":"tests/fixtures/print.ts"}}'), 'fs_write tests/fixtures/print.ts');
+  // Claude Code の stream-json(道具の呼び出しは message.content の中の tool_use)
+  assert.equal(keywordOf('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"node tools/pms/pms.mjs act click e7"}}]}}'), 'Bash node tools/pms/pms.mjs act click e7');
   assert.equal(keywordOf('{"type":"assistant.message","content":"考え中"}'), null);
   assert.equal(keywordOf('plain text'), null);
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pms-act-')), 'x.activity');
@@ -539,6 +541,50 @@ test('run: explore.step のセッションには、種類ごとの使用禁止�
   assert.equal(dry.json.stdin, true);
 });
 
+test('run: --runner で CLI を選ぶと、モデルと種類ごとの使用禁止を CLI ごとの値(cardTypes.<種類>.runners・agents.yaml の <CLI>_model)から取る', () => {
+  const sample = JSON.parse(fs.readFileSync(path.join(REAL_ROOT, 'config/pms.sample.json'), 'utf8'));
+  const cfg = { ...runner(), runner: { ...sample.runner, fake: runner().runner.fake }, cardTypes: sample.cardTypes };
+  const root = repo({}, { config: cfg });
+  build(root);
+  pms(root, ['next', '--flow', 'F-003']);
+  submitOut(root, 'C-0001', OUT['setup.reuse']());
+  pms(root, ['next', '--flow', 'F-003']);
+  submitOut(root, 'C-0002', OUT['setup.build']());
+  const dry = (name) => pms(root, ['run', '--flow', 'F-003', '--runner', name, '--dry-run']).json;
+  const after = (cmd, flag) => cmd[cmd.indexOf(flag) + 1];
+
+  // Claude Code: モデルは agents.yaml の claude_model、使用禁止は runner.claude.deny と runners.claude.deny を --disallowedTools で渡す
+  const c = dry('claude');
+  assert.equal(c.kind, 'explore.step');
+  assert.equal(c.runner, 'claude');
+  assert.equal(c.command[0], 'claude');
+  assert.equal(after(c.command, '--agent'), 'pms-card-explore-step');
+  assert.equal(after(c.command, '--model'), 'sonnet');
+  assert.ok(c.command.includes('Bash(npx *)'), c.command.join(' '));
+  assert.ok(c.command.includes('Bash(sqlcmd *)'));
+  assert.ok(!c.command.some((x) => x.startsWith('shell(')), 'Copilot の形の使用禁止を Claude Code に渡さない');
+  assert.equal(c.stdin, true);
+
+  // Copilot: モデルと使用禁止は runners.copilot
+  const g = dry('copilot');
+  assert.equal(after(g.command, '--model'), 'gpt-6-luna');
+  assert.ok(g.command.includes('shell(npx:*)'));
+  assert.ok(!g.command.some((x) => x.startsWith('Bash(')));
+
+  // Kiro: 使用禁止はエージェントの定義にあり、CLI には渡さない
+  const k = dry('kiro');
+  assert.equal(k.command[0], 'kiro-cli');
+  assert.equal(after(k.command, '--agent'), 'pms-card-explore-step');
+  assert.ok(!k.command.some((x) => /^(shell|Bash)\(/.test(x)));
+});
+
+test('config: cardTypes.<種類>.runners の形が誤っていれば終了コード 2', () => {
+  const root = repo({}, { config: { ...runner(), cardTypes: { 'explore.step': { runners: { claude: 'sonnet' } } } } });
+  const r = pms(root, ['run', '--flow', 'F-003', '--dry-run']);
+  assert.equal(r.code, 2, r.stdout + r.stderr);
+  assert.match(r.json?.error ?? r.stderr, /cardTypes\.explore\.step\.runners/);
+});
+
 // ════════════════════════════════════════════════════════
 // エージェントの定義(生成物)
 // ════════════════════════════════════════════════════════
@@ -550,6 +596,7 @@ test('agents: カードの種類ごとのエージェントと入口のエージ
   for (const k of kinds) {
     assert.ok(fs.existsSync(path.join(REAL_ROOT, '.github/agents', `${agentName(k)}.agent.md`)), k);
     assert.ok(fs.existsSync(path.join(REAL_ROOT, '.kiro/agents', `${agentName(k)}.json`)), k);
+    assert.ok(fs.existsSync(path.join(REAL_ROOT, '.claude/agents', `${agentName(k)}.md`)), k);
   }
   // 入口のエージェント(B1)が呼べるサブエージェントは、pms next が出力の agent に書く名前と同じ
   const runnerMd = fs.readFileSync(path.join(REAL_ROOT, '.github/agents/pms-runner.agent.md'), 'utf8');

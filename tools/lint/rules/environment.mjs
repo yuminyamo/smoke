@@ -13,7 +13,7 @@ import { LintSetupError } from '../lib/repo.mjs';
 const SCAN_DIRS = ['work', 'kb', 'logs', 'tests', 'traceability'];
 // skills の生成先(外部操作 skill の条件2: 資格情報の値を skill に書かない)。procedure/skills.config.json の targets[].dir
 const SKILLS_CONFIG = 'procedure/skills.config.json';
-const DEFAULT_SKILL_DIRS = ['.github/skills', '.kiro/skills'];
+const DEFAULT_SKILL_DIRS = ['.github/skills', '.kiro/skills', '.claude/skills'];
 const TEXT_EXT = new Set(['.md', '.yaml', '.yml', '.json', '.jsonl', '.ts', '.js', '.mjs', '.cjs', '.txt', '.csv', '.log', '.sql', '.ps1']);
 const MAX_BYTES = 5 * 1024 * 1024;
 // これより短い値は、ほかの文字列と偶然一致しやすいので探さない(notes に書く)

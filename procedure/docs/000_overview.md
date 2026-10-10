@@ -238,6 +238,32 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 
 # 改訂履歴
 
+## 36. 2026-10-10 改訂(Claude Code への配備)— 手順版 proc-v026
+
+**人間の指示による改訂である。** skills とエージェントを、GitHub Copilot・Kiro に加えて Claude Code からも使えるようにし、正本を直したときに3つの生成先へ同時に反映されるようにする。あわせて、`pms run`(B2)が Copilot・Kiro・Claude Code のどの CLI でもカードごとにセッションを起こせるようにする。外部操作 skill(人間が整備する。生成の対象外)は、これまで `.github/skills/` と `.kiro/skills/` に同じものを手で置いていたため、片方だけ直す食い違いを検出できなかった。
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 36.1 | **生成先に Claude Code を足した。** `skills.config.json` の `targets` に `claude`(`.claude/skills`・`.claude/agents`)を足し、`build-skills.mjs` が skills(作業ごとの skill と入口 skill)とエージェントを Claude Code の形でも生成するようにした。`invocation: manual` の skill(pms-40-improve)には Copilot と同じく `disable-model-invocation: true` を付ける | procedure(`skills.config.json`)/ tools/build-skills |
+| 36.2 | **Claude Code のエージェントの形を決めた。** カードのエージェントは `.claude/agents/pms-card-<種類>.md`(`tools` は `tools_claude`。使用禁止の `deny_shell`・`deny_shell_extra`・`deny_write` を `disallowedTools` に `Bash(<パターン>)`・`Edit(<パス>)` の形で書く。モデルは `claude_model` があれば書き、なければ呼び出し元と同じ)。入口のエージェントは `.claude/agents/pms-runner.md`(`tools: Bash, Agent(pms-card-…)`)。Claude Code のサブエージェントはサブエージェントを呼べないため、`claude --agent pms-runner` でメインのエージェントとして起動する | procedure(`cards/agents.yaml`)/ tools/build-skills / 00 |
+| 36.3 | **外部操作 skill の原本を `.github/skills/<名前>/` の1つにした。** `skills.config.json` の `external_skills` に原本の場所と skill の名前を書き、`build-skills.mjs` がほかの生成先へバイト単位でそのまま写す。`--check`(lint `skills_in_sync`)が写しの食い違い・欠け・余分を検出する | procedure(`skills.config.json`)/ tools/build-skills / 00 ■外部操作 skill の条件 |
+| 36.4 | カードのエージェントの書き込み禁止(`deny_write`)と `config/pms.sample.json` の `runner.copilot.deny` に `.claude/skills/**`・`.claude/agents/**` を足した | procedure(`cards/agents.yaml`)/ config |
+| 36.5 | lint `env_value_leak` の既定の skills の場所と、`env_restored` の判定スクリプトの候補に `.claude/skills/` を足した(`env_value_leak` は `targets[].dir` を読むので、設定があれば自動で含まれる) | tools/lint |
+| 36.6 | `.gitattributes` で `.claude/skills/pms-*/**` の改行を LF に固定した | .gitattributes |
+| 36.7 | 生成スクリプトのテストに、Claude Code の生成物と外部操作 skill の写しの検査を足した | tools/build-skills/test |
+| 36.8 | 00 ■進行役と記録の道具・■外部操作 skill の条件・■手順書の版と配備・■ディレクトリ構成・■lint の表、`tools/pms/README.md` 14章、`docs/skills版_利用説明書.md`、`remote/README.md` に Claude Code を足した。発生環境の復旧手順(`docs/005_発生環境の復旧手順.md`)の7章に proc-v026 の節を足した | 00 / docs / tools/pms / remote |
+| 36.9 | 手順版を `proc-v026` に更新 | vocab |
+| 36.10 | **`pms run`(B2)で Claude Code の CLI を使えるようにした。** 見本 `config/pms.sample.json` の `runner` に `claude`(`claude -p --agent {agent} --model {model} --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools Bash` と、使用禁止を `--disallowedTools` で渡す。依頼文は標準入力)を足した。`--runner copilot|kiro|claude` で、Copilot・Kiro・Claude Code のどれでもカードごとに新しいセッションを起こせる | config / tools/pms |
+| 36.11 | **カードの種類ごとのモデルと使用禁止を、CLI ごとに選ぶようにした。** モデルの名前と使用禁止のパターンは CLI ごとに書き方が違うため、`cardType` は `cardTypes.<種類>.runners.<CLI>`(config)→ `kinds.<種類>.<CLI>_model`(agents.yaml)→ 従来の `cardTypes.<種類>.model`・`kinds.<種類>.model` の順に見る。`agents.yaml` の各種類に `claude_model: sonnet` を足した(Claude Code のエージェントの定義の `model` にも使う)。見本の `cardTypes` は `runners.copilot`・`runners.claude` に分けた。従来の `cardTypes.<種類>.model`・`deny` はそのまま使える | tools/pms(`lib/agents.mjs`・`lib/run.mjs`・`lib/config.mjs`)/ procedure(`cards/agents.yaml`)/ config |
+| 36.12 | `pms run` の進み具合で、Claude Code の `stream-json` の行(`message.content[].input.command`)から道具の呼び出しを取れるように、JSON をたどる深さを4から6にした | tools/pms(`lib/progress.mjs`) |
+| 36.13 | 00 ■進行役と記録の道具(`pms run` と実行形態の表)・`stages.md` §10(B2 の説明と B1 を選んでよい場面)・`tools/pms/README.md` 7・10・13章・利用説明書に Claude Code の CLI を足した。テストに `--runner` ごとのモデル・使用禁止の選び方と、Claude Code の出力の行のキーワードを足した | 00 / stages / tools/pms / docs |
+
+### 変更していないもの
+
+- 手順の中身(カード・提出の検査・記録・保護ブロック・`pipeline.dot`)は変更していない。変わったのは配備先・生成の仕組み・`pms run` が起こす CLI の選択肢だけである。stages.md §10 は、B2 で使える CLI の列挙に Claude Code を足しただけである
+- `default_runner` の既定は `copilot` のまま
+- Claude Code の CLI のフラグ・`disallowedTools` のパターンの書き方・`Agent(<名前>, …)` による呼べるサブエージェントの絞り込みは、公式のドキュメントに沿って書いたが、実物では動かしていない(`tools/pms/README.md` 13章・14.3)
+
 ## 35. 2026-10-09 改訂(`pms db` のパスワードの渡し方)— 手順版 proc-v025
 
 **人間の指示による改訂である。** proc-v024 を取り込んだ発生環境で `node tools/pms/pms.mjs db --check` が `"ok": false` になった。発生環境の AI の調べでは、原因は sqlcmd の `-X` とパスワードの渡し方の食い違いだった。`lib/db.mjs` はパスワードを環境変数 `SQLCMDPASSWORD` で渡していたが、同時に付けていた `-X` が環境変数の読み込みを止める。標準入力と `-X1` の組み合わせではログインできた。人間の指示は、この調べを踏まえて直すこと。

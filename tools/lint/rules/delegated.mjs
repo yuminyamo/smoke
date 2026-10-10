@@ -67,6 +67,7 @@ export function prohibition_recheck(repo) {
 const MARKER_SCRIPTS = [
   '.github/skills/restore-golden-image/scripts/Test-EnvRestoreMarker.ps1',
   '.kiro/skills/restore-golden-image/scripts/Test-EnvRestoreMarker.ps1',
+  '.claude/skills/restore-golden-image/scripts/Test-EnvRestoreMarker.ps1',
 ];
 
 function findPowerShell() {

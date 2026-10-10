@@ -6,17 +6,21 @@
 export const RUNNER_AGENT = 'pms-runner';
 
 /**
- * カードの種類のエージェント・モデル・追加の使用禁止。エージェントとモデルは config の cardTypes が procedure/cards/agents.yaml より優先。
- * 使用禁止のパターンは CLI ごとに書き方が違うため、config(runner.<名前>.deny と cardTypes.<種類>.deny)にだけ書く
+ * カードの種類のエージェント・モデル・追加の使用禁止。runner は pms run の CLI の名前(copilot / kiro / claude など。B1 では省く)。
+ * モデルと使用禁止は CLI ごとに書き方が違うため、CLI ごとの値を先に見る:
+ *   モデル: config の cardTypes.<種類>.runners.<CLI>.model → agents.yaml の kinds.<種類>.<CLI>_model(kiro_model・claude_model)
+ *          → config の cardTypes.<種類>.model → agents.yaml の kinds.<種類>.model(Copilot のモデルの候補)
+ *   使用禁止: cardTypes.<種類>.runners.<CLI>.deny → cardTypes.<種類>.deny(使用禁止のパターンは config にだけ書く)
  */
-export function cardType(ctx, kind) {
+export function cardType(ctx, kind, runner = null) {
   const a = ctx.proc.agents?.kinds?.[kind] ?? {};
   const c = ctx.cfg.cardTypes?.[kind] ?? {};
-  const models = c.model ?? a.model ?? [];
+  const r = (runner && c.runners?.[runner]) || {};
+  const models = r.model ?? (runner ? a[`${runner}_model`] : undefined) ?? c.model ?? a.model ?? [];
   return {
-    agent: c.agent ?? agentName(kind),
+    agent: r.agent ?? c.agent ?? agentName(kind),
     model: (Array.isArray(models) ? models : [models]).filter(Boolean)[0] ?? '',
-    deny: c.deny ?? [],
+    deny: r.deny ?? c.deny ?? [],
   };
 }
 

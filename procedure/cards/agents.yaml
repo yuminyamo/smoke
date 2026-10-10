@@ -3,22 +3,28 @@
 # tools/build-skills/build-skills.mjs が、ここから次を生成する(生成物を直接編集しない。lint skills_in_sync):
 #   .github/agents/pms-card-<種類>.agent.md   GitHub Copilot(Copilot CLI の --agent・VS Code のカスタムエージェント)
 #   .kiro/agents/pms-card-<種類>.json         Kiro(Kiro CLI の --agent)
+#   .claude/agents/pms-card-<種類>.md         Claude Code(サブエージェント)
 # <種類> は vocab.pms_card_kind の値の「.」と「_」を「-」にしたもの(例 setup.build → pms-card-setup-build)。
 # kinds のキーは vocab.pms_card_kind と過不足なく一致させる(生成スクリプトが照合する)。
 #
 # エージェントの本文はどの種類も同じ短い指示(instruction)にする。カードごとの指示・規則はカードの本文にある。
 # model は候補を優先順に並べる(Copilot のエージェントの定義には先頭の1つを書く。pms run は config/pms.json の
 # cardTypes.<種類>.model があればそちらを使う)。Kiro はモデルの名前が違うため kiro_model に書く(なければ書かない)。
-# 使用禁止(Kiro のエージェントの permissions に書く。Copilot は config/pms.json の runner.copilot.deny で CLI に渡す):
+# Claude Code も同じく claude_model に書く(Claude Code のモデルの別名 sonnet・haiku・opus か、モデルID)。エージェントの定義の model と、
+# pms run --runner claude の {model} の両方に使う(pms run は config/pms.json の cardTypes.<種類>.runners.claude.model があればそちらを使う)。
+# 使用禁止(Kiro のエージェントの permissions、Claude Code のエージェントの disallowedTools に書く。Copilot は config/pms.json の runner.copilot.deny で CLI に渡す):
 #   deny_shell: すべての種類に共通のシェルのパターン / deny_write: 書き込みを禁止するパス
 #   kinds.<種類>.deny_shell_extra: その種類だけに足すパターン
 #
 # 入口のエージェント(runner。IDE 内のループ B1。00 ■進行役と記録の道具)も、ここから生成する:
 #   .github/agents/pms-runner.agent.md   VS Code + Copilot のチャットで選ぶエージェント。呼べるサブエージェントは agents に並べた pms-card-* だけ
 #   .kiro/agents/pms-runner.json         Kiro IDE。呼べるサブエージェントは toolsSettings.subagent.availableAgents の pms-card-* だけ
+#   .claude/agents/pms-runner.md         Claude Code。サブエージェントはサブエージェントを呼べないため、メインのエージェントとして起動する
+#                                        (claude --agent pms-runner)。呼べるサブエージェントは tools の Agent(pms-card-…) に並べたものだけ
 # 本文(runner.instruction)は、どのモデルでも守れる短さにする。カードの種類とサブエージェントの対応は pms next の出力(agent・prompt)にあり、
 # 入口は対応表を覚えない。自分で使う道具は、端末で pms next・pms status を実行することと、サブエージェントを呼ぶことだけ
-# (Copilot は tools_copilot、Kiro は kiro_tools と allow_shell。VS Code の tools はコマンドごとには絞れない)。
+# (Copilot は tools_copilot、Kiro は kiro_tools と allow_shell、Claude Code は tools_claude。VS Code・Claude Code の tools はコマンドごとには絞れない)。
+# tools_claude の Agent は、生成時に Agent(<カードのエージェントの名前>, …) に広げる。
 
 instruction: |
   あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
@@ -30,12 +36,14 @@ instruction: |
   5. カードの外の作業をしない(次のカードを取りに行かない・記録や台帳・手順書を直接書き換えない)。カードの範囲で判断できないときは、出力の result を cannot_proceed にして理由を書き、提出する
 
 tools_copilot: [read, edit, search, execute]
+tools_claude: [Read, Edit, Write, Grep, Glob, Bash]
 
 runner:
   name: pms-runner
   description: "PMS 回帰テスト作成の作業10のカード(前提状態の準備・探索)を、チャットの中で1枚ずつサブエージェントに行わせる(IDE 内のループ)。「F-003 を進めて」と伝える"
   model: [gpt-6-luna]
   tools_copilot: [execute, agent]
+  tools_claude: [Bash, Agent]
   kiro_tools: [shell, subagent]
   allow_shell:
     - "node tools/pms/pms.mjs next *"
@@ -64,28 +72,37 @@ deny_write:
   - ".github/agents/**"
   - ".kiro/skills/**"
   - ".kiro/agents/**"
+  - ".claude/skills/**"
+  - ".claude/agents/**"
 
 kinds:
   setup.build:
     description: "作業10フェーズA: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめて提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet
     deny_shell_extra: ["npx *"]
   setup.code:
     description: "作業10フェーズA: 合格した操作列をシナリオ部品と fixture のコードにし、2回実行して提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet
   setup.reuse:
     description: "作業10フェーズA: 過去のフローの fixture を1回実行し、状態が成立するかを提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet
   explore.step:
     description: "作業10パートC: シナリオの1ステップを pms act で探索し、期待結果を満たすかを判定して提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet
     deny_shell_extra: ["npx *"]
   explore.close:
     description: "作業10パートC: シナリオ末尾の DB不変条件を検査し、確立した操作の反映先を決めて提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet
   explore.session_close:
     description: "作業10パートC: 探索セッションの終わりに DB不変条件の全体検査を1回行って提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet
   report.findings:
     description: "作業10: pms が記録から作った報告書の下書きを読み、所見の欄だけを書いて提出する"
     model: [gpt-6-luna]
+    claude_model: sonnet

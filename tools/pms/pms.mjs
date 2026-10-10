@@ -24,7 +24,7 @@
 //                                   カードを付ければ記録(db-log.jsonl)に1行書く。--check は接続先の確認だけをする(作業10の工程0)
 //   node tools/pms/pms.mjs submit --flow F-003 --card C-0001 [--file work/_flows/F-003/out/C-0001.json]
 //                                   AI の出力を検査し、合格なら記録(setup-log・探索記録・台帳)を書く
-//   node tools/pms/pms.mjs run    --flow F-003 [--phase A|C|all] [--runner copilot|kiro] [--max-cards N] [--dry-run]
+//   node tools/pms/pms.mjs run    --flow F-003 [--phase A|C|all] [--runner copilot|kiro|claude] [--max-cards N] [--dry-run]
 //                                   カードを1枚ずつ新しいAIのセッション(config/pms.json の runner)で行わせ、提出を確かめて次へ進む。
 //                                   全部終われば報告書と status.yaml を作り、lint を実行する(実行形態 B2)。
 //                                   セッションの進み具合(道具・pms のコマンドのキーワード、動きのない時間)を標準エラー出力に出す

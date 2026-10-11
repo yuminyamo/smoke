@@ -4,7 +4,7 @@
 
 ## やること(1つだけ)
 
-シナリオ **{{scenario_id}}** の探索が終わった。**シナリオ末尾の DB不変条件を検査し、探索で確立した操作の反映先を決めて反映する。** シナリオの判定は pms がステップの判定から決める(ここでは書かない)。
+シナリオ **{{scenario_id}}** の探索が終わった。**シナリオ末尾の DB不変条件を検査し(`vocab.invariant` に定義があるときだけ)、探索で確立した操作の反映先を決めて反映する。** シナリオの判定は pms がステップの判定から決める(ここでは書かない)。
 
 ## 入力
 
@@ -17,7 +17,7 @@
 - DB不変条件の注記: {{invariant_note}}
 - DB の接続: {{db_connection}}
 
-DB不変条件(`vocab.invariant`):
+DB不変条件(`vocab.invariant`。次の一覧が空なら定義対象なし。SQL を起草・実行せず、`invariants` は `{}` にする):
 
 {{vocab:invariant}}
 
@@ -58,7 +58,7 @@ DB不変条件の違反の扱い(`00_common.md` の保護ブロック):
 ```json
 {
   "result": "closed | cannot_proceed",
-  "invariants": { "INV-001": "pass | fail | 未実施(<理由>)", "…": "…" },
+  "invariants": { "<vocab.invariant のキー>": "pass | fail | 未実施(<理由>)" },
   "violations": [],
   "reflections": [{ "operation": "<確立した操作>", "target": "<反映先の区分>", "path": "<反映したファイル> | null" }],
   "manual_gap": false,
@@ -75,7 +75,7 @@ DB不変条件の違反の扱い(`00_common.md` の保護ブロック):
 ```json
 {
   "result": "closed",
-  "invariants": { "INV-001": "未実施(課金スキーマ未確認)", "INV-002": "未実施(課金スキーマ未確認)", "INV-003": "pass", "INV-004": "pass", "INV-005": "pass" },
+  "invariants": {},
   "violations": [],
   "reflections": [
     { "operation": "印刷ジョブ一覧の検索", "target": "page", "path": "tests/pages/JobListPage.ts" },

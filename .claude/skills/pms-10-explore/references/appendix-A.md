@@ -52,7 +52,7 @@ scenarios:
         assertion_hint: |
           waitUntil で PrintJob.Status = 'Completed' を待機。画面はジョブ一覧の状態列で確認
         evidence: [evidence/SC-PRT-01-S3_01.png]
-    invariants: { INV-001: pass, INV-002: 未実施(スキーマ未確認), INV-003: pass, INV-004: pass, INV-005: pass }
+    invariants: {}             # vocab.invariant の全キーに pass / fail / 未実施(理由)。定義がなければ {}
     discrepancies: [DISC-PRT-001]
     manual_gap: false           # マニュアルに操作手順の記載がなかったら true
 

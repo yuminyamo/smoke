@@ -5,7 +5,7 @@
   "required": ["result", "invariants", "violations", "reflections", "manual_gap", "handoffs", "procedure_signals", "notes"],
   "properties": {
     "result": { "enum": ["closed", "cannot_proceed"], "description": "closed = 終わりの処理をした / cannot_proceed = カードの範囲で判断できない(理由を notes に)" },
-    "invariants": { "type": "object", "description": "シナリオ末尾の DB不変条件の結果。vocab.invariant の全キーに pass / fail / 未実施(理由)" },
+    "invariants": { "type": "object", "description": "シナリオ末尾の DB不変条件の結果。vocab.invariant の全キーに pass / fail / 未実施(理由)。定義がなければ {}" },
     "violations": {
       "type": "array", "description": "違反(fail にした INV の内容。なければ [])",
       "items": { "type": "object", "additionalProperties": false, "required": ["inv", "detail"], "properties": {

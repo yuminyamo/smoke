@@ -4,7 +4,7 @@
 
 ## やること(1つだけ)
 
-このラウンドの全シナリオの探索が終わった。**DB 全体の不変条件の検査を1回行う。**
+このラウンドの全シナリオの探索が終わった。**DB 全体の不変条件の検査を1回行う。**(このカードは `vocab.invariant` に定義があるときだけ作られる)
 
 ## 入力
 
@@ -37,7 +37,7 @@ DB不変条件(`vocab.invariant`):
 ```json
 {
   "result": "checked | cannot_proceed",
-  "invariants": { "INV-001": "pass | fail | 未実施(<理由>)", "…": "…" },
+  "invariants": { "<vocab.invariant のキー>": "pass | fail | 未実施(<理由>)" },
   "violations": [],
   "notes": null
 }
@@ -45,13 +45,13 @@ DB不変条件(`vocab.invariant`):
 
 {{schema}}
 
-## 合格した記入例
+## 記入例(違反があったとき。INV のID・内容は説明のための仮のもの)
 
 ```json
 {
   "result": "checked",
-  "invariants": { "INV-001": "未実施(課金スキーマ未確認)", "INV-002": "未実施(課金スキーマ未確認)", "INV-003": "pass", "INV-004": "fail", "INV-005": "pass" },
-  "violations": [{ "inv": "INV-004", "detail": "BillingDetail に Amount = -120 の行が1件(BillingId 553。本フローのデータではない)" }],
+  "invariants": { "INV-901": "pass", "INV-902": "fail" },
+  "violations": [{ "inv": "INV-902", "detail": "BillingDetail に Amount = -120 の行が1件(BillingId 553。本フローのデータではない)" }],
   "notes": null
 }
 ```

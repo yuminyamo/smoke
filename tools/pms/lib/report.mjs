@@ -215,8 +215,10 @@ function reportText(ctx, q, d, s, { draft }) {
   L.push('## 固有2. DB不変条件の結果', '');
   if (s._violations.length) L.push('**違反があります(最優先)。** 人間の判断へ回す(INV_NO_RETRY)。', '', table(['INV', '内容'], s._violations.map((v) => [v.inv, v.detail])), '');
   const invKeys = Object.keys(ctx.proc.vocab.invariant ?? {});
-  L.push(table(['シナリオID', ...invKeys], d.latest.map((sc) => [sc.id, ...invKeys.map((k) => sc.invariants?.[k] ?? '未記録')])), '');
-  L.push(`全体検査: ${s._session.length ? Object.entries(s._session.at(-1).output?.invariants ?? {}).map(([k, v]) => `${k} ${v}`).join(' / ') : '未実施(カードが終わっていない)'}`, '');
+  if (invKeys.length) {
+    L.push(table(['シナリオID', ...invKeys], d.latest.map((sc) => [sc.id, ...invKeys.map((k) => sc.invariants?.[k] ?? '未記録')])), '');
+    L.push(`全体検査: ${s._session.length ? Object.entries(s._session.at(-1).output?.invariants ?? {}).map(([k, v]) => `${k} ${v}`).join(' / ') : '未実施(カードが終わっていない)'}`, '');
+  } else L.push('定義対象なし(`vocab.invariant` が空のため、シナリオ末尾の検査も全体検査も行っていない)', '');
   // 固有3
   L.push('## 固有3. 判定一覧表', '');
   L.push(table(['シナリオID', 'ステップID', '判定', '検証手段', '健全性シグナル', 'DISC', '証跡'], st.map(({ sc, s: x }) => [sc.id, x.step_id, x.verdict, x.verification ?? '',

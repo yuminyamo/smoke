@@ -2,12 +2,12 @@
 name: pms-10-explore
 description: "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、進行役 pms のカード(pms run がカードごとにAIのセッションを、チャットではエージェント pms-runner がカードごとにサブエージェントを起こす)で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。"
 metadata:
-  procedure_version: proc-v029
+  procedure_version: proc-v030
   generated_from: "procedure/stages.md §10"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v029 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v030 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業10 シナリオ生成と探索(手順版 proc-v029)
+# 作業10 シナリオ生成と探索(手順版 proc-v030)
 
 この skill は、手順書の正本の `stages.md` §10 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -43,7 +43,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v029` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v030` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -306,7 +306,7 @@ metadata:
 
 **探索のキューの作り方**(pms がカードにする。AIは選ばない)
 
-- シナリオごとに、scenarios.md のステップの表の行ごとに `explore.step` を1枚(順序の列の順)、そのシナリオの最後に `explore.close` を1枚作る。対象シナリオのあとに `explore.session_close` を1枚、最後に `report.findings` を1枚作る
+- シナリオごとに、scenarios.md のステップの表の行ごとに `explore.step` を1枚(順序の列の順)、そのシナリオの最後に `explore.close` を1枚作る。対象シナリオのあとに `explore.session_close` を1枚(`vocab.invariant` に定義があるときだけ)、最後に `report.findings` を1枚作る
 - **フェーズAのカードを先に出し、パートCのカードはそのあとに出す**(前提状態を整備してから探索する)。カードは作った順に1枚ずつ出す
 - シナリオの最初のステップのカードを出す前に、pms が setup-log で前提状態を確かめる。`blocked` の状態があれば、全ステップを `blocked` と記録し(最初のステップの `blocked_by` は setup-log の理由と参照、`resume_from` は最初のステップ)、そのシナリオのカードをAIに出さない(`skipped`)。整備の記録がない状態(フェーズAのカードが人間の確認待ち)があれば、そのシナリオのステップを STOP にする
 - ステップを `blocked` で提出したら、同じシナリオの後続のステップは pms が `{ reason: 前ステップが blocked }` と記録し、AIに出さない
@@ -354,19 +354,19 @@ metadata:
 
 シナリオの終わり(`explore.close`)
 
-- **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く
+- **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く。`vocab.invariant` に定義がなければ検査しない(`invariants` は `{}`。R-INV-4)
 - **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(該当画面・T05・`kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
 - **[R-EXP-18]** マニュアルに、このシナリオの操作手順の記載がなかったら `manual_gap` を true にする
 
 探索セッションの終わり(`explore.session_close`)
 
-- **[R-EXP-19]** 全シナリオのあとに、DB 全体の不変条件の検査を1回行う(00 ■DB不変条件 の全体検査)。違反は `violations` に書く。pms が `context.invariant_violation=found` として人間の判断へ回す
+- **[R-EXP-19]** 全シナリオのあとに、DB 全体の不変条件の検査を1回行う(00 ■DB不変条件 の全体検査)。違反は `violations` に書く。pms が `context.invariant_violation=found` として人間の判断へ回す。`vocab.invariant` に定義がなければ、pms はこのカードを作らない
 
 報告の所見(`report.findings`)
 
 - **[R-RPT-1]** 書くのは所見の欄だけである。数値・一覧は pms が記録から作った下書きのとおりであり、出力に数値を書き直さない。下書きと記録が食い違うと思ったら `open_questions` に書く
 - **[R-RPT-2]** 判断に迷った点・仕様の矛盾・前段の成果物への疑義は、書き換えずに `open_questions` に列挙する。確信のない断定をしない
-- **[R-RPT-3]** 優先レビュー推奨は上位5件程度とし、それぞれ理由を1文で書く。DB不変条件の SQL を実行したなら、それを必ず挙げる(誤った INV は偽の失敗を全シナリオに撒くため)
+- **[R-RPT-3]** 優先レビュー推奨は上位5件程度とし、それぞれ理由を1文で書く。DB不変条件の SQL を実行したなら、それを必ず挙げる(誤った INV は偽の失敗を全シナリオに撒くため)。実行していなければ挙げない
 - **[R-RPT-4]** 禁止操作リストへの追記提案は、包括原則でエスカレーションした操作のうち、恒久的に禁止・許可のいずれかに定めるべきものだけを書く(リストは人間が書く)
 - **[R-RPT-5]** 調査が大規模で KB が足りないと判断したら `knowledge_gap.needed` を true に、非決定値カタログの未登録値が多く作業02の増分実施を勧めるなら `nd_increment.needed` を true にし、理由を1文で書く
 

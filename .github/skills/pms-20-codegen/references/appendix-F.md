@@ -63,18 +63,18 @@ await waitUntil(() => jobIsCompleted(jobId), { timeout: 180_000 });
 
 ## DB不変条件
 
-00の2段構え設計に従って実装する。
+00の2段構え設計に従って実装する。**`vocab.invariant` に定義がなければ実装しない**(`afterEach`・`globalTeardown` の検査も `tests/helpers/invariants.ts` も作らない。報告書の「DB不変条件の実装状況」は「定義対象なし」)。次の例の `INV-xxx` は、定義があるときの書き方である。
 
 ```typescript
 // シナリオ末尾: 自シナリオのデータにスコープした検査
 test.afterEach(async ({}, testInfo) => {
   await waitForBillingQuiescence(ctx.jobIds);          // 非同期書き込みの完了を待つ
-  await assertInvariantsScoped(ctx, ['INV-001', 'INV-002', 'INV-003', 'INV-004', 'INV-005']);
+  await assertInvariantsScoped(ctx, ['INV-xxx']);  // vocab.invariant の全キー
 });
 
 // globalTeardown: スイート終端でDB全体を1回検査
 export default async function globalTeardown() {
-  await assertInvariantsGlobal(['INV-001', 'INV-002', 'INV-003', 'INV-004', 'INV-005']);
+  await assertInvariantsGlobal(['INV-xxx']);
 }
 ```
 

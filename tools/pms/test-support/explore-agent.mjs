@@ -19,15 +19,16 @@ export const OUT = {
       ext_demand: { operation: '機器パネルでペアリングを承認', target: 'シミュレータ', gap: 'skillなし', alternative: '不明', prohibition: '該当なし' } },
   }),
   'setup.reuse': () => ({ result: 'reused', runs: [{ command: 'npx playwright test tests/specs/auth.spec.ts --workers=1', exit_code: 0, started_at: process.env.PMS_NOW, ended_at: process.env.PMS_NOW }], notes: null }),
-  'explore.close': () => ({
+  // inv: カードに載った vocab.invariant のキー(定義がなければ [])。すべて pass にする
+  'explore.close': (inv = []) => ({
     result: 'closed',
-    invariants: { 'INV-001': '未実施(課金スキーマ未確認)', 'INV-002': '未実施(課金スキーマ未確認)', 'INV-003': 'pass', 'INV-004': 'pass', 'INV-005': 'pass' },
+    invariants: Object.fromEntries(inv.map((k) => [k, 'pass'])),
     violations: [], reflections: [{ operation: 'ログアウトのリンクの見つけ方', target: 'kb', path: 'kb/00_索引.md' }],
     manual_gap: false, handoffs: [], procedure_signals: [], notes: null,
   }),
-  'explore.session_close': () => ({
+  'explore.session_close': (inv = []) => ({
     result: 'checked',
-    invariants: { 'INV-001': '未実施(課金スキーマ未確認)', 'INV-002': '未実施(課金スキーマ未確認)', 'INV-003': 'pass', 'INV-004': 'pass', 'INV-005': 'pass' },
+    invariants: Object.fromEntries(inv.map((k) => [k, 'pass'])),
     violations: [], notes: null,
   }),
   'report.findings': () => ({
@@ -35,7 +36,7 @@ export const OUT = {
     headline: 'SC-PRT-01-S2 でジョブがエラーになる健全性シグナルが出た(作業15で問い合わせる)',
     inputs_note: null,
     open_questions: ['SC-PRT-01-S3 の機器での印刷に使える skill がないため、完了状態の確認ができていない'],
-    priority_review: [{ item: 'explore.close の INV-003〜005 の SQL', reason: '誤った INV は偽の失敗を全シナリオに撒くため' }],
+    priority_review: [{ item: 'SC-PRT-01-S1 の DB の確認の SELECT', reason: '作業20のアサーションの根拠になるため' }],
     prohibition_proposals: [],
     knowledge_gap: { needed: false, reason: null },
     nd_increment: { needed: true, reason: '未登録の非決定値(ジョブID)があるため' },
@@ -104,7 +105,7 @@ export default async function agent({ root, flow, card, kind, body, pms }) {
     const id = body.match(/ステップ \*\*(SC-[A-Za-z0-9]+-\d+-S\d+)\*\*/)[1];
     out = step(id, actf);
   } else {
-    out = OUT[kind]();
+    out = OUT[kind]([...body.matchAll(/^- `(INV-\d{3})`/gm)].map((m) => m[1]));
   }
   const file = path.join(root, 'work/_flows', flow, 'out', `${card}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });

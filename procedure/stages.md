@@ -2,7 +2,7 @@
 
 本書は**各作業に固有な内容だけ**を持つ。原則・規約は `00_common.md`、統制語彙は `vocab.yaml`、実行順序と分岐は `pipeline.dot` を参照する。**それらの再掲を本書に書かない。**
 
-改訂: 2026-10-11 / 版: v20(db.auth の既定を sql に: §20 の DB へのログインで、未登録の db.auth を SQL Server 認証として扱う。人間の指示による改訂。前版 v19 は 2026-10-08 のDB への接続を `pms db` に集約: 作業01・02・15の DB の観測と作業10のカードの DB の確認を `pms db` で行うことと、作業10の工程0で DB への接続を確かめること(`pms db --check`)を書いた。付録F にテストコードの DB のログインの方式(`db.auth`)を書いた。前版 v18 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
+改訂: 2026-10-11 / 版: v21(DB不変条件の定義を撤回: §10 の R-EXP-16・R-EXP-19・R-RPT-3、§20 の報告書の DB不変条件の実装状況、付録F の DB不変条件に、定義がないときは検査しない・実装しないことを書いた。付録A・付録E の記入例から INV-001〜005 を外した。人間の指示による改訂。前版 v20 は同日の db.auth の既定を sql に)
 
 ---
 
@@ -609,7 +609,7 @@ context_updates:
 
 **探索のキューの作り方**(pms がカードにする。AIは選ばない)
 
-- シナリオごとに、scenarios.md のステップの表の行ごとに `explore.step` を1枚(順序の列の順)、そのシナリオの最後に `explore.close` を1枚作る。対象シナリオのあとに `explore.session_close` を1枚、最後に `report.findings` を1枚作る
+- シナリオごとに、scenarios.md のステップの表の行ごとに `explore.step` を1枚(順序の列の順)、そのシナリオの最後に `explore.close` を1枚作る。対象シナリオのあとに `explore.session_close` を1枚(`vocab.invariant` に定義があるときだけ)、最後に `report.findings` を1枚作る
 - **フェーズAのカードを先に出し、パートCのカードはそのあとに出す**(前提状態を整備してから探索する)。カードは作った順に1枚ずつ出す
 - シナリオの最初のステップのカードを出す前に、pms が setup-log で前提状態を確かめる。`blocked` の状態があれば、全ステップを `blocked` と記録し(最初のステップの `blocked_by` は setup-log の理由と参照、`resume_from` は最初のステップ)、そのシナリオのカードをAIに出さない(`skipped`)。整備の記録がない状態(フェーズAのカードが人間の確認待ち)があれば、そのシナリオのステップを STOP にする
 - ステップを `blocked` で提出したら、同じシナリオの後続のステップは pms が `{ reason: 前ステップが blocked }` と記録し、AIに出さない
@@ -657,19 +657,19 @@ context_updates:
 
 シナリオの終わり(`explore.close`)
 
-- **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く
+- **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く。`vocab.invariant` に定義がなければ検査しない(`invariants` は `{}`。R-INV-4)
 - **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(該当画面・T05・`kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
 - **[R-EXP-18]** マニュアルに、このシナリオの操作手順の記載がなかったら `manual_gap` を true にする
 
 探索セッションの終わり(`explore.session_close`)
 
-- **[R-EXP-19]** 全シナリオのあとに、DB 全体の不変条件の検査を1回行う(00 ■DB不変条件 の全体検査)。違反は `violations` に書く。pms が `context.invariant_violation=found` として人間の判断へ回す
+- **[R-EXP-19]** 全シナリオのあとに、DB 全体の不変条件の検査を1回行う(00 ■DB不変条件 の全体検査)。違反は `violations` に書く。pms が `context.invariant_violation=found` として人間の判断へ回す。`vocab.invariant` に定義がなければ、pms はこのカードを作らない
 
 報告の所見(`report.findings`)
 
 - **[R-RPT-1]** 書くのは所見の欄だけである。数値・一覧は pms が記録から作った下書きのとおりであり、出力に数値を書き直さない。下書きと記録が食い違うと思ったら `open_questions` に書く
 - **[R-RPT-2]** 判断に迷った点・仕様の矛盾・前段の成果物への疑義は、書き換えずに `open_questions` に列挙する。確信のない断定をしない
-- **[R-RPT-3]** 優先レビュー推奨は上位5件程度とし、それぞれ理由を1文で書く。DB不変条件の SQL を実行したなら、それを必ず挙げる(誤った INV は偽の失敗を全シナリオに撒くため)
+- **[R-RPT-3]** 優先レビュー推奨は上位5件程度とし、それぞれ理由を1文で書く。DB不変条件の SQL を実行したなら、それを必ず挙げる(誤った INV は偽の失敗を全シナリオに撒くため)。実行していなければ挙げない
 - **[R-RPT-4]** 禁止操作リストへの追記提案は、包括原則でエスカレーションした操作のうち、恒久的に禁止・許可のいずれかに定めるべきものだけを書く(リストは人間が書く)
 - **[R-RPT-5]** 調査が大規模で KB が足りないと判断したら `knowledge_gap.needed` を true に、非決定値カタログの未登録値が多く作業02の増分実施を勧めるなら `nd_increment.needed` を true にし、理由を1文で書く
 
@@ -1382,7 +1382,7 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 2. **実行結果**: 工程0の復元のあとの最初の実行(`clean_run`)と最終の結果の、green / red / flaky の件数。前提状態の欠落で red になったシナリオ
 3. **実行時間**: 全体、および外部操作あり/なしの内訳。最も時間のかかったテスト上位5件
 4. **flaky テスト一覧**: テストID、症状、推定原因、提案する対処(非決定値カタログの見直し / 待機値の見直し / データ分離)
-5. **DB不変条件の実装状況**: 適用した条件と、実行時に違反が出たテスト
+5. **DB不変条件の実装状況**: 適用した条件と、実行時に違反が出たテスト(`vocab.invariant` に定義がなければ「定義対象なし」)
 6. **逸脱一覧**: 作業10の記録に無い操作を追加した箇所と理由
 7. **コード化不能・要差し戻し**: `assertion_hint` 不足、前提状態の欠落(requires の fixture がない、`clean_run` で前提の欠落が分かった)、データ分離不能、KB T05 未登録の操作、禁止操作への抵触などで実装できなかったシナリオ
 8. **FRAGILE・serial 化の残存箇所**
@@ -1915,7 +1915,7 @@ scenarios:
         assertion_hint: |
           waitUntil で PrintJob.Status = 'Completed' を待機。画面はジョブ一覧の状態列で確認
         evidence: [evidence/SC-PRT-01-S3_01.png]
-    invariants: { INV-001: pass, INV-002: 未実施(スキーマ未確認), INV-003: pass, INV-004: pass, INV-005: pass }
+    invariants: {}             # vocab.invariant の全キーに pass / fail / 未実施(理由)。定義がなければ {}
     discrepancies: [DISC-PRT-001]
     manual_gap: false           # マニュアルに操作手順の記載がなかったら true
 
@@ -2309,7 +2309,7 @@ skill の正本は skills の機構である。ここに書く skill名は、動
 ```markdown
 # GOT-0007: 保存ボタンのダブルクリックで二重登録
 - 事象: 料金表編集モーダルで保存を素早く2回押すと明細が2件登録される
-- 影響: INV-002(明細合計=総額)に影響しうる。シナリオ側はシングルクリックを厳守
+- 影響: 明細の合計と総額が食い違いうる。シナリオ側はシングルクリックを厳守
 - 出所: OBS / 2026-09-02
 - DISC: 起票済(DISC-012)※不具合かどうかは人間が判断
 ```
@@ -2415,18 +2415,18 @@ await waitUntil(() => jobIsCompleted(jobId), { timeout: 180_000 });
 
 ## DB不変条件
 
-00の2段構え設計に従って実装する。
+00の2段構え設計に従って実装する。**`vocab.invariant` に定義がなければ実装しない**(`afterEach`・`globalTeardown` の検査も `tests/helpers/invariants.ts` も作らない。報告書の「DB不変条件の実装状況」は「定義対象なし」)。次の例の `INV-xxx` は、定義があるときの書き方である。
 
 ```typescript
 // シナリオ末尾: 自シナリオのデータにスコープした検査
 test.afterEach(async ({}, testInfo) => {
   await waitForBillingQuiescence(ctx.jobIds);          // 非同期書き込みの完了を待つ
-  await assertInvariantsScoped(ctx, ['INV-001', 'INV-002', 'INV-003', 'INV-004', 'INV-005']);
+  await assertInvariantsScoped(ctx, ['INV-xxx']);  // vocab.invariant の全キー
 });
 
 // globalTeardown: スイート終端でDB全体を1回検査
 export default async function globalTeardown() {
-  await assertInvariantsGlobal(['INV-001', 'INV-002', 'INV-003', 'INV-004', 'INV-005']);
+  await assertInvariantsGlobal(['INV-xxx']);
 }
 ```
 

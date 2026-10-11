@@ -2,12 +2,12 @@
 name: pms-20-codegen
 description: "PMS回帰テスト作成の作業20(回帰テストコード生成)。通常は入口skill pms-regression から使う。作業10の探索記録と status.yaml から、実行時にAIを使わない Playwright の回帰テストを生成し、実行確認と突合表の更新を行う。"
 metadata:
-  procedure_version: proc-v029
+  procedure_version: proc-v030
   generated_from: "procedure/stages.md §20"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v029 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v030 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業20 回帰テストコード生成(手順版 proc-v029)
+# 作業20 回帰テストコード生成(手順版 proc-v030)
 
 この skill は、手順書の正本の `stages.md` §20 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -38,7 +38,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v029` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v030` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -268,7 +268,7 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 2. **実行結果**: 工程0の復元のあとの最初の実行(`clean_run`)と最終の結果の、green / red / flaky の件数。前提状態の欠落で red になったシナリオ
 3. **実行時間**: 全体、および外部操作あり/なしの内訳。最も時間のかかったテスト上位5件
 4. **flaky テスト一覧**: テストID、症状、推定原因、提案する対処(非決定値カタログの見直し / 待機値の見直し / データ分離)
-5. **DB不変条件の実装状況**: 適用した条件と、実行時に違反が出たテスト
+5. **DB不変条件の実装状況**: 適用した条件と、実行時に違反が出たテスト(`vocab.invariant` に定義がなければ「定義対象なし」)
 6. **逸脱一覧**: 作業10の記録に無い操作を追加した箇所と理由
 7. **コード化不能・要差し戻し**: `assertion_hint` 不足、前提状態の欠落(requires の fixture がない、`clean_run` で前提の欠落が分かった)、データ分離不能、KB T05 未登録の操作、禁止操作への抵触などで実装できなかったシナリオ
 8. **FRAGILE・serial 化の残存箇所**

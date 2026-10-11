@@ -39,10 +39,10 @@ const EXPECTED_CHANGE_RE = /(期待結果|判定基準)(を|は|の)?.{0,12}(変
 
 /**
  * パートCのカードを1ラウンド分作る: シナリオごとにステップの数の explore.step と explore.close、
- * 最後に explore.session_close と report.findings。
+ * 最後に explore.session_close(vocab.invariant に定義があるときだけ)と report.findings。
  */
 export function exploreCards(ctx, q, scenarios, context) {
-  const { store } = ctx;
+  const { store, proc } = ctx;
   const round = (q.rounds.at(-1)?.round ?? 0) + 1;
   const tag = { recheck_of: context.recheck_of ?? null, reexplore_of: context.reexplore_of ?? null };
   q.rounds.push({ round, created_at: timestamp(), scenarios: scenarios.map((s) => s.id), context, ...tag });
@@ -57,7 +57,7 @@ export function exploreCards(ctx, q, scenarios, context) {
     for (const row of sc.steps) add({ kind: 'explore.step', feature: sc.feature, scenario: sc.id, step_id: row.id, digest: row.digest });
     add({ kind: 'explore.close', feature: sc.feature, scenario: sc.id });
   }
-  add({ kind: 'explore.session_close', feature: scenarios[0]?.feature ?? null });
+  if (Object.keys(proc.vocab.invariant ?? {}).length) add({ kind: 'explore.session_close', feature: scenarios[0]?.feature ?? null });
   add({ kind: 'report.findings', feature: null });
   return added;
 }

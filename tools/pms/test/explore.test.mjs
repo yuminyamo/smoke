@@ -99,6 +99,15 @@ function repo(files = {}, opts = {}) {
   return root;
 }
 
+/** 一時リポジトリの vocab.invariant に定義を置く(実物の vocab は定義対象なし) */
+function defineInvariants(root) {
+  const f = path.join(root, 'procedure/vocab.yaml');
+  const text = fs.readFileSync(f, 'utf8');
+  const next = text.replace(/^invariant: \{\}.*$/m, 'invariant:\n  INV-901: 試験用の条件1\n  INV-902: 試験用の条件2');
+  assert.notEqual(next, text, 'vocab.yaml に invariant: {} がない');
+  fs.writeFileSync(f, next);
+}
+
 function build(root, phase = 'all') {
   const r = pms(root, ['queue', 'build', '--flow', 'F-003', '--phase', phase]);
   assert.equal(r.code, 0, r.stdout + r.stderr);
@@ -137,7 +146,7 @@ function explorationLog(root) {
 // queue build
 // ════════════════════════════════════════════════════════
 
-test('queue build --phase all: フェーズAのあとに、ステップごとの explore.step・シナリオごとの explore.close・session_close・report.findings を作る。stage10-context.json が要る', () => {
+test('queue build --phase all: フェーズAのあとに、ステップごとの explore.step・シナリオごとの explore.close・report.findings を作る(session_close は vocab.invariant に定義があるときだけ)。stage10-context.json が要る', () => {
   const root = repo();
   fs.rmSync(path.join(root, 'work/_flows/F-003/stage10-context.json'));
   const no = pms(root, ['queue', 'build', '--flow', 'F-003', '--phase', 'all']);
@@ -154,9 +163,13 @@ test('queue build --phase all: フェーズAのあとに、ステップごとの
     ['C-0006', 'explore.close', 'C', 'SC-PRT-01'],
     ['C-0007', 'explore.step', 'C', 'SC-PRT-02-S1'], ['C-0008', 'explore.step', 'C', 'SC-PRT-02-S2'],
     ['C-0009', 'explore.close', 'C', 'SC-PRT-02'],
-    ['C-0010', 'explore.session_close', 'C', null], ['C-0011', 'report.findings', 'C', null],
+    ['C-0010', 'report.findings', 'C', null],
   ]);
   assert.equal(q.rounds.length, 1);
+  const withInv = repo();
+  defineInvariants(withInv);
+  build(withInv);
+  assert.deepEqual(queue(withInv).cards.slice(-2).map((c) => c.kind), ['explore.session_close', 'report.findings']);
   assert.equal(q.cards[2].digest, '印刷を指示する\u0000ジョブが受け付けられる');
   // パートCのカードが残っている間は、次のラウンドを作れない
   assert.equal(pms(root, ['queue', 'build', '--flow', 'F-003', '--phase', 'C']).code, 2);
@@ -168,7 +181,7 @@ test('queue build: --phase A のあとに --phase C を足せる(段1のキュ�
   assert.deepEqual(queue(root).cards.map((c) => c.kind), ['setup.reuse', 'setup.build']);
   build(root, 'C');
   const q = queue(root);
-  assert.equal(q.cards.length, 11);
+  assert.equal(q.cards.length, 10);
   assert.equal(q.phase, 'A+C');
   // フェーズAのカードを先に出す
   assert.equal(pms(root, ['next', '--flow', 'F-003']).json.kind, 'setup.reuse');
@@ -184,7 +197,7 @@ test('explore: 合格した提出から pms が付録Aの探索記録・DISC・�
   const done = await doAll(root);
   assert.equal(done.json.state, 'done', JSON.stringify(done.json));
   const q = queue(root);
-  assert.deepEqual(q.cards.map((c) => c.status), ['passed', 'passed', 'passed', 'passed', 'passed', 'passed', 'skipped', 'skipped', 'skipped', 'passed', 'passed']);
+  assert.deepEqual(q.cards.map((c) => c.status), ['passed', 'passed', 'passed', 'passed', 'passed', 'passed', 'skipped', 'skipped', 'skipped', 'passed']);
 
   const doc = explorationLog(root);
   assert.equal(doc.environment, 'vm01');
@@ -193,7 +206,7 @@ test('explore: 合格した提出から pms が付録Aの探索記録・DISC・�
   assert.equal(s1.verdict, 'blocked');
   assert.match(s1.requires_setup, /S-ADMIN-LOGIN: fixtures\/auth\.ts#adminLogin\(既存流用\(F-001\)\)で成立を確認/);
   assert.deepEqual(s1.carried_data, { job_id: 'JOB-1' });
-  assert.equal(s1.invariants['INV-003'], 'pass');
+  assert.deepEqual(s1.invariants, {}); // vocab.invariant は定義対象なし
   assert.deepEqual(s1.discrepancies, ['DISC-PRT-001']);
   const [a, b, c] = s1.steps;
   // ステップ1: actions・時刻・証跡・act は pms act の記録から
@@ -222,7 +235,7 @@ test('explore: 合格した提出から pms が付録Aの探索記録・DISC・�
   assert.equal(s2.verdict, 'blocked');
   assert.deepEqual(s2.steps[0].blocked_by, { reason: '操作手段なし', handoff: 'HO-PRT-001', ext_demand: 'EXT-001', resume_from: 'SC-PRT-02-S1' });
   assert.deepEqual(s2.steps[1].blocked_by, { reason: '前ステップが blocked' });
-  assert.match(s2.invariants['INV-003'], /^未実施/);
+  assert.deepEqual(s2.invariants, {});
   // 台帳
   assert.match(read(root, 'work/_common/discrepancies.md'), /## DISC-PRT-001\n\n- \*\*種別\*\*: 実画面≠マニュアル\n- \*\*関連項目\*\*: SC-PRT-01-S1/);
   assert.match(read(root, 'work/_common/discrepancies.md'), /\*\*証跡\*\*: evidence\/SC-PRT-01-S1_5\.png/);
@@ -324,15 +337,16 @@ test('explore.step の検査: scenarios.md のステップの行を書き換え�
 
 test('explore.close・session_close の検査: INV の全キー、fail と violations の対応、反映先のファイル。report.findings は INV を優先レビューに求める', async () => {
   const root = repo();
+  defineInvariants(root);
   build(root);
   for (let i = 0; i < 5; i++) await doNext(root); // reuse・build・S1・S2・S3
   pms(root, ['next', '--flow', 'F-003']); // C-0006 close
   const cats = (out) => submitOut(root, 'C-0006', out).json.failures?.map((f) => f.category) ?? [];
-  const ok = OUT['explore.close']();
-  const { 'INV-005': _drop, ...partial } = ok.invariants;
+  const ok = OUT['explore.close'](['INV-901', 'INV-902']);
+  const { 'INV-902': _drop, ...partial } = ok.invariants;
   void _drop;
   assert.deepEqual(cats({ ...ok, invariants: partial }), ['schema']);
-  assert.deepEqual(cats({ ...ok, invariants: { ...ok.invariants, 'INV-004': 'fail' } }), ['red_flag']);
+  assert.deepEqual(cats({ ...ok, invariants: { ...ok.invariants, 'INV-901': 'fail' } }), ['red_flag']);
   assert.deepEqual(cats({ ...ok, reflections: [{ operation: 'ログアウトのリンク', target: 'page', path: 'tests/pages/NoSuch.ts' }] }), ['red_flag']);
 });
 
@@ -367,6 +381,7 @@ test('report: 記録から報告書の数値・一覧と status.yaml を作り�
   assert.deepEqual(cu.blocked_by_prohibition, []);
   assert.deepEqual(st.signals_recorded, ['SIG-0001']);
   const md = read(root, 'work/PRT/exploration/report.md');
+  assert.match(md, /## 固有2\. DB不変条件の結果\n\n定義対象なし/);
   for (const h of ['## 1. 要約', '## 2. サマリ', '## 3. 参照した', '## 4. 資産流用', '## 5. 申し送り', ...Array.from({ length: 11 }, (_, i) => `## 固有${i + 1}. `), '## 6. 未確認', '## 7. 優先レビュー', '## 8. 手順改善シグナル']) assert.ok(md.includes(h), h);
   assert.match(md, /最も重要な1件: SC-PRT-01-S2 でジョブがエラーになる健全性シグナル/);
   assert.match(md, /\| DISC-PRT-001 \| SC-PRT-01-S1 \| 実画面≠マニュアル \| ドキュメント不備疑い \|/);
@@ -428,7 +443,7 @@ test('run: カードを1枚ずつ新しいセッションで行わせ、報告�
   assert.equal(r.code, 0, r.stdout + r.stderr);
   assert.equal(r.json.state, 'done');
   assert.equal(r.json.lint.ok, true);
-  assert.equal(r.json.sessions.length, 8); // 11 枚のうち 3 枚は skipped
+  assert.equal(r.json.sessions.length, 7); // 10 枚のうち 3 枚は skipped
   assert.ok(r.json.sessions.every((s) => s.status === 'passed' && s.exit_code === 0));
   assert.ok(exists(root, 'work/PRT/exploration/status.yaml'));
   const out = read(root, 'work/_flows/F-003/runs/C-0003-1.jsonl');
@@ -637,7 +652,7 @@ test('パートP: 同じフローに新しいラウンドを足し、recheck_of 
   write(root, 'work/_flows/F-003/stage10-context.json', JSON.stringify(context(root, { recheck_of: 'sha256:old' })));
   const r = pms(root, ['queue', 'build', '--flow', 'F-003', '--phase', 'C', '--scenarios', 'SC-PRT-01']);
   assert.equal(r.code, 0, r.stdout);
-  assert.deepEqual(r.json.cards.map((c) => c.kind), ['explore.step', 'explore.step', 'explore.step', 'explore.close', 'explore.session_close', 'report.findings']);
+  assert.deepEqual(r.json.cards.map((c) => c.kind), ['explore.step', 'explore.step', 'explore.step', 'explore.close', 'report.findings']);
   await doAll(root);
   const scs = explorationLog(root).scenarios.filter((x) => x.id === 'SC-PRT-01');
   assert.equal(scs.length, 2);
@@ -702,7 +717,7 @@ test('B1: 入口のループでカードをサブエージェントに渡し、�
   const { last, lines } = await ideLoop(root, { drop: new Set(['C-0003']) });
   assert.equal(last.json.state, 'done', last.stdout);
   assert.equal(lines.filter((l) => l.startsWith('C-0003 ')).length, 2); // 提出せずに終わったカードを、次の next が出し直した
-  assert.equal(lines.length, 9); // 8 枚 + 出し直し 1 回(3 枚は skipped)
+  assert.equal(lines.length, 8); // 7 枚 + 出し直し 1 回(3 枚は skipped)
 
   // pms run と違い、ループは報告書を作らない。status が report_pending を示し、入口 skill が pms report を実行する
   let s = pms(root, ['status', '--flow', 'F-003', '--json']);

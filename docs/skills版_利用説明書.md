@@ -264,7 +264,26 @@ skills版/
    node tools/pms/pms.mjs db --check                  (接続先のサーバ名・DB名・ログイン名が出れば "ok":true)
    ```
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
-10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`)。`sqlcmd` で呼べないときは `db_cli` を直します
+10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で次のように行います
+   - **AI 実行PC: sqlcmd を入れる。** 端末で次を実行します(Go 版。`C:\Program Files\SqlCmd\sqlcmd.exe` に入ります。すでに入っていれば「利用可能なアップグレードが見つかりませんでした」と出ます)
+     ```
+     winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
+     ```
+     PATH の変更は**新しく開いた端末にしか効きません**。VS Code の中の端末や AI のチャットは VS Code ごと起動し直してから、`sqlcmd -?` で起動できることを確かめます。起動し直せないときは、`config/pms.json` の `db_cli` を `["C:\\Program Files\\SqlCmd\\sqlcmd.exe"]` にします
+   - **PMS サーバー: ファイアウォールで SQL Server のポートを開ける。** AI 実行PC で `Test-NetConnection <db.server> -Port 1433` を実行し、`TcpTestSucceeded : True` なら不要です。`False` なら、PMS サーバーの中で**管理者の PowerShell** を開き、SQL Server が待ち受けているポートを確かめてから受信の規則を足します
+     ```powershell
+     # SQL Server が待ち受けているポート(1433 が出なければ、SQL Server 構成マネージャーで TCP/IP を有効にするのが先)
+     Get-NetTCPConnection -State Listen | Where-Object { $_.OwningProcess -in (Get-Process sqlservr).Id } | Select-Object LocalAddress, LocalPort
+
+     # 既定インスタンス(1433/TCP)。-RemoteAddress は AI 実行PC の IP アドレスかそのサブネット
+     New-NetFirewallRule -DisplayName "SQL Server 1433 TCP (PMS test)" -Direction Inbound -Protocol TCP -LocalPort 1433 -RemoteAddress <AI 実行PCのIP> -Action Allow -Profile Any
+
+     # 名前付きインスタンスのときだけ: SQL Browser(1434/UDP)と、そのインスタンスのポート
+     New-NetFirewallRule -DisplayName "SQL Browser 1434 UDP (PMS test)" -Direction Inbound -Protocol UDP -LocalPort 1434 -RemoteAddress <AI 実行PCのIP> -Action Allow -Profile Any
+     ```
+     `netsh` で行う場合は `netsh advfirewall firewall add rule name="SQL Server 1433 TCP" dir=in action=allow protocol=TCP localport=1433 remoteip=<AI 実行PCのIP>` です。1433 以外のポートで待ち受けているときは、`db.server` を `<サーバー>,<ポート>` の形で保存します。**PMS サーバーがゴールデンイメージで戻す VM のときは、この規則をゴールデンイメージに入れます**(VM の中で足しただけでは、次の復元で消えます。ゴールデンイメージの取り直しは `remote/README.md` 3.1 の⑧)
+   - **ログインの方式を合わせる。** 既定の Windows 認証は、AI 実行PC が PMS サーバーと同じドメインにないと `The login is from an untrusted domain and cannot be used with Integrated authentication.` で失敗します。そのときは 9. の SQL Server 認証(`db.auth sql`・`db.user`・`db.password`)を保存します
+   - 最後に `node tools/pms/pms.mjs db --check` が `"ok":true` になることを確かめます(13. の「DB」と同じ)
 11. **AI の CLI を導入する**(proc-v018 以降。`pms run` が使う)。Copilot CLI(`copilot`)・Kiro CLI(`kiro-cli`)・Claude Code の CLI(`claude`)のどれかを導入して認証し、組織の設定で利用が許可されていることを管理者が確かめます(Copilot CLI はトークン `COPILOT_GITHUB_TOKEN` などでも認証できます。Kiro CLI の非対話の実行には `KIRO_API_KEY` が要ります。Claude Code は `claude` でログインするか `ANTHROPIC_API_KEY` を設定します)。使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。`config/pms.json` に、見本 `config/pms.sample.json` の `runner`・`default_runner`・`cardTypes` を写し、使うモデル(`cardTypes.<種類>.model`)と1枚の上限時間(`runner.<名前>.timeoutSec`)を決めます。呼び出しの雛形は公式のドキュメントで確かめたフラグで書いてありますが、実物では確かめていません。`node tools/pms/pms.mjs run --flow <フローID> --dry-run` で、起こすコマンドを実行せずに確かめられます(`tools/pms/README.md` 13章の「実物で確かめること」)。カードの種類ごとのエージェントは `.github/agents/`・`.kiro/agents/`・`.claude/agents/` に生成済みです。課金の数え方(AI credits か premium requests か)は組織の契約で確かめてください(カード1枚が1回の依頼になります)
 12. **チャットで進める準備をする**(proc-v019 以降。`pms-runner` を使う人がいるとき)。`.github/agents/pms-runner.agent.md`・`.kiro/agents/pms-runner.json`・`.claude/agents/pms-runner.md` と `pms-card-*` は生成済みなので、置くだけで使えます(直接編集しない)。管理者が次を確かめます
    - VS Code: チャットの Agent のドロップダウンに `pms-runner` が出るか。組織の設定でカスタムエージェントとサブエージェントが許可されているか

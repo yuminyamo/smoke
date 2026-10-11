@@ -346,6 +346,19 @@ Test-Path 'C:\PMS\tools\LogCollector.exe'     # True なら OK
 
 - **置き換え**: パス → `remote/targets/pms-vm/config.psd1` の `LogCollect.ExePath` の値。ゴールデンイメージに含まれていれば追加の作業はありません
 
+**⑤-9 ファイアウォールで SQL Server のポートを開ける(必要なときだけ)**
+
+窓口(PmsRemote)には要りませんが、DB の確認(`pms db`)と回帰テストが AI 実行環境から PMS の DB に接続するために要ります。同じくゴールデンイメージに入れる前提なので、⑤のついでに行います。
+
+**選ぶ**: AI 実行環境で `Test-NetConnection 192.168.100.10 -Port 1433` を打ち、`TcpTestSucceeded : True` なら不要です(置き換え: `192.168.100.10` → 環境情報の `db.server`)。
+
+```powershell
+New-NetFirewallRule -DisplayName "SQL Server 1433 TCP (PMS test)" -Direction Inbound -Protocol TCP -LocalPort 1433 -RemoteAddress 192.168.100.0/24 -Action Allow -Profile Any
+```
+
+- **何をする**: SQL Server(既定インスタンス)の 1433 番への受信を許します
+- **置き換え**: `192.168.100.0/24` → AI 実行環境の IP アドレス、またはそのサブネット。名前付きインスタンス・1433 以外のポートの場合と、AI 実行環境への sqlcmd の導入は `docs/skills版_利用説明書.md` 8章 10. にあります
+
 #### ⑥ 資格情報を保存する(AI 実行環境で)
 
 AI 実行環境に戻り、**AI と回帰テストを動かすのと同じ Windows ユーザー**で、リポジトリのルートで打ちます(管理者でなくてよい)。

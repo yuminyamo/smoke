@@ -19,3 +19,6 @@ work/_flows/*/runs/
 
 # 書き込み途中の一時ファイル(tools/pms/lib/util.mjs・tools/env の原子的な書き込み)
 *.tmp-*
+
+# 検証環境ごとの接続先設定(各自の環境にだけあればよい)
+config/environments.json

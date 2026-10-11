@@ -33,14 +33,14 @@ AI を動かして回帰テストを作る PC(以下「AI 実行PC」)に、次�
 |---|---|---|---|---|---|
 | 1 | Windows と Windows PowerShell 5.1 | Windows 10/11・Windows Server に標準で入っている | 検証環境のゴールデンイメージへの復元・サーバーのログ収集(`tools/remote/pms-remote.ps1`) | 全員 | `$PSVersionTable.PSVersion`(5.1 と出る) |
 | 2 | Git | 新しいもの | リポジトリの取得・成果物のコミット | 全員 | `git --version` |
-| 3 | Node.js(npm・npx を含む) | **18 以上**(LTS 版を勧める) | 進行役 `pms`・環境情報 `env.mjs`・lint・skills の生成・回帰テストの実行 | 全員 | `node -v` |
+| 3 | Node.js(npm・npx を含む) | **20 以上**(LTS 版を勧める。Playwright Test 1.64 が 20 以上を求める。進行役などの道具だけなら 18 以上で動く) | 進行役 `pms`・環境情報 `env.mjs`・lint・skills の生成・回帰テストの実行 | 全員 | `node -v` |
 | 4 | IDE と AI のチャット | — | `/pms-regression` で依頼する | 全員(次のどれか1つ) | — |
 |   | ・VS Code + GitHub Copilot(Copilot Chat の拡張機能) | | | | |
 |   | ・Kiro | | | | |
 |   | ・Claude Code | | | | `claude --version` |
 | 5 | playwright-cli(npm パッケージ `@playwright/cli`)とブラウザ | **0.1.22**(進行役が前提にしている版) | 前提状態の準備と探索で画面を操作する(`pms act`・`pms pwcli` が呼ぶ。AI は直接呼ばない) | 全員 | `npx --no-install playwright-cli --version` |
 | 6 | sqlcmd(Go 版 `go-sqlcmd` か ODBC 版のどちらか) | Go 版 v1.10.0・ODBC 版 15.0.4298.1 で確かめ済み | 検証環境の DB を読み取って確かめる(`pms db`。作業10の開始時にも接続を確かめる) | 全員 | `sqlcmd -?`(引数なしの `sqlcmd` は使わない) |
-| 7 | Playwright Test(npm パッケージ `@playwright/test`)とブラウザ | 1.42 以上 | 作業20で作った回帰テストの実行 | 全員(作業20) | `npx playwright --version` |
+| 7 | Playwright Test(npm パッケージ `@playwright/test`)とブラウザ | 1.64.0(`package.json` で固定。付録F の機能には 1.42 以上が要る) | 作業20で作った回帰テストの実行 | 全員(作業20) | `npx playwright --version` |
 |   | `mssql`(npm パッケージ。Windows 認証で DB に入るときは `msnodesqlv8` も) | — | 回帰テストの中で DB を確かめる(付録F) | DB を確かめるテストがあるとき | `npm ls mssql` |
 | 8 | AI の CLI(Copilot CLI `copilot`・Kiro CLI `kiro-cli`・Claude Code `claude` のどれか1つ) | — | 端末の `pms run` が、カードごとに AI のセッションを起こす | 端末で進める人(4. の既定の進め方) | `copilot --version` など |
 
@@ -70,16 +70,12 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
    git config core.hooksPath tools/git-hooks
    ```
 4. **playwright-cli と Playwright Test をリポジトリの中に入れる**(リポジトリのルートで)
-   - リポジトリに `package.json` がすでにある(ほかのメンバーが作った)ときは、次だけです。`package.json` に書かれた版(playwright-cli 0.1.22 など)が `node_modules/` に入ります
+   - 要るパッケージと版は、リポジトリのルートの `package.json` に書いてあります(playwright-cli 0.1.22・Playwright Test 1.64.0・mssql)。次を実行すると、その版が `node_modules/` に入ります
      ```powershell
      npm install
      ```
-   - まだ `package.json` がない(最初の1人)ときは、次で作り、`package.json`・`package-lock.json` をコミットします。版を固定するため、playwright-cli は `@0.1.22` を付けます
-     ```powershell
-     npm init -y
-     npm install --save-dev @playwright/cli@0.1.22 @playwright/test mssql
-     ```
-   - どちらの場合も、続けて回帰テストが使うブラウザを入れます。ブラウザはリポジトリではなく、自分のユーザーのフォルダ(`%LOCALAPPDATA%\ms-playwright`)に入ります(PC のほかのユーザーには影響しません)
+   - `package-lock.json`(実際に入った版の記録)がまだリポジトリにないときは、最初に `npm install` した人がコミットします。以後は全員が同じ版を入れられます
+   - 続けて、回帰テストが使うブラウザを入れます。ブラウザはリポジトリではなく、自分のユーザーのフォルダ(`%LOCALAPPDATA%\ms-playwright`)に入ります(PC のほかのユーザーには影響しません)
      ```powershell
      npx playwright install chromium
      ```

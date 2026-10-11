@@ -1,8 +1,11 @@
 .DS_Store
 
-/references/
+/reference/
 
-# npm と Playwright Test(docs/skills版_利用説明書.md 2.2)
+# npm のパッケージはリポジトリの中(ローカル)に入れる。中身は package.json・package-lock.json から npm install で作るので git に入れない(docs/skills版_利用説明書.md 2.2)
 node_modules/
+
+# Playwright Test・playwright-cli の実行結果
 test-results/
 playwright-report/
+.playwright-cli/

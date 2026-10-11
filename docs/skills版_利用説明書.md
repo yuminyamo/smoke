@@ -38,7 +38,7 @@ AI を動かして回帰テストを作る PC(以下「AI 実行PC」)に、次�
 |   | ・VS Code + GitHub Copilot(Copilot Chat の拡張機能) | | | | |
 |   | ・Kiro | | | | |
 |   | ・Claude Code | | | | `claude --version` |
-| 5 | playwright-cli(npm パッケージ `@playwright/cli`)とブラウザ | **0.1.22**(進行役が前提にしている版) | 前提状態の準備と探索で画面を操作する(`pms act`・`pms pwcli` が呼ぶ。AI は直接呼ばない) | 全員 | `playwright-cli --version` |
+| 5 | playwright-cli(npm パッケージ `@playwright/cli`)とブラウザ | **0.1.22**(進行役が前提にしている版) | 前提状態の準備と探索で画面を操作する(`pms act`・`pms pwcli` が呼ぶ。AI は直接呼ばない) | 全員 | `npx --no-install playwright-cli --version` |
 | 6 | sqlcmd(Go 版 `go-sqlcmd` か ODBC 版のどちらか) | Go 版 v1.10.0・ODBC 版 15.0.4298.1 で確かめ済み | 検証環境の DB を読み取って確かめる(`pms db`。作業10の開始時にも接続を確かめる) | 全員 | `sqlcmd -?`(引数なしの `sqlcmd` は使わない) |
 | 7 | Playwright Test(npm パッケージ `@playwright/test`)とブラウザ | 1.42 以上 | 作業20で作った回帰テストの実行 | 全員(作業20) | `npx playwright --version` |
 |   | `mssql`(npm パッケージ。Windows 認証で DB に入るときは `msnodesqlv8` も) | — | 回帰テストの中で DB を確かめる(付録F) | DB を確かめるテストがあるとき | `npm ls mssql` |
@@ -52,6 +52,8 @@ AI 実行PC のほかに、次のマシンが要ります。**管理者が用意
 ### 2.2 入れ方
 
 PowerShell で、上から順に行います。winget(Windows のパッケージ管理。Windows 10/11 に標準で入っている)を使います。すでに入っているものは飛ばします。
+
+**npm のパッケージ(playwright-cli・Playwright Test・Copilot CLI など)は、PC 全体(グローバル。`npm install -g`)ではなく、リポジトリの中(ローカル。リポジトリの `node_modules/`)に入れます。** この作業のための道具が、PC のほかの作業や他のプロジェクトに影響しないようにするためです。`node_modules/` は git に入りません(`.gitignore`)。ただし、**すでにグローバルに入っているものは、そのまま使って構いません**(版が合っていれば。手順4)。
 
 1. **Git・Node.js・VS Code を入れる**
    ```powershell
@@ -67,41 +69,54 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
    cd <リポジトリのフォルダ>
    git config core.hooksPath tools/git-hooks
    ```
-4. **playwright-cli を入れる**
-   ```powershell
-   npm install -g @playwright/cli@0.1.22
-   playwright-cli --version          # 0.1.22 と出る
-   ```
-   - 版を変えると、進行役が出力を読み取れなくなることがあります(13.)。管理者が別の版に決めたときは、その版を入れます
-   - `config/pms.json` を見本 `config/pms.sample.json` から作った場合は、`playwright_cli` を `["playwright-cli"]` に直します(見本の `["npx", "--no-install", "playwright-cli"]` は、リポジトリの中に入れた場合の書き方です)。`config/pms.json` がなければ、そのままで使えます
+4. **playwright-cli と Playwright Test をリポジトリの中に入れる**(リポジトリのルートで)
+   - リポジトリに `package.json` がすでにある(ほかのメンバーが作った)ときは、次だけです。`package.json` に書かれた版(playwright-cli 0.1.22 など)が `node_modules/` に入ります
+     ```powershell
+     npm install
+     ```
+   - まだ `package.json` がない(最初の1人)ときは、次で作り、`package.json`・`package-lock.json` をコミットします。版を固定するため、playwright-cli は `@0.1.22` を付けます
+     ```powershell
+     npm init -y
+     npm install --save-dev @playwright/cli@0.1.22 @playwright/test mssql
+     ```
+   - どちらの場合も、続けて回帰テストが使うブラウザを入れます。ブラウザはリポジトリではなく、自分のユーザーのフォルダ(`%LOCALAPPDATA%\ms-playwright`)に入ります(PC のほかのユーザーには影響しません)
+     ```powershell
+     npx playwright install chromium
+     ```
+   - 入ったことを確かめます
+     ```powershell
+     npx --no-install playwright-cli --version     # 0.1.22 と出る
+     npx --no-install playwright --version
+     ```
+   - **すでにグローバルに playwright-cli が入っている**(`playwright-cli --version` で 0.1.22 と出る)ときは、それを使っても構いません。その場合は手順5の `config/pms.json` で `playwright_cli` を `["playwright-cli"]` にします
+   - 版を変えると、進行役が出力を読み取れなくなることがあります(13.)。管理者が別の版に決めたときは、`package.json` の版を直して `npm install` します
    - playwright-cli はブラウザを自分で起動します。初めての探索で「ブラウザが見つからない」旨のエラーになったら、Google Chrome を入れます(`winget install --id Google.Chrome --exact`)
-5. **sqlcmd を入れる**(Go 版が手軽です)
+5. **進行役の設定 `config/pms.json` を作る。** 進行役 `pms` は、リポジトリの中に入れた playwright-cli を `npx --no-install playwright-cli` で呼びます。この呼び方は見本 `config/pms.sample.json` に書いてあるので、見本を写します(`config/pms.json` は各自のファイルで、git に入りません)
+   ```powershell
+   if (-not (Test-Path config\pms.json)) { Copy-Item config\pms.sample.json config\pms.json }
+   ```
+   `config/pms.json` がないと、進行役は PATH の `playwright-cli`(グローバル)を呼ぶので、リポジトリの中に入れたものが見つからずに失敗します。グローバルのものを使うときは、`"playwright_cli": ["playwright-cli"]` に直します。ほかの項目(`default_runner` など)は手順7と 8. の10・11 で直します
+6. **sqlcmd を入れる**(Go 版が手軽です)。sqlcmd は npm のパッケージではないので、winget で PC に入れます
    ```powershell
    winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
    ```
    端末を開き直してから `sqlcmd -?` で起動できることを確かめます。ODBC 版を使うとき・DB に接続するまでの準備(ファイアウォール・SQL ログイン・ログイン情報の保存)は 8. の10 にあります。DB の接続先とログインは管理者から聞くか、作業10の始めに AI に聞かれたときに答えます(5. の「環境の情報を聞かれたら」)
-6. **Playwright Test を入れる**(リポジトリのルートで)
-   ```powershell
-   npm install                                            # package.json がすでにあるとき(メンバーが入れたものを揃える)
-   ```
-   リポジトリにまだ `package.json` がない(最初の1人)ときは、次で作り、`package.json`・`package-lock.json` をコミットします(`node_modules/` は git に入りません)
-   ```powershell
-   npm init -y
-   npm install --save-dev @playwright/test mssql
-   ```
-   どちらの場合も、続けて回帰テストが使うブラウザを入れます
-   ```powershell
-   npx playwright install chromium
-   ```
-7. **(端末で進める人)AI の CLI を入れて認証する。** どれか1つを入れ、使う CLI の名前を `config/pms.json` の `default_runner` に書きます。設定の詳細は 8. の11 です
-   - Copilot CLI: `npm install -g @github/copilot` のあと `copilot` を起動してログイン(またはトークン `COPILOT_GITHUB_TOKEN`)
+7. **(端末で進める人)AI の CLI を入れて認証する。** どれか1つを入れ、使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。設定の詳細は 8. の11 です
+   - Copilot CLI: グローバルに入っていなければ(`copilot --version` がエラー)、リポジトリの中に入れます。`package.json` に書かれるので、ほかのメンバーの `npm install` でも入ります
+     ```powershell
+     npm install --save-dev @github/copilot
+     npx --no-install copilot          # 起動してログインする(またはトークン COPILOT_GITHUB_TOKEN)
+     ```
+     リポジトリの中に入れたときは、`config/pms.json` の `runner.copilot.command` の先頭の `"copilot"` を `"npx", "--no-install", "copilot"` に置き換えます(例 `"command": ["npx", "--no-install", "copilot", "-p", "{prompt}", …]`)
    - Claude Code: 手順2で入れた `claude` を起動してログイン(または `ANTHROPIC_API_KEY`)
    - Kiro CLI: Kiro の公式の手順で入れ、非対話の実行のために `KIRO_API_KEY` を設定
 
 入れ終わったら、**端末を開き直して**からリポジトリのルートで次を実行し、どれもエラーにならないことを確かめます。
 
 ```powershell
-$PSVersionTable.PSVersion; git --version; node -v; playwright-cli --version; sqlcmd -?; npx playwright --version
+$PSVersionTable.PSVersion; git --version; node -v; sqlcmd -?
+npx --no-install playwright-cli --version                # 0.1.22(グローバルのものを使うときは playwright-cli --version)
+npx --no-install playwright --version
 node tools/build-skills/build-skills.mjs --check          # skills_in_sync: OK
 node tools/env/env.mjs check                              # "ok":true
 ```
@@ -350,7 +365,7 @@ skills版/
    ```
    保存できたかは `node tools/env/env.mjs list` で確かめます(秘密情報は `"set": true`・`"source": "local"` で、値は `****` と出ます)
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
-10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`。どちらでも動きます)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で、次の順に行います
+10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`。2.2 の手順でリポジトリの中に入れたときは、見本の値のままで使えます)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`。どちらでも動きます)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で、次の順に行います
    - **AI 実行PC: sqlcmd を入れる。** Go 版か ODBC 版のどちらかを入れます(両方入れてもかまいません。`pms db` は `db_cli` の sqlcmd を `-?` の出力で見分け、SQL Server 認証のパスワードの渡し方を変えます。見分けを固定するときは `config/pms.json` の `db_cli_kind` を `odbc` か `go` にします。既定は `auto`。`tools/pms/README.md` 2.7)
      - Go 版(手軽。`C:\Program Files\SqlCmd\sqlcmd.exe` に入ります。すでに入っていれば「利用可能なアップグレードが見つかりませんでした」と出ます)
        ```

@@ -263,13 +263,31 @@ skills版/
    node tools/env/env.mjs set db.password -           (値を標準入力から。各自の environments.local.json に入る)
    node tools/pms/pms.mjs db --check                  (接続先のサーバ名・DB名・ログイン名が出れば "ok":true)
    ```
+   `set <キー> -` は値を標準入力から**終わりまで**読みます。値を打って Enter を押しただけでは先に進まないので、続けて **`Ctrl+Z` → Enter** を押します(Windows の入力の終わり。末尾の改行は取り除かれます)。画面に値を出さずに保存したいときは、PowerShell で次のようにパイプで渡します(Windows PowerShell 5.1 のパイプは ASCII 以外の文字を壊すことがあるので、パスワードは英数字と記号にします)
+   ```powershell
+   $p = Read-Host -AsSecureString "DB password"; [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($p)) | node tools/env/env.mjs set db.password -; Remove-Variable p
+   ```
+   保存できたかは `node tools/env/env.mjs list` で確かめます(秘密情報は `"set": true`・`"source": "local"` で、値は `****` と出ます)
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
-10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で次のように行います
-   - **AI 実行PC: sqlcmd を入れる。** 端末で次を実行します(Go 版。`C:\Program Files\SqlCmd\sqlcmd.exe` に入ります。すでに入っていれば「利用可能なアップグレードが見つかりませんでした」と出ます)
+10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`。どちらでも動きます)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で、次の順に行います
+   - **AI 実行PC: sqlcmd を入れる。** Go 版か ODBC 版のどちらかを入れます(両方入れてもかまいません。`pms db` は `db_cli` の sqlcmd を `-?` の出力で見分け、SQL Server 認証のパスワードの渡し方を変えます。見分けを固定するときは `config/pms.json` の `db_cli_kind` を `odbc` か `go` にします。既定は `auto`。`tools/pms/README.md` 2.7)
+     - Go 版(手軽。`C:\Program Files\SqlCmd\sqlcmd.exe` に入ります。すでに入っていれば「利用可能なアップグレードが見つかりませんでした」と出ます)
+       ```
+       winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
+       ```
+     - ODBC 版(Microsoft Command Line Utilities 15 for SQL Server)。sqlcmd 本体は winget にないので、Microsoft の配布元の MSI を入れます。**ODBC Driver 17 が要ります**(18 だけではインストールが終了コード 1603 で失敗します)。管理者の PowerShell で次を実行します(`C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\SQLCMD.EXE` に入ります)
+       ```powershell
+       winget install --id Microsoft.msodbcsql.17 --exact --silent --accept-package-agreements --accept-source-agreements
+       $msi = "$env:TEMP\MsSqlCmdLnUtils.msi"
+       Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2230791" -OutFile $msi -UseBasicParsing
+       (Get-AuthenticodeSignature $msi).Status          # Valid(署名者 Microsoft Corporation)であることを確かめる
+       Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /quiet /norestart IACCEPTMSSQLCMDLNUTILSLICENSETERMS=YES" -Wait -PassThru | Select-Object ExitCode   # 0 なら成功
+       ```
+     PATH の変更は**新しく開いた端末にしか効きません**。VS Code の中の端末や AI のチャットは VS Code ごと起動し直してから、`sqlcmd -?` で起動できることを確かめます(**引数なしの `sqlcmd` は使わない**。Go 版は引数なしだと保存済みの接続設定を読みに行き、`The system cannot find the file specified.` と出ますが、異常ではありません)。両方を入れると PATH の先にある方が `sqlcmd` で呼ばれます(`Get-Command sqlcmd -All` で順番を確かめられます)。使う方を決めるとき・起動し直せないときは、`config/pms.json` の `db_cli` に絶対パスを書きます
+     ```json
+     { "db_cli": ["C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\SQLCMD.EXE"] }
      ```
-     winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
-     ```
-     PATH の変更は**新しく開いた端末にしか効きません**。VS Code の中の端末や AI のチャットは VS Code ごと起動し直してから、`sqlcmd -?` で起動できることを確かめます。起動し直せないときは、`config/pms.json` の `db_cli` を `["C:\\Program Files\\SqlCmd\\sqlcmd.exe"]` にします
+     (Go 版なら `["C:\\Program Files\\SqlCmd\\sqlcmd.exe"]`。`config/pms.json` がすでにあれば、`db_cli` の行だけを足すか直します)
    - **PMS サーバー: ファイアウォールで SQL Server のポートを開ける。** AI 実行PC で `Test-NetConnection <db.server> -Port 1433` を実行し、`TcpTestSucceeded : True` なら不要です。`False` なら、PMS サーバーの中で**管理者の PowerShell** を開き、SQL Server が待ち受けているポートを確かめてから受信の規則を足します
      ```powershell
      # SQL Server が待ち受けているポート(1433 が出なければ、SQL Server 構成マネージャーで TCP/IP を有効にするのが先)
@@ -282,8 +300,28 @@ skills版/
      New-NetFirewallRule -DisplayName "SQL Browser 1434 UDP (PMS test)" -Direction Inbound -Protocol UDP -LocalPort 1434 -RemoteAddress <AI 実行PCのIP> -Action Allow -Profile Any
      ```
      `netsh` で行う場合は `netsh advfirewall firewall add rule name="SQL Server 1433 TCP" dir=in action=allow protocol=TCP localport=1433 remoteip=<AI 実行PCのIP>` です。1433 以外のポートで待ち受けているときは、`db.server` を `<サーバー>,<ポート>` の形で保存します。**PMS サーバーがゴールデンイメージで戻す VM のときは、この規則をゴールデンイメージに入れます**(VM の中で足しただけでは、次の復元で消えます。ゴールデンイメージの取り直しは `remote/README.md` 3.1 の⑧)
-   - **ログインの方式を合わせる。** 既定の Windows 認証は、AI 実行PC が PMS サーバーと同じドメインにないと `The login is from an untrusted domain and cannot be used with Integrated authentication.` で失敗します。そのときは 9. の SQL Server 認証(`db.auth sql`・`db.user`・`db.password`)を保存します
-   - 最後に `node tools/pms/pms.mjs db --check` が `"ok":true` になることを確かめます(13. の「DB」と同じ)
+   - **ログインの方式を合わせる。** 既定の Windows 認証は、AI 実行PC が PMS サーバーと同じドメインにないと `The login is from an untrusted domain and cannot be used with Integrated authentication.` で失敗します。そのときは、PMS サーバーに**読み取りだけの権限の SQL ログイン**を作り、AI 実行PC に SQL Server 認証の情報を保存します
+     1. **PMS サーバー: SQL ログインを作る。** PMS サーバーの中で**管理者の PowerShell** を開き、サーバーの中からは使える Windows 認証(`-E`)で次を実行します。`-S` は SQL Server のインスタンス(既定のインスタンスなら `localhost`、名前付きなら `localhost\<インスタンス名>`。ApeosWare Management Suite の既定は名前付きの `FXAW`)、`AWMS2` は `db.name` の DB、`e2e-reader` はログイン名の例です
+        ```powershell
+        # 混合モードか確かめる(0 なら混合モード。1 なら Windows 認証のみなので、SSMS でサーバーのプロパティ →[セキュリティ]を
+        # 「SQL Server 認証モードと Windows 認証モード」にして、SQL Server のサービスを再起動する)
+        sqlcmd -S localhost\FXAW -E -C -Q "SELECT SERVERPROPERTY('IsIntegratedSecurityOnly')"
+
+        # 読み取りだけのログイン(db_datareader)を作る
+        sqlcmd -S localhost\FXAW -E -C -Q "CREATE LOGIN [e2e-reader] WITH PASSWORD = N'<強いパスワード>', CHECK_POLICY = ON; USE AWMS2; CREATE USER [e2e-reader] FOR LOGIN [e2e-reader]; ALTER ROLE db_datareader ADD MEMBER [e2e-reader];"
+        ```
+        **PMS サーバーがゴールデンイメージで戻す VM のときは、このログインもゴールデンイメージに入れます**(ファイアウォールの規則と同じく、VM の中で作っただけでは次の復元で消えます。`remote/README.md` 3.1 の⑧)
+     2. **AI 実行PC: ログインの情報を保存する。** 9. の SQL Server 認証の3つ(`db.auth sql`・`db.user`・`db.password`)を保存します。パスワードの入力のしかたは 9. の注意のとおりです
+   - 最後に `node tools/pms/pms.mjs db --check` が `"ok":true` になり、`target` に検証環境のサーバー名・DB名・ログイン名が出ることを確かめます(13. の「DB」と同じ)。うまくいかないときは、出力の `error` で次のように分けます
+
+     | 出力・症状 | 原因 | すること |
+     |---|---|---|
+     | `sqlcmd が見つかりません` | `db_cli` の sqlcmd が PATH にない | VS Code ごと起動し直す。または `config/pms.json` の `db_cli` に絶対パスを書く |
+     | `named pipe` のエラー・接続の時間切れ | SQL Server のポートに届かない | `Test-NetConnection <db.server> -Port 1433` を確かめ、PMS サーバーのファイアウォールを開ける(上の手順) |
+     | `untrusted domain` | AI 実行PC がサーバーと同じドメインにない | SQL ログインを作り、SQL Server 認証にする(上の手順) |
+     | `Login failed for user '<ログイン名>'` | ログイン名・パスワードの誤り、ログインがない(復元で消えた)、混合モードでない | `env.mjs list` で保存を確かめ、PMS サーバーでログインと混合モードを確かめる |
+     | `liner: function not supported in this terminal` | 古い `pms db`(コミット a365ae2 より前の `tools/pms`)が Go 版の sqlcmd にパスワードを渡せない | `tools/pms` を新しくする(Go 版を見分けて渡し方を変える版)。すぐに直せなければ ODBC 版を入れて `db_cli` に書く |
+     | 証明書のエラー | サーバー証明書を検証している | `db.trust_server_certificate` を確かめる(00 ■DB への接続 [R-DB-1]) |
 11. **AI の CLI を導入する**(proc-v018 以降。`pms run` が使う)。Copilot CLI(`copilot`)・Kiro CLI(`kiro-cli`)・Claude Code の CLI(`claude`)のどれかを導入して認証し、組織の設定で利用が許可されていることを管理者が確かめます(Copilot CLI はトークン `COPILOT_GITHUB_TOKEN` などでも認証できます。Kiro CLI の非対話の実行には `KIRO_API_KEY` が要ります。Claude Code は `claude` でログインするか `ANTHROPIC_API_KEY` を設定します)。使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。`config/pms.json` に、見本 `config/pms.sample.json` の `runner`・`default_runner`・`cardTypes` を写し、使うモデル(`cardTypes.<種類>.model`)と1枚の上限時間(`runner.<名前>.timeoutSec`)を決めます。呼び出しの雛形は公式のドキュメントで確かめたフラグで書いてありますが、実物では確かめていません。`node tools/pms/pms.mjs run --flow <フローID> --dry-run` で、起こすコマンドを実行せずに確かめられます(`tools/pms/README.md` 13章の「実物で確かめること」)。カードの種類ごとのエージェントは `.github/agents/`・`.kiro/agents/`・`.claude/agents/` に生成済みです。課金の数え方(AI credits か premium requests か)は組織の契約で確かめてください(カード1枚が1回の依頼になります)
 12. **チャットで進める準備をする**(proc-v019 以降。`pms-runner` を使う人がいるとき)。`.github/agents/pms-runner.agent.md`・`.kiro/agents/pms-runner.json`・`.claude/agents/pms-runner.md` と `pms-card-*` は生成済みなので、置くだけで使えます(直接編集しない)。管理者が次を確かめます
    - VS Code: チャットの Agent のドロップダウンに `pms-runner` が出るか。組織の設定でカスタムエージェントとサブエージェントが許可されているか

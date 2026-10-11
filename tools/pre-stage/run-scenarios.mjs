@@ -30,7 +30,7 @@
 //   state: skipped(設定なし)/ passed(全件成功)/ warning(on_failure: continue のエントリだけが失敗)/ failed
 // 終了コード: 0 = skipped / passed / warning、1 = failed(作業を始めない)、2 = 設定の誤り・実行できない
 // 環境変数 PMS_RESTORE は外して実行する(globalSetup による VM の復元を二重に行わないため)。
-// 依存: Node.js 18 以上のみ(Playwright は設定の command で呼ぶ)。テスト: node --test tools/pre-stage/test/
+// 依存: Node.js 18 以上のみ(Playwright は設定の command で呼ぶ)。テスト: node --test tools/pre-stage/test/run-scenarios.test.mjs
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -132,10 +132,7 @@ function runScenario(id, entry) {
   const env = { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out };
   delete env.PMS_RESTORE;
   const started = Date.now();
-  const r = spawnSync(command[0], argv, {
-    cwd: ROOT, env, encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
-    shell: process.platform === 'win32', stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  const r = spawnCommand([command[0], ...argv], { env, stdio: ['ignore', 'ignore', 'pipe'] });
   const duration = Math.round((Date.now() - started) / 100) / 10;
   if (r.error) return { result: 'failed', duration, message: r.error.code === 'ETIMEDOUT' ? `時間切れ(${timeoutMs / 1000} 秒)` : `起動できません: ${r.error.message}` };
   let report = null;
@@ -154,10 +151,7 @@ function runOperation(entry) {
   const env = { ...process.env };
   delete env.PMS_RESTORE;
   const started = Date.now();
-  const r = spawnSync(entry.run[0], entry.run.slice(1), {
-    cwd: ROOT, env, encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
-    shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const r = spawnCommand(entry.run, { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const duration = Math.round((Date.now() - started) / 100) / 10;
   if (r.error) return { result: 'failed', duration, message: r.error.code === 'ETIMEDOUT' ? `時間切れ(${timeoutMs / 1000} 秒)` : `起動できません: ${r.error.message}` };
   let output;
@@ -165,6 +159,21 @@ function runOperation(entry) {
   if (text) { try { output = JSON.parse(text); } catch { output = undefined; } }
   if (r.status !== 0) return { result: 'failed', duration, output, message: `実行体が失敗しました(終了コード ${r.status})。${lastLine(r.stderr)}` };
   return { result: 'passed', duration, output };
+}
+
+// Windows では npx などの .cmd を起動するためにシェル(cmd.exe)を経由する。Node はシェル経由のとき引数をクォートせずに
+// 空白でつなぐだけなので、空白を含むパス(C:\Program Files\...)が途中で切れる。コマンドラインはここでクォートして組み立てる
+function spawnCommand(argv, opts) {
+  const base = { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs, windowsHide: true, ...opts };
+  if (process.platform !== 'win32') return spawnSync(argv[0], argv.slice(1), { ...base, shell: false });
+  return spawnSync(argv.map(winQuote).join(' '), { ...base, shell: true });
+}
+
+// cmd.exe と、実行体側の引数の解釈(Microsoft C ランタイムの規則)の両方で1つの引数として渡るようにクォートする。
+// 二重引用符の中では cmd.exe の & | < > ^ は文字のまま渡る(%…% の環境変数の展開だけは止められない)
+function winQuote(a) {
+  if (a !== '' && /^[\w\-.:/\\=@,+]+$/.test(a)) return a;
+  return `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`;
 }
 
 function collectSpecs(suites) {

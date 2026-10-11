@@ -1,4 +1,4 @@
-// run-scenarios.test.mjs — tools/pre-stage/run-scenarios.mjs のテスト(node --test tools/pre-stage/test/)
+// run-scenarios.test.mjs — tools/pre-stage/run-scenarios.mjs のテスト(node --test tools/pre-stage/test/run-scenarios.test.mjs)
 // Playwright の代わりに、--grep の値に応じて JSON レポートを書く差し替えのコマンドを使う。
 
 import test from 'node:test';
@@ -177,4 +177,18 @@ test('復元範囲(--restore-scope): 外部操作の復元エントリも、両�
   const s = JSON.parse(spawnSync(process.execPath, [SCRIPT, '--root', root, '--restore-scope'], { encoding: 'utf8' }).stdout);
   assert.deepEqual(s.scenarios, [{ target: '時刻:PMSサーバ', op_work10: 'OP-ENV-001', op_work20: 'OP-ENV-001' }]);
   assert.deepEqual(s.partial, [{ target: '時刻:実機:MFP-A', only_in: 'work10' }]);
+});
+
+test('空白や記号を含む実行体のパス・引数も、そのまま1つの引数として渡る(Windows のシェル経由の起動)', () => {
+  const root = repo({});
+  const dir = path.join(root, 'tools dir');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'echo args.mjs'), 'console.log(JSON.stringify(process.argv.slice(2)));\n');
+  const args = ['a b', 'x&y', 'say "hi"', 'C:\\Program Files\\','50%'];
+  fs.writeFileSync(path.join(root, 'config/pre-stage-scenarios.json'), JSON.stringify({ hooks: { work10: [
+    { name: 'x', op: 'OP-ENV-001', run: [process.execPath, path.join(dir, 'echo args.mjs'), ...args] },
+  ] } }));
+  const r = run(root, '--hook', 'work10');
+  assert.equal(r.code, 0, r.stderr);
+  assert.deepEqual(r.json.results[0].output, args);
 });

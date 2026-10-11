@@ -3,9 +3,8 @@ name: pms-card-explore-close
 description: "作業10パートC: シナリオ末尾の DB不変条件を検査し、確立した操作の反映先を決めて提出する"
 model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash
-disallowedTools: ["Bash(playwright-cli *)", "Bash(npx playwright-cli *)", "Bash(npx @playwright/cli *)", "Bash(node tools/env/env.mjs get *--reveal*)", "Bash(sqlcmd *)", "Bash(node tools/pms/pms.mjs pwcli *)", "Edit(procedure/**)", "Edit(.github/skills/**)", "Edit(.github/agents/**)", "Edit(.kiro/skills/**)", "Edit(.kiro/agents/**)", "Edit(.claude/skills/**)", "Edit(.claude/agents/**)"]
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 explore.close)/ 手順版: proc-v028 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(カードの種類 explore.close)/ 手順版: proc-v029 / 生成: tools/build-skills/build-skills.mjs -->
 
 あなたは PMS 回帰テスト作成の進行役 pms が出すカードを1枚だけ行う。
 

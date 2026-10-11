@@ -43,7 +43,7 @@
       "stallWarnSec": 180
     },
     "claude": {
-      "_comment": "Claude Code の CLI(非対話の -p。依頼文は標準入力)。エージェントは .claude/agents/pms-card-*.md、モデルは procedure/cards/agents.yaml の kinds.<種類>.claude_model。使用禁止は生成したエージェントの disallowedTools に書いてあり、ここの deny で CLI にも重ねて渡す(--disallowedTools は --allowedTools より優先する)。-p では確認の要る道具が使えないため、編集は --permission-mode acceptEdits、シェルは --allowedTools Bash で許す。認証は claude へのログインか環境変数 ANTHROPIC_API_KEY。Windows で起動できない(ENOENT)ときは command の先頭を claude.exe の絶対パスにする",
+      "_comment": "Claude Code の CLI(非対話の -p。依頼文は標準入力)。エージェントは .claude/agents/pms-card-*.md、モデルは procedure/cards/agents.yaml の kinds.<種類>.claude_model。使用禁止はここの deny だけで CLI に渡す(--disallowedTools は --allowedTools より優先する)。生成したエージェントには disallowedTools を書かない(規則の形を書くと Bash・Edit の道具そのものが外れる。proc-v029)。-p では確認の要る道具が使えないため、編集は --permission-mode acceptEdits、シェルは --allowedTools Bash で許す。認証は claude へのログインか環境変数 ANTHROPIC_API_KEY。Windows で起動できない(ENOENT)ときは command の先頭を claude.exe の絶対パスにする",
       "command": ["claude", "-p", "--agent", "{agent}", "--model", "{model}", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--allowedTools", "Bash", "{deny}"],
       "deny_arg": ["--disallowedTools", "{pattern}"],
       "deny": [

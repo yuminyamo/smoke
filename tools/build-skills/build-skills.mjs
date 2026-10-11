@@ -398,13 +398,12 @@ function buildAgents(target) {
       const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
       put(`${dir}/${name}.agent.md`, fm + notice + instruction);
     } else if (target.frontmatter === 'claude') {
-      // Claude Code のサブエージェント(.claude/agents/<名前>.md)。使用禁止は disallowedTools に権限の規則の形で書く
-      const shell = [...(agentsDef.deny_shell ?? []), ...(k.deny_shell_extra ?? [])];
-      const disallowed = [...shell.map((p) => `Bash(${p})`), ...(agentsDef.deny_write ?? []).map((p) => `Edit(${p})`)];
+      // Claude Code のサブエージェント(.claude/agents/<名前>.md)。disallowedTools は書かない:
+      // 規則の形(Bash(sqlcmd *) など)を書くと Claude Code は Bash・Edit の道具そのものを外す(SIG-0009)。
+      // 使用禁止は config/pms.json の runner.claude.deny を pms run が CLI の --disallowedTools で渡す
       const fm = ['---', `name: ${name}`, `description: ${yamlString(k.description)}`,
         ...(k.claude_model ? [`model: ${k.claude_model}`] : []),
-        `tools: ${(agentsDef.tools_claude ?? []).join(', ')}`,
-        ...(disallowed.length ? [`disallowedTools: [${disallowed.map(yamlString).join(', ')}]`] : []), '---', ''].join('\n');
+        `tools: ${(agentsDef.tools_claude ?? []).join(', ')}`, '---', ''].join('\n');
       const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
       put(`${dir}/${name}.md`, fm + notice + instruction);
     } else {

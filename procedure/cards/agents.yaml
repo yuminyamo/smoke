@@ -12,7 +12,8 @@
 # cardTypes.<種類>.model があればそちらを使う)。Kiro はモデルの名前が違うため kiro_model に書く(なければ書かない)。
 # Claude Code も同じく claude_model に書く(Claude Code のモデルの別名 sonnet・haiku・opus か、モデルID)。エージェントの定義の model と、
 # pms run --runner claude の {model} の両方に使う(pms run は config/pms.json の cardTypes.<種類>.runners.claude.model があればそちらを使う)。
-# 使用禁止(Kiro のエージェントの permissions、Claude Code のエージェントの disallowedTools に書く。Copilot は config/pms.json の runner.copilot.deny で CLI に渡す):
+# 使用禁止(Kiro のエージェントの permissions に書く。Copilot は config/pms.json の runner.copilot.deny、Claude Code は runner.claude.deny で CLI に渡す。
+# Claude Code のエージェントの disallowedTools には書かない: 規則の形(Bash(sqlcmd *) など)を書くと Bash・Edit の道具そのものが外れる(SIG-0009)):
 #   deny_shell: すべての種類に共通のシェルのパターン / deny_write: 書き込みを禁止するパス
 #   kinds.<種類>.deny_shell_extra: その種類だけに足すパターン
 #

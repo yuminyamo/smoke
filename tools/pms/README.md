@@ -378,4 +378,4 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 - サブエージェントの端末で `PMS_RUNNER` が設定されず、提出の記録が `b1` になるか(`pms stats` で `b1` と `b2` が分かれるか)
 - Kiro IDE で、Workflows を有効にしているときに、入口がサブエージェントの終わりを待たずに `pms next` を呼ばないか。呼ぶと、同じカードが二重に出る(出し直しの回数が増え、上限で STOP になる)。待たない場合は、`pms-runner` を使うあいだ Workflows を無効にする(利用説明書の既知の制約)
 - Kiro IDE で、`permissions` の `allow` と `toolsSettings` の旧形式を併記した `pms-runner.json` を読めるか
-- Claude Code で、`claude --agent pms-runner` が `Agent(pms-card-…)` に並べたカードのエージェントだけを呼べるか。カードのエージェントの `disallowedTools`(`Bash(sqlcmd *)`・`Edit(procedure/**)` など)で、使用禁止のコマンドと書き込みが実際に拒まれるか。拒まれないときは、パターンの書き方(`Bash(sqlcmd:*)` など)を生成スクリプトで直す
+- Claude Code で、`claude --agent pms-runner` が `Agent(pms-card-…)` に並べたカードのエージェントだけを呼べるか。`pms run --runner claude` が渡す `--disallowedTools`(`Bash(sqlcmd *)`・`Edit(procedure/**)` など)で、使用禁止のコマンドと書き込みが実際に拒まれるか。拒まれないときは、`config/pms.json` の `runner.claude.deny` のパターンの書き方を直す。**カードのエージェントの定義には `disallowedTools` を書かない**(Claude Code 2.1.296 では、規則の形を書くと Bash・Edit の道具そのものが外れた。CLI の `--disallowedTools` では Bash は残る。proc-v029)

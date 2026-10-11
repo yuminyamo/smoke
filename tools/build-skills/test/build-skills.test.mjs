@@ -102,16 +102,12 @@ test('build: 入口のエージェント pms-runner とカードの種類ごと�
   assert.equal(cfm.tools, `Bash, Agent(${kinds.map(cardAgent).join(', ')})`);
   assert.equal(cmd.replace(/^---\n[\s\S]*?\n---\n/, ''), md.replace(/^---\n[\s\S]*?\n---\n/, ''));
 
-  // Claude Code のカードのエージェント: 使用禁止を disallowedTools に書く(種類だけの禁止も足す)
+  // Claude Code のカードのエージェント: disallowedTools を書かない(規則の形を書くと Bash・Edit が外れる。SIG-0009)。
+  // 使用禁止は config/pms.json の runner.claude.deny を pms run が --disallowedTools で渡す
   const cstep = frontmatter(fs.readFileSync(path.join(root, '.claude/agents/pms-card-explore-step.md'), 'utf8'));
   assert.equal(cstep.name, 'pms-card-explore-step');
   assert.equal(cstep.tools, 'Read, Edit, Write, Grep, Glob, Bash');
-  assert.ok(cstep.disallowedTools.includes('Bash(sqlcmd *)'), cstep.disallowedTools.join(' '));
-  assert.ok(cstep.disallowedTools.includes('Bash(npx *)'));
-  assert.ok(cstep.disallowedTools.includes('Edit(procedure/**)'));
-  assert.ok(cstep.disallowedTools.includes('Edit(.claude/agents/**)'));
-  const ccode = frontmatter(fs.readFileSync(path.join(root, '.claude/agents/pms-card-setup-code.md'), 'utf8'));
-  assert.ok(!ccode.disallowedTools.includes('Bash(npx *)'));
+  assert.equal(cstep.disallowedTools, undefined);
 });
 
 test('build: skills を Claude Code にも生成し、手動の skill には disable-model-invocation を付ける', () => {

@@ -238,6 +238,29 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 
 # 改訂履歴
 
+## 39. 2026-10-11 改訂(Claude Code のエージェントの使用禁止)— 手順版 proc-v029
+
+**人間の指示による改訂である**(作業40 IR-001。改訂 IMP-001、状態 `指示適用`)。F-001 の作業10で、`pms run --runner claude` のカード C-0001(setup.build)のセッションに Bash・Edit の道具がなく、`pms act`・`pms submit` を実行できずに STOP(issue_limit)になった(SIG-0009)。生成したカードのエージェント(`.claude/agents/pms-card-*.md`)の `disallowedTools` に規則の形(`Bash(sqlcmd *)` など)を書くと、Claude Code(2.1.296)は Bash・Edit の道具そのものを外す。CLI の `--disallowedTools` に同じ規則を渡したときは Bash は残る。
+
+指示の原文:
+
+> SIG-0009の改善を実施して。処理途中ですが気にせず修正して
+
+(SIG-0009 の改善案: 「Claude Code のエージェントの disallowedTools には規則の形を書かず、使用禁止は config/pms.json の runner.claude.deny(CLI の --disallowedTools)だけで渡す(tools/build-skills/build-skills.mjs の Claude Code のエージェントの生成)」)
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 39.1 | IMP-001(CM/進行役と記録の道具(pms)): **Claude Code のカードのエージェントに `disallowedTools` を書かないようにした。** 使用禁止は `config/pms.json` の `runner.claude.deny` を `pms run` が `--disallowedTools` で渡すだけにする。■進行役と記録の道具 の「`pms run` が起こすセッションで使用禁止にするもの」に、その旨と、B1 の Claude Code のサブエージェントには使用禁止がなく記録の検査(`seq_missing`)とカードの規則で止めることを書いた。理由: SIG-0009 | 00 / tools/build-skills / cards/agents.yaml(注記) |
+| 39.2 | `tools/build-skills/test/build-skills.test.mjs`: Claude Code のカードのエージェントに `disallowedTools` がないことを確かめる形にした | tools/build-skills/test |
+| 39.3 | 見本 `config/pms.sample.json` の `runner.claude._comment` と `tools/pms/README.md` の実物で確かめることを、使用禁止は CLI だけで渡す書き方にした | config / tools/pms |
+| 39.4 | 手順版を `proc-v029` に更新し、skills とエージェントを生成し直した | vocab / skills |
+
+### 変更していないもの
+
+- `config/pms.json`(各自。git に入れない)の `runner.claude.deny` と `cardTypes.<種類>.runners.claude.deny` は、これまでどおり使用禁止のパターンを持つ。各自の設定に `runner.claude.deny` がなければ、見本から写す(写さないと B2 の Claude Code のセッションで使用禁止が効かない)
+- Kiro(`permissions`)・Copilot(`runner.copilot.deny`)の使用禁止の渡し方は変えていない
+- **配備の時機**: ■手順書の版と配備 はフローの境界でのみ配備するとするが、F-001(proc-v028 で開始。作業10の途中)の最中に配備した(指示の「処理途中ですが気にせず修正して」による)。F-001 の flow.md・フロー台帳の手順版は proc-v028 のまま。作業20の開始時の版の照合で食い違いが報告される見込み
+
 ## 38. 2026-10-11 改訂(`db.auth` の既定を `sql` に)— 手順版 proc-v028
 
 **人間の指示による改訂である。** 37章で検証環境は参照用ユーザーの SQL Server 認証を前提としたが、`db.auth` の既定は `windows` のまま残していた(37章「変更していないもの」)。その既定そのものを `sql` にする。

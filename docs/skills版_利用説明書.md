@@ -70,11 +70,12 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
    git config core.hooksPath tools/git-hooks
    ```
 4. **playwright-cli と Playwright Test をリポジトリの中に入れる**(リポジトリのルートで)
-   - 要るパッケージと版は、リポジトリのルートの `package.json` に書いてあります(playwright-cli 0.1.22・Playwright Test 1.64.0・mssql)。次を実行すると、その版が `node_modules/` に入ります
+   - 要るパッケージは、リポジトリのルートの `package.json`(playwright-cli 0.1.22・Playwright Test 1.64.0・mssql)と `package-lock.json`(それらが使うパッケージまで含めた、入れる版の記録)に書いてあります。**`package-lock.json` を使って、次のコマンドで入れます**
      ```powershell
-     npm install
+     npm ci
      ```
-   - `package-lock.json`(実際に入った版の記録)がまだリポジトリにないときは、最初に `npm install` した人がコミットします。以後は全員が同じ版を入れられます
+     `npm ci` は `package-lock.json` に書かれた版を**そのとおりに**入れます(`node_modules/` があれば消してから入れ直します)。全員が同じ版で動かせるように、`npm install` ではなく `npm ci` を使います。`package-lock.json` と `package.json` が食い違っているとエラーで止まります(何も入れません)。そのときは管理者に伝えます
+   - `git pull` で `package-lock.json` が変わったときも、`npm ci` をもう一度実行します
    - 続けて、回帰テストが使うブラウザを入れます。ブラウザはリポジトリではなく、自分のユーザーのフォルダ(`%LOCALAPPDATA%\ms-playwright`)に入ります(PC のほかのユーザーには影響しません)
      ```powershell
      npx playwright install chromium
@@ -85,7 +86,7 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
      npx --no-install playwright --version
      ```
    - **すでにグローバルに playwright-cli が入っている**(`playwright-cli --version` で 0.1.22 と出る)ときは、それを使っても構いません。その場合は手順5の `config/pms.json` で `playwright_cli` を `["playwright-cli"]` にします
-   - 版を変えると、進行役が出力を読み取れなくなることがあります(13.)。管理者が別の版に決めたときは、`package.json` の版を直して `npm install` します
+   - 版を変えると、進行役が出力を読み取れなくなることがあります(13.)。版を変える・パッケージを足すのは管理者です。`npm install --save-dev <パッケージ>@<版>` で `package.json` と `package-lock.json` を一緒に直してコミットし、ほかのメンバーは `git pull` のあと `npm ci` します(`package-lock.json` を手で直さない)
    - playwright-cli はブラウザを自分で起動します。初めての探索で「ブラウザが見つからない」旨のエラーになったら、Google Chrome を入れます(`winget install --id Google.Chrome --exact`)
 5. **進行役の設定 `config/pms.json` を作る。** 進行役 `pms` は、リポジトリの中に入れた playwright-cli を `npx --no-install playwright-cli` で呼びます。この呼び方は見本 `config/pms.sample.json` に書いてあるので、見本を写します(`config/pms.json` は各自のファイルで、git に入りません)
    ```powershell
@@ -98,9 +99,9 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
    ```
    端末を開き直してから `sqlcmd -?` で起動できることを確かめます。ODBC 版を使うとき・DB に接続するまでの準備(ファイアウォール・SQL ログイン・ログイン情報の保存)は 8. の10 にあります。DB の接続先とログインは管理者から聞くか、作業10の始めに AI に聞かれたときに答えます(5. の「環境の情報を聞かれたら」)
 7. **(端末で進める人)AI の CLI を入れて認証する。** どれか1つを入れ、使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。設定の詳細は 8. の11 です
-   - Copilot CLI: グローバルに入っていなければ(`copilot --version` がエラー)、リポジトリの中に入れます。`package.json` に書かれるので、ほかのメンバーの `npm install` でも入ります
+   - Copilot CLI: グローバルに入っていなければ(`copilot --version` がエラー)、リポジトリの中に入れたものを使います。`package.json` にまだ `@github/copilot` がなければ、管理者に足してもらいます(手順4の「パッケージを足す」。足されたら `git pull` のあと `npm ci` で入ります)
      ```powershell
-     npm install --save-dev @github/copilot
+     npm ci                            # package-lock.json に @github/copilot があれば入る
      npx --no-install copilot          # 起動してログインする(またはトークン COPILOT_GITHUB_TOKEN)
      ```
      リポジトリの中に入れたときは、`config/pms.json` の `runner.copilot.command` の先頭の `"copilot"` を `"npx", "--no-install", "copilot"` に置き換えます(例 `"command": ["npx", "--no-install", "copilot", "-p", "{prompt}", …]`)

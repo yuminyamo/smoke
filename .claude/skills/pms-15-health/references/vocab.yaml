@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-10 / 版: v28(Claude Code への配備: 手順版を proc-v026 に更新。前版 v27 は 2026-10-09 の pms db のパスワードの渡し方)
+# 改訂: 2026-10-11 / 版: v29(SQL Server の参照用ユーザー: 手順版を proc-v027 に更新、db.auth の説明に検証環境は sql(参照用ユーザー e2e_reader)を前提とすることを書いた。既定値は windows のまま。前版 v28 は 2026-10-10 の Claude Code への配備)
+#       2026-10-10 / 版: v28(Claude Code への配備: 手順版を proc-v026 に更新。前版 v27 は 2026-10-09 の pms db のパスワードの渡し方)
 #       2026-10-09 / 版: v27(pms db のパスワードの渡し方: 手順版を proc-v025 に更新、db.password の説明を標準入力で渡す形に直した。前版 v26 は 2026-10-08 の DB への接続を pms db に集約)
 #       2026-10-08 / 版: v24(台帳の書式の崩れを早く見つける: 手順版を proc-v022 に更新)
 #       2026-10-08 / 版: v23(カードを使わない作業の秘密情報の入力: 手順版を proc-v021 に更新)
@@ -42,7 +43,7 @@
 meta:
   step: 1                       # 本語彙が対象とするステップ
   revision: "2026-10-08"
-  procedure_version: proc-v026  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  procedure_version: proc-v027  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -254,10 +255,10 @@ env_optional_keys:              # 全フローで使うが、未登録なら既�
     kind: other
     default: windows
     values: [windows, sql]
-    description: DB へのログインの方式(00 ■DB への接続)。windows(既定)= 実行するアカウントの Windows 認証(sqlcmd -E)/ sql = SQL Server 認証(db.user・db.password)。混合モードのサーバではどちらも使える
+    description: DB へのログインの方式(00 ■DB への接続)。windows(既定)= 実行するアカウントの Windows 認証(sqlcmd -E)/ sql = SQL Server 認証(db.user・db.password)。検証環境は混合モードで、読み取りだけの参照用ユーザー e2e_reader による sql を前提とする(人間が sql を保存する。未登録なら既定の windows で接続する)
   db.user:
     kind: account
-    description: db.auth が sql のときのログイン名
+    description: db.auth が sql のときのログイン名(参照用ユーザー。既定の名前は e2e_reader。00 ■DB への接続)
   db.password:
     kind: secret
     description: db.user のパスワード(db.auth が sql のとき)。pms db が標準入力で sqlcmd に渡す。AIは取り出さない

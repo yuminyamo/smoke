@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-09 / 版: v27(`pms db` のパスワードの渡し方: ■DB への接続 の `db.password` の渡し方を標準入力に直した。前版 v26 は 2026-10-08 の DB への接続を `pms db` に集約: ■DB への接続 を書き直し、R-DB-2(DB への SELECT は `pms db` で行う)と環境情報 `db.auth`・`db.user`・`db.password` を加えた。カードのセッションで sqlcmd の直接の呼び出しを使用禁止にした。前版 v25 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
+改訂: 2026-10-11 / 版: v28(SQL Server の参照用ユーザー: ■DB への接続 に、検証環境は混合モードで、読み取りだけの参照用ユーザー `e2e_reader` に SQL Server 認証でログインする前提と、参照用ユーザーを作るコマンドを加えた。人間の指示による改訂。前版 v27 は 2026-10-09 の `pms db` のパスワードの渡し方)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -974,9 +974,15 @@ lint の違反・人間の指摘・回帰実行の切り分けに由来するシ
 | 環境情報のキー | 意味 |
 |---|---|
 | `db.server` / `db.name` | サーバ名(インスタンス名を含む)と PMS の DB 名(基本キー `vocab.env_base_keys`) |
-| `db.auth` | ログインの方式(`vocab.env_optional_keys`。未登録なら既定の `windows`)。`windows` = 実行するアカウントの Windows 認証 / `sql` = SQL Server 認証。混合モードのサーバではどちらも使える。どちらにするかは人間が環境ごとに決める |
+| `db.auth` | ログインの方式(`vocab.env_optional_keys`。未登録なら既定の `windows`)。`windows` = 実行するアカウントの Windows 認証 / `sql` = SQL Server 認証。**検証環境は `sql`(下の参照用ユーザー)を前提とする。** 人間が環境ごとに `sql` を保存する(未登録のままだと既定の `windows` で接続する) |
 | `db.user` / `db.password` | `db.auth` が `sql` のときのログイン名とパスワード(`account` / `secret`)。パスワードは pms が標準入力で sqlcmd に渡し、引数・出力・記録に書かない |
 | `db.trust_server_certificate` | サーバ証明書の検証を無効にするか([R-DB-1]) |
+
+**検証環境の前提(参照用ユーザー)**: 検証環境の SQL Server は混合モード(SQL Server 認証と Windows 認証の両方を受け付ける)とし、`pms db` と回帰テストは、**読み取りだけの権限(`db_datareader`)を持つ参照用ユーザー `e2e_reader`** に SQL Server 認証でログインする。参照用ユーザーは、導入時に SQL Server の管理者権限を持つ人間が次のコマンドで作る(`<サーバ名>`・`<パスワード>`・`<DB名>` は人間が入れる。**AIは参照用ユーザーを作らない・権限を変えない**。■DB操作の安全規約)。作ったら、人間が環境情報に `db.auth`(`sql`)・`db.user`(`e2e_reader`)・`db.password` を保存する。ゴールデンイメージで戻す環境では、参照用ユーザーもゴールデンイメージに含める(復元で消えないように)。手順の詳細は `docs/skills版_利用説明書.md` 8. の 10 にある。
+
+```
+sqlcmd -S <サーバ名> -E -C -Q "CREATE LOGIN e2e_reader WITH PASSWORD=N'<パスワード>'; USE [<DB名>]; CREATE USER e2e_reader FOR LOGIN e2e_reader; ALTER ROLE db_datareader ADD MEMBER e2e_reader;"
+```
 
 検証環境の SQL Server は、自己署名など信頼できない証明書で TLS 接続を求めることが多い(sqlcmd・ODBC Driver 18 以降・Node の `mssql` は既定で暗号化と証明書の検証を行う)。サーバ証明書を検証するかは、人間が環境ごとに環境情報のキー `db.trust_server_certificate` で決める。
 

@@ -1,6 +1,6 @@
 .DS_Store
 
-/reference/
+/references/
 
 # npm と Playwright Test(docs/skills版_利用説明書.md 2.2)
 node_modules/

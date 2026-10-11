@@ -1,6 +1,6 @@
 .DS_Store
 
-/reference/
+/references/
 
 # npm のパッケージはリポジトリの中(ローカル)に入れる。中身は package.json・package-lock.json から npm install で作るので git に入れない(docs/skills版_利用説明書.md 2.2)
 node_modules/

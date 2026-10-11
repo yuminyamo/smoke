@@ -9,3 +9,13 @@ node_modules/
 test-results/
 playwright-report/
 .playwright-cli/
+
+# 実行体が各自の検証環境で追記する実行記録(00_common.md の work/_common/。個人の作業場所にだけあればよい)
+work/_common/env-restore-log.jsonl
+work/_common/pre-stage-log.jsonl
+
+# pms run のセッションの出力(AI の CLI の生の出力と進み具合の表示用ファイル)
+work/_flows/*/runs/
+
+# 書き込み途中の一時ファイル(tools/pms/lib/util.mjs・tools/env の原子的な書き込み)
+*.tmp-*

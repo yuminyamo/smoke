@@ -130,24 +130,45 @@ export function selectOnly(input) {
   return { sql: raw.replace(/;\s*$/, '') };
 }
 
+/** sqlcmd の種類の見分け(config/pms.json の db_cli_kind が auto のとき。1回のプロセスで1度だけ -? を呼ぶ) */
+const cliKinds = new Map();
+export function dbCliKind(cfg) {
+  if (cfg.db_cli_kind && cfg.db_cli_kind !== 'auto') return cfg.db_cli_kind;
+  const key = JSON.stringify(cfg.db_cli);
+  if (!cliKinds.has(key)) {
+    const r = spawnSync(cfg.db_cli[0], [...cfg.db_cli.slice(1), '-?'], { encoding: 'utf8', input: '', timeout: 15_000 });
+    if (r.error && r.error.code === 'ENOENT') throw new UsageError(`${cfg.db_cli[0]} が見つかりません(sqlcmd を入れるか、config/pms.json の db_cli を直す)`);
+    // Go 版(go-sqlcmd)の -? は「sqlcmd: Install/Create/Query SQL Server, ...」で始まる。見分けられなければ ODBC 版として扱う
+    cliKinds.set(key, /Install\/Create\/Query|go-sqlcmd/i.test(`${r.stdout ?? ''}${r.stderr ?? ''}`) ? 'go' : 'odbc');
+  }
+  return cliKinds.get(key);
+}
+
 /**
- * sqlcmd の呼び出し(config/pms.json の db_cli)。パスワードは標準入力で渡し、引数に書かない。
- * 環境変数 SQLCMDPASSWORD は使えない: -X は ED・!! を止めるのと同時に、環境変数を sqlcmd に渡さなくする(proc-v025)。
- * -X1 は止めたコマンドが現れたら警告で続けずにエラーで終わる
+ * sqlcmd の呼び出し(config/pms.json の db_cli)。パスワードは引数に書かない(プロセスの一覧に出さない)。
+ * - ODBC 版: 標準入力で渡し、-X1 を付ける。-X は ED・!! を止めるのと同時に環境変数を sqlcmd に渡さなくするため、
+ *   SQLCMDPASSWORD は使えない(proc-v025)。-X1 は止めたコマンドが現れたら警告で続けずにエラーで終わる
+ * - Go 版(go-sqlcmd): 標準入力が端末でないとパスワードを読めない(「liner: function not supported in this terminal」)。
+ *   -X1 があると SQLCMDPASSWORD も読まないため、-X1 を外して SQLCMDPASSWORD で渡す。sqlcmd のコマンド(行頭の : や !!)・GO・
+ *   $(…) は selectOnly が受け付けず、起動スクリプト(SQLCMDINI)などの SQLCMD* の環境変数は消して渡す(-X の代わりの守り)
+ * Windows 認証はパスワードを使わないので、どちらの版でも -X1 を付ける
  */
 function sqlcmd(cfg, s, query, { headers }) {
+  const goSql = s.auth === 'sql' && dbCliKind(cfg) === 'go';
   const args = [
     '-S', s.server, '-d', s.name,
     ...(s.auth === 'sql' ? ['-U', s.user] : ['-E']),
     ...(s.trust ? ['-C'] : []),
-    '-b', '-X1', '-l', String(LOGIN_TIMEOUT_SEC), '-t', String(QUERY_TIMEOUT_SEC), '-W', '-s', '\t', '-w', '65535',
+    '-b', ...(goSql ? [] : ['-X1']), '-l', String(LOGIN_TIMEOUT_SEC), '-t', String(QUERY_TIMEOUT_SEC), '-W', '-s', '	', '-w', '65535',
     ...(headers ? [] : ['-h', '-1']),
     '-Q', query,
   ];
   const env = { ...process.env };
-  delete env.SQLCMDPASSWORD;
+  for (const k of Object.keys(env)) if (/^SQLCMD/i.test(k)) delete env[k];
+  if (goSql) env.SQLCMDPASSWORD = s.password;
   const r = spawnSync(cfg.db_cli[0], [...cfg.db_cli.slice(1), ...args], {
-    encoding: 'utf8', env, input: s.auth === 'sql' ? `${s.password}\n` : '', timeout: (LOGIN_TIMEOUT_SEC + QUERY_TIMEOUT_SEC + 15) * 1000, maxBuffer: 16 * 1024 * 1024,
+    encoding: 'utf8', env, input: s.auth === 'sql' && !goSql ? `${s.password}
+` : '', timeout: (LOGIN_TIMEOUT_SEC + QUERY_TIMEOUT_SEC + 15) * 1000, maxBuffer: 16 * 1024 * 1024,
   });
   if (r.error && r.error.code === 'ENOENT') throw new UsageError(`${cfg.db_cli[0]} が見つかりません(sqlcmd を入れるか、config/pms.json の db_cli を直す)`);
   return { code: r.status ?? 1, stdout: stripPrompt(r.stdout ?? ''), stderr: r.stderr ?? '', error: r.error ? String(r.error.message) : null };

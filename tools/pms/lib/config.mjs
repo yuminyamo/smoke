@@ -38,6 +38,8 @@ export const DEFAULTS = {
   env_cli: null,
   // pms db が呼ぶ sqlcmd(コマンドの配列)。接続の引数は pms が環境情報から足す(00 ■DB への接続)
   db_cli: ['sqlcmd'],
+  // db_cli の種類: auto(-? の出力で見分ける)/ odbc / go。SQL Server 認証のパスワードの渡し方が変わる(lib/db.mjs の sqlcmd)
+  db_cli_kind: 'auto',
   // 同じカードを出す回数の上限(超えたら STOP)
   max_issues: 3,
   // 同じカードの提出が不合格になる回数の上限(達したら STOP)
@@ -100,6 +102,7 @@ export function loadConfig(root) {
       if (r.stdin != null && r.stdin !== 'prompt') throw new UsageError(`${CONFIG_FILE} の runner.${name}.stdin は "prompt" か null でなければなりません`);
     }
   }
+  if (!['auto', 'odbc', 'go'].includes(cfg.db_cli_kind)) throw new UsageError(`${CONFIG_FILE} の db_cli_kind は auto / odbc / go のどれかでなければなりません`);
   if (typeof cfg.default_runner !== 'string') throw new UsageError(`${CONFIG_FILE} の default_runner は文字列でなければなりません`);
   if (!cfg.cardTypes || typeof cfg.cardTypes !== 'object' || Array.isArray(cfg.cardTypes)) throw new UsageError(`${CONFIG_FILE} の cardTypes はオブジェクトでなければなりません`);
   for (const [kind, t] of Object.entries(cfg.cardTypes)) {

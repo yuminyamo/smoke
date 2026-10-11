@@ -105,6 +105,51 @@ test('db: SQL Server 認証はパスワードを標準入力で渡し(-X1 は環
   assert.match(r.json.output, /^Note\n----\n/);
 });
 
+test('db: Go 版の sqlcmd(-? で見分ける)には、SQL Server 認証のパスワードを -X1 なしの SQLCMDPASSWORD で渡し、SQLCMDINI などは消す。Windows 認証は -X1 のまま', () => {
+  let root = repo(SQL_AUTH.attrs, { local: SQL_AUTH.local, stub: { kind: 'go', result: `Note\n----\n${DB_PASSWORD}\n` } });
+  let r = pms(root, ['db', '--', 'SELECT Note FROM T'], { env: { SQLCMDINI: 'C:\\evil.sql', SQLCMDPASSWORD: 'caller-value' } });
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  assert.ok(!r.stdout.includes(DB_PASSWORD), '秘密情報の値が出ている');
+  let c = calls(root);
+  assert.equal(c.length, 2);
+  for (const x of c) {
+    assert.deepEqual(x.args.slice(0, 7), ['-S', 'pms-test-01\\SQLEXPRESS', '-d', 'PMS', '-U', 'e2e-reader', '-C']);
+    assert.ok(!x.args.includes('-X1') && !x.args.includes('-X'));
+    assert.ok(!x.args.some((a) => a.includes(DB_PASSWORD)));
+    assert.equal(x.env_password, DB_PASSWORD);
+    assert.equal(x.stdin_password, null);
+    assert.equal(x.sqlcmdini, null);
+  }
+
+  root = repo({}, { stub: { kind: 'go' } });
+  r = pms(root, ['db', '--check']);
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  for (const x of calls(root)) {
+    assert.ok(x.args.includes('-X1') && x.args.includes('-E'));
+    assert.equal(x.env_password, null);
+  }
+});
+
+test('db: config/pms.json の db_cli_kind で sqlcmd の種類を固定できる(-? を呼ばない)。auto / odbc / go 以外は終了コード 2', () => {
+  const root = repo(SQL_AUTH.attrs, { local: SQL_AUTH.local, stub: { kind: 'go' } });
+  const cfg = JSON.parse(read(root, 'config/pms.json'));
+  write(root, 'config/pms.json', JSON.stringify({ ...cfg, db_cli_kind: 'odbc' }));
+  let r = pms(root, ['db', '--check']);
+  assert.equal(r.code, 1);
+  assert.equal(r.json.reason, 'connect_failed');
+  assert.match(r.json.error, /liner: function not supported/);
+  assert.ok(calls(root)[0].args.includes('-X1'));
+
+  write(root, 'config/pms.json', JSON.stringify({ ...cfg, db_cli_kind: 'go' }));
+  r = pms(root, ['db', '--check']);
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+
+  write(root, 'config/pms.json', JSON.stringify({ ...cfg, db_cli_kind: 'go-sqlcmd' }));
+  r = pms(root, ['db', '--check']);
+  assert.equal(r.code, 2);
+  assert.match(r.stdout + r.stderr, /db_cli_kind は auto \/ odbc \/ go/);
+});
+
 test('db: 環境情報の不足・接続の失敗・接続先の違い・SELECT の失敗は終了コード 1 と reason。SELECT 以外の文は sqlcmd を呼ばずに 2', () => {
   let root = repo({ 'db.auth': { kind: 'other', value: 'sql' } });
   let r = pms(root, ['db', '--', 'SELECT 1']);

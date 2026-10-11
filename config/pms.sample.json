@@ -7,6 +7,7 @@
   "browser_config": "config/playwright-cli.json",
   "env_cli": null,
   "db_cli": ["sqlcmd"],
+  "db_cli_kind": "auto",
   "max_issues": 3,
   "max_rejections": 3,
   "ops": {},

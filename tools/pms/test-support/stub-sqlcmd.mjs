@@ -3,10 +3,13 @@
 //
 // 応答は環境変数 PMS_STUB_DIR の sqlcmd.json で決める:
 //   { "target": "<@@SERVERNAME>\t<DB_NAME()>\t<SUSER_SNAME()>", "result": "<SELECT の出力>",
-//     "fail_connect": "<接続の失敗の文言>" | null, "fail_query": "<SELECT の失敗の文言>" | null, "prompt": true | false }
+//     "fail_connect": "<接続の失敗の文言>" | null, "fail_query": "<SELECT の失敗の文言>" | null, "prompt": true | false,
+//     "kind": "odbc" | "go" }
 // 実物の ODBC 版に合わせ、-X(-X1)があれば環境変数 SQLCMDPASSWORD を読まない。-U のときはパスワードを標準入力から読み、
 // なければログインに失敗する。prompt が true なら、標準入力から読んだときに「Password:」の促しを標準出力に出す。
-// 呼び出しは PMS_STUB_DIR/sqlcmd-calls.jsonl に1行ずつ残す(引数・標準入力から読んだパスワード・環境変数 SQLCMDPASSWORD の値)。
+// kind が "go" なら Go 版(go-sqlcmd v1.10 で確かめたふるまい): -U のときに標準入力を読まず、SQLCMDPASSWORD がない(-X があるときを含む)と
+// 「liner: function not supported in this terminal」で失敗する。-? の出力の先頭も版ごとの実物に合わせる(-? の呼び出しは記録しない)。
+// 呼び出しは PMS_STUB_DIR/sqlcmd-calls.jsonl に1行ずつ残す(引数・標準入力から読んだパスワード・環境変数 SQLCMDPASSWORD の値・SQLCMDINI の有無)。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,11 +19,20 @@ const args = process.argv.slice(2);
 const file = path.join(dir, 'sqlcmd.json');
 const conf = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
 const stdin = fs.readFileSync(0, 'utf8');
+const go = conf.kind === 'go';
+if (args.includes('-?')) {
+  console.log(go ? 'sqlcmd: Install/Create/Query SQL Server, Azure SQL, and Tools\n\nVersion: v1.10.0' : 'Microsoft (R) SQL Server Command Line Tool\nVersion 15.0.4298.1 NT');
+  process.exit(0);
+}
 const envPassword = args.some((a) => /^-X1?$/.test(a)) ? null : (process.env.SQLCMDPASSWORD ?? null);
 const stdinPassword = stdin.split(/\r?\n/)[0] || null;
-fs.appendFileSync(path.join(dir, 'sqlcmd-calls.jsonl'), JSON.stringify({ args, stdin_password: stdinPassword, env_password: process.env.SQLCMDPASSWORD ?? null }) + '\n');
+fs.appendFileSync(path.join(dir, 'sqlcmd-calls.jsonl'), JSON.stringify({ args, stdin_password: stdinPassword, env_password: process.env.SQLCMDPASSWORD ?? null, sqlcmdini: process.env.SQLCMDINI ?? null }) + '\n');
 const query = args[args.indexOf('-Q') + 1] ?? '';
 if (args.includes('-U')) {
+  if (go && !envPassword) {
+    console.error('liner: function not supported in this terminal');
+    process.exit(1);
+  }
   const password = envPassword ?? stdinPassword;
   if (!password) {
     console.error(`Sqlcmd: Error: Microsoft ODBC Driver 18 for SQL Server : Login failed for user '${args[args.indexOf('-U') + 1]}'.`);

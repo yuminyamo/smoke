@@ -349,10 +349,10 @@ skills版/
    node tools/env/env.mjs set db.name PMS
    node tools/env/env.mjs require                     (揃っていれば "state":"complete")
    ```
-   DB へのログインは、既定では AI を動かすアカウントの Windows 認証です。混合モードの SQL Server に SQL Server 認証でログインさせるときは、次も保存します(proc-v024。00 ■DB への接続)。読み取りだけの権限のアカウントを勧めます
+   DB へは、混合モードの SQL Server に、10. で作る参照用ユーザー(`e2e_reader`。読み取りだけの権限)の SQL Server 認証でログインします。次も保存します(proc-v024。00 ■DB への接続。`db.auth` を保存しないと既定の Windows 認証になります)
    ```
    node tools/env/env.mjs set db.auth sql
-   node tools/env/env.mjs set db.user e2e-reader
+   node tools/env/env.mjs set db.user e2e_reader
    node tools/env/env.mjs set db.password -           (値を標準入力から。各自の environments.local.json に入る)
    node tools/pms/pms.mjs db --check                  (接続先のサーバ名・DB名・ログイン名が出れば "ok":true)
    ```
@@ -393,18 +393,19 @@ skills版/
      New-NetFirewallRule -DisplayName "SQL Browser 1434 UDP (PMS test)" -Direction Inbound -Protocol UDP -LocalPort 1434 -RemoteAddress <AI 実行PCのIP> -Action Allow -Profile Any
      ```
      `netsh` で行う場合は `netsh advfirewall firewall add rule name="SQL Server 1433 TCP" dir=in action=allow protocol=TCP localport=1433 remoteip=<AI 実行PCのIP>` です。1433 以外のポートで待ち受けているときは、`db.server` を `<サーバー>,<ポート>` の形で保存します。**PMS サーバーがゴールデンイメージで戻す VM のときは、この規則をゴールデンイメージに入れます**(VM の中で足しただけでは、次の復元で消えます。ゴールデンイメージの取り直しは `remote/README.md` 3.1 の⑧)
-   - **ログインの方式を合わせる。** 既定の Windows 認証は、AI 実行PC が PMS サーバーと同じドメインにないと `The login is from an untrusted domain and cannot be used with Integrated authentication.` で失敗します。そのときは、PMS サーバーに**読み取りだけの権限の SQL ログイン**を作り、AI 実行PC に SQL Server 認証の情報を保存します
-     1. **PMS サーバー: SQL ログインを作る。** PMS サーバーの中で**管理者の PowerShell** を開き、サーバーの中からは使える Windows 認証(`-E`)で次を実行します。`-S` は SQL Server のインスタンス(既定のインスタンスなら `localhost`、名前付きなら `localhost\<インスタンス名>`。ApeosWare Management Suite の既定は名前付きの `FXAW`)、`AWMS2` は `db.name` の DB、`e2e-reader` はログイン名の例です
-        ```powershell
-        # 混合モードか確かめる(0 なら混合モード。1 なら Windows 認証のみなので、SSMS でサーバーのプロパティ →[セキュリティ]を
-        # 「SQL Server 認証モードと Windows 認証モード」にして、SQL Server のサービスを再起動する)
-        sqlcmd -S localhost\FXAW -E -C -Q "SELECT SERVERPROPERTY('IsIntegratedSecurityOnly')"
-
-        # 読み取りだけのログイン(db_datareader)を作る
-        sqlcmd -S localhost\FXAW -E -C -Q "CREATE LOGIN [e2e-reader] WITH PASSWORD = N'<強いパスワード>', CHECK_POLICY = ON; USE AWMS2; CREATE USER [e2e-reader] FOR LOGIN [e2e-reader]; ALTER ROLE db_datareader ADD MEMBER [e2e-reader];"
+   - **SQL Server の参照用ユーザーを作る(必須)。** 検証環境の SQL Server は混合モード(SQL Server 認証と Windows 認証の両方を受け付ける)であることを前提とし、AI と回帰テストは**読み取りだけの権限の参照用ユーザー**で SQL Server 認証によりログインします。PMS の DB の管理者アカウントや Windows 認証のアカウントは使いません
+     1. **PMS サーバー: 参照用ユーザーを作る。** SQL Server の管理者権限を持つ人が、Windows 認証(`-E`)で次を実行します。`<サーバ名>`・`<パスワード>`・`<DB名>` は自分で入れます
         ```
-        **PMS サーバーがゴールデンイメージで戻す VM のときは、このログインもゴールデンイメージに入れます**(ファイアウォールの規則と同じく、VM の中で作っただけでは次の復元で消えます。`remote/README.md` 3.1 の⑧)
-     2. **AI 実行PC: ログインの情報を保存する。** 9. の SQL Server 認証の3つ(`db.auth sql`・`db.user`・`db.password`)を保存します。パスワードの入力のしかたは 9. の注意のとおりです
+        sqlcmd -S <サーバ名> -E -C -Q "CREATE LOGIN e2e_reader WITH PASSWORD=N'<パスワード>'; USE [<DB名>]; CREATE USER e2e_reader FOR LOGIN e2e_reader; ALTER ROLE db_datareader ADD MEMBER e2e_reader;"
+        ```
+        | 置き換える値 | 入れるもの |
+        |---|---|
+        | `<サーバ名>` | SQL Server のインスタンス。PMS サーバーの中で実行するなら `localhost\<インスタンス名>`(ApeosWare Management Suite の既定は `FXAW`。サービスの一覧の `SQL Server (〇〇)` の 〇〇 がインスタンス名)。既定のインスタンスなら `localhost` |
+        | `<パスワード>` | 参照用ユーザーのパスワード。サーバーのパスワードポリシーを満たすもの |
+        | `<DB名>` | PMS の DB 名(`db.name` に保存する値)。分からなければ `sqlcmd -S <サーバ名> -E -C -Q "SELECT name FROM sys.databases"` で一覧を出します |
+
+        付ける権限は `db_datareader` だけです(書き込みの権限は付けません。00 ■DB操作の安全規約)。このコマンドの文字列にはパスワードが含まれ、端末の履歴に残ります。気になるときは、同じ SQL 文を SSMS で実行します。**PMS サーバーがゴールデンイメージで戻す VM のときは、このユーザーもゴールデンイメージに入れます**(ファイアウォールの規則と同じく、VM の中で作っただけでは次の復元で消えます。`remote/README.md` 3.1 の⑧)
+     2. **AI 実行PC: ログインの情報を保存する。** 9. の SQL Server 認証の3つ(`db.auth sql`・`db.user e2e_reader`・`db.password`)を保存します。パスワードの入力のしかたは 9. の注意のとおりです
    - 最後に `node tools/pms/pms.mjs db --check` が `"ok":true` になり、`target` に検証環境のサーバー名・DB名・ログイン名が出ることを確かめます(13. の「DB」と同じ)。うまくいかないときは、出力の `error` で次のように分けます
 
      | 出力・症状 | 原因 | すること |

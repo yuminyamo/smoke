@@ -13,12 +13,13 @@ import { selectOnly, dbConnection } from '../lib/db.mjs';
 const STUB_SQLCMD = path.join(PMS_DIR, 'test-support', 'stub-sqlcmd.mjs');
 const DB_PASSWORD = 'Db-Passw0rd#1';
 
-/** db.* の環境情報を足したリポジトリ。attrs で共有の設定の属性を足す(null は消す) */
+/** db.* の環境情報を足したリポジトリ。attrs で共有の設定の属性を足す(null は消す)。
+ *  db.auth は既定(vocab の sql)と違う windows を明示しておく(Windows 認証の呼び出しを確かめるテストが多いため。既定はテスト 'db: db.auth が未登録なら…' で確かめる) */
 function repo(attrs = {}, { local = {}, stub = {} } = {}) {
   const root = makeRepo({}, { config: { db_cli: [process.execPath, STUB_SQLCMD] } });
   const f = JSON.parse(read(root, 'config/environments.json'));
   const a = f.environments.vm01.attributes;
-  Object.assign(a, { 'db.server': { kind: 'endpoint', value: 'pms-test-01\\SQLEXPRESS' }, 'db.name': { kind: 'endpoint', value: 'PMS' } });
+  Object.assign(a, { 'db.server': { kind: 'endpoint', value: 'pms-test-01\\SQLEXPRESS' }, 'db.name': { kind: 'endpoint', value: 'PMS' }, 'db.auth': { kind: 'other', value: 'windows' } });
   for (const [k, v] of Object.entries(attrs)) { if (v === null) delete a[k]; else a[k] = v; }
   write(root, 'config/environments.json', JSON.stringify(f));
   const l = JSON.parse(read(root, 'config/environments.local.json'));
@@ -60,7 +61,7 @@ test('selectOnly: SELECT・WITH を1文だけ受け付け、書き込み・DDL�
   ng('SELECT 1 /* x', /コメント \/\* が閉じていない/);
 });
 
-test('db: Windows 認証(既定)で、接続先を確かめてから SELECT をトランザクションの中で実行する。カードなしは記録を書かない', () => {
+test('db: Windows 認証(db.auth が windows)で、接続先を確かめてから SELECT をトランザクションの中で実行する。カードなしは記録を書かない', () => {
   const root = repo();
   const r = pms(root, ['db', '--', 'SELECT JobId, Status FROM PrintJob']);
   assert.equal(r.code, 0, r.stdout + r.stderr);
@@ -184,6 +185,22 @@ test('db: 環境情報の不足・接続の失敗・接続先の違い・SELECT 
   assert.match(r.json.error, /-- の後ろに書く/);
 });
 
+test('db: db.auth が未登録なら既定の sql(参照用ユーザーの SQL Server 認証。00 ■DB への接続)で、db.user・db.password がなければ env_missing', () => {
+  let root = repo({ 'db.auth': null });
+  let r = pms(root, ['db', '--check']);
+  assert.equal(r.code, 1);
+  assert.equal(r.json.reason, 'env_missing');
+  assert.match(r.json.error, /環境情報 db\.user・db\.password がない/);
+  assert.equal(calls(root).length, 0);
+
+  root = repo({ 'db.auth': null, 'db.user': SQL_AUTH.attrs['db.user'] }, { local: SQL_AUTH.local });
+  r = pms(root, ['db', '--check']);
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  assert.equal(r.json.settings.auth, 'sql');
+  assert.equal(r.json.settings.user, 'e2e-reader');
+  assert.ok(!r.stdout.includes(DB_PASSWORD));
+});
+
 test('db --check: 接続先だけを確かめる(作業10の工程0)', () => {
   const root = repo();
   const r = pms(root, ['db', '--check']);
@@ -219,11 +236,11 @@ test('db: カードを付ければ db-log に1行書き、now・next を返す�
 });
 
 test('DB の接続の行: pms db の使い方・接続先・ログインの方式・証明書の扱いを書き、パスワードは書かない', () => {
-  const vocab = { env_optional_keys: { 'db.trust_server_certificate': { default: 'true' }, 'db.auth': { default: 'windows' } } };
-  let root = repo();
+  const vocab = { env_optional_keys: { 'db.trust_server_certificate': { default: 'true' }, 'db.auth': { default: 'sql' } } };
+  let root = repo({ 'db.auth': null });
   let line = dbConnection(root, vocab, 'vm01', 'node tools/pms/pms.mjs db --flow F-003 --card C-0003');
   assert.match(line, /^`node tools\/pms\/pms\.mjs db --flow F-003 --card C-0003 --intent "<確かめること>" -- "<SELECT 文>"` で行う\(sqlcmd などを直接呼ばない。接続情報を調べない \[R-DB-2\]\)/);
-  assert.match(line, /サーバ pms-test-01\\SQLEXPRESS \/ DB PMS \/ ログイン 実行するアカウントの Windows 認証\(環境情報 db\.auth: 未登録のため既定の windows\)/);
+  assert.match(line, /サーバ pms-test-01\\SQLEXPRESS \/ DB PMS \/ ログイン SQL Server 認証\(db\.user 未登録\)\(環境情報 db\.auth: 未登録のため既定の sql\)/);
   assert.match(line, /サーバ証明書の検証を無効にして接続する\(人間が承認済み。環境情報 db\.trust_server_certificate: 未登録のため既定の true\)/);
   root = repo({ ...SQL_AUTH.attrs, 'db.trust_server_certificate': { kind: 'other', value: 'false' } }, { local: SQL_AUTH.local });
   line = dbConnection(root, vocab, 'vm01');
@@ -233,8 +250,8 @@ test('DB の接続の行: pms db の使い方・接続先・ログインの方�
   root = repo({ 'db.server': null, 'db.auth': { kind: 'other', value: 'kerberos' } });
   line = dbConnection(root, vocab, 'vm01');
   assert.match(line, /サーバ \(未登録\)/);
-  assert.match(line, /値 "kerberos" は windows \/ sql でないため既定の windows/);
-  assert.match(line, /環境情報 db\.server が未登録のため、いまは接続できない/);
+  assert.match(line, /値 "kerberos" は windows \/ sql でないため既定の sql/);
+  assert.match(line, /環境情報 db\.server・db\.user・db\.password が未登録のため、いまは接続できない/);
 });
 
 test('env.mjs set: 任意キー db.password は --kind なしでも secret として各自の設定に保存する', async () => {

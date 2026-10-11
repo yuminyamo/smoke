@@ -238,6 +238,28 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
 
 # 改訂履歴
 
+## 38. 2026-10-11 改訂(`db.auth` の既定を `sql` に)— 手順版 proc-v028
+
+**人間の指示による改訂である。** 37章で検証環境は参照用ユーザーの SQL Server 認証を前提としたが、`db.auth` の既定は `windows` のまま残していた(37章「変更していないもの」)。その既定そのものを `sql` にする。
+
+指示の原文:
+
+> 既定そのものをsqlにして　コミットプッシュ
+
+| # | 修正 | 対象 |
+|---|---|---|
+| 38.1 | **`env_optional_keys.db.auth` の `default` を `windows` から `sql` にした。** `pms db` は既定値を vocab から読むため、`db.auth` が未登録の環境は SQL Server 認証で接続し、`db.user`・`db.password` がなければ `env_missing` を返す(作業は ■検証環境の情報 の足りない環境情報の確認に進む) | vocab / tools/pms(動作) |
+| 38.2 | ■DB への接続 の `db.auth` の行と参照用ユーザーの段落を、既定が `sql` である書き方にした(Windows 認証で接続する環境だけ、人間が `windows` を保存する) | 00 |
+| 38.3 | §20 の DB へのログイン(テストコード)を、`sql` または未登録なら SQL Server 認証、`windows` なら Windows 認証とした | stages |
+| 38.4 | `tools/pms/test/db.test.mjs`: Windows 認証の呼び出しを確かめるテストは `db.auth: windows` を明示し、未登録なら既定の `sql` で `db.user`・`db.password` を要することを確かめるテストを足した | tools/pms/test |
+| 38.5 | 見本 `config/environments.sample.json`・利用説明書 8. の 9・発生環境の復旧手順 7章を既定の `sql` に合わせた | config / docs |
+| 38.6 | 手順版を `proc-v028` に更新し、skills を生成し直した | vocab / skills |
+
+### 変更していないもの
+
+- `pms db` のコード(`tools/pms/lib/db.mjs`)は変えていない。既定値を vocab から読む仕組みのままで、動作が変わるのは vocab の既定値による
+- 回帰テストのコード(`tests/`)はまだない。§20 で生成するときに 38.3 に従う
+
 ## 37. 2026-10-11 改訂(SQL Server の参照用ユーザー)— 手順版 proc-v027
 
 **人間の指示による改訂である。** 検証環境の SQL Server は混合モードであり、DB の確認には読み取りだけの権限の参照用ユーザーを SQL Server 認証で使う。これまでの手順書は Windows 認証を既定とし、SQL Server 認証は「Windows 認証が使えないとき」の代わりとしてしか書いていなかったため、参照用ユーザーを作る必要があることが導入時に分からなかった。

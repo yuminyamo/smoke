@@ -2,7 +2,7 @@
 
 本書は**各作業に固有な内容だけ**を持つ。原則・規約は `00_common.md`、統制語彙は `vocab.yaml`、実行順序と分岐は `pipeline.dot` を参照する。**それらの再掲を本書に書かない。**
 
-改訂: 2026-10-08 / 版: v19(DB への接続を `pms db` に集約: 作業01・02・15の DB の観測と作業10のカードの DB の確認を `pms db` で行うことと、作業10の工程0で DB への接続を確かめること(`pms db --check`)を書いた。付録F にテストコードの DB のログインの方式(`db.auth`)を書いた。前版 v18 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
+改訂: 2026-10-11 / 版: v20(db.auth の既定を sql に: §20 の DB へのログインで、未登録の db.auth を SQL Server 認証として扱う。人間の指示による改訂。前版 v19 は 2026-10-08 のDB への接続を `pms db` に集約: 作業01・02・15の DB の観測と作業10のカードの DB の確認を `pms db` で行うことと、作業10の工程0で DB への接続を確かめること(`pms db --check`)を書いた。付録F にテストコードの DB のログインの方式(`db.auth`)を書いた。前版 v18 は 2026-10-08 のカードを使わない作業の秘密情報の入力)
 
 ---
 
@@ -2440,7 +2440,7 @@ export default async function globalTeardown() {
 - `envValue` は `tools/env/env.mjs get` を呼ぶだけにする(環境の選び方・各自の設定による上書きを1か所で決めるため)。使う環境は環境変数 `PMS_ENV` で切り替える(未指定なら設定の既定)。値がないときは例外で失敗させる(黙って空文字で進めない)
 - `playwright.config.ts` の `baseURL` も `envValue('pms.url')` から取る
 - DB への接続(`tests/helpers/invariants.ts` など)は、サーバ名・DB名を `envValue('db.server')` / `envValue('db.name')` から取り、サーバ証明書の検証は環境情報の `db.trust_server_certificate` に従う(00 ■DB への接続 [R-DB-1])。`true` または未登録なら `trustServerCertificate: true`、`false` なら検証する
-- DB へのログインは環境情報の `db.auth` に従う(00 ■DB への接続)。`sql` なら `envValue('db.user')` / `envValue('db.password')` で SQL Server 認証、`windows` または未登録なら実行するアカウントの Windows 認証(Node の `mssql` では `msnodesqlv8` ドライバの `trustedConnection: true`)。**`db.trust_server_certificate` と `db.auth` は未登録を既定値(`vocab.env_optional_keys`)で補い**、`envValue` の例外で失敗させない
+- DB へのログインは環境情報の `db.auth` に従う(00 ■DB への接続)。`sql` または未登録(既定の `sql`)なら `envValue('db.user')` / `envValue('db.password')` で SQL Server 認証、`windows` なら実行するアカウントの Windows 認証(Node の `mssql` では `msnodesqlv8` ドライバの `trustedConnection: true`)。**`db.trust_server_certificate` と `db.auth` は未登録を既定値(`vocab.env_optional_keys`)で補い**、`envValue` の例外で失敗させない
 
 ```typescript
 // tests/helpers/env.ts — 検証環境の情報を読む(00 ■検証環境の情報)。値は config/environments*.json にあり、コードには書かない

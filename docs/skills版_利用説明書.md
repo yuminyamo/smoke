@@ -349,7 +349,7 @@ skills版/
    node tools/env/env.mjs set db.name PMS
    node tools/env/env.mjs require                     (揃っていれば "state":"complete")
    ```
-   DB へは、混合モードの SQL Server に、10. で作る参照用ユーザー(`e2e_reader`。読み取りだけの権限)の SQL Server 認証でログインします。次も保存します(proc-v027。00 ■DB への接続。`db.auth` を保存しないと既定の Windows 認証になります)
+   DB へは、混合モードの SQL Server に、10. で作る参照用ユーザー(`e2e_reader`。読み取りだけの権限)の SQL Server 認証でログインします。次も保存します(proc-v028。00 ■DB への接続。`db.auth` の既定は `sql` なので保存しなくても SQL Server 認証になりますが、明示のために保存しておきます。Windows 認証で接続する環境だけ `windows` を保存します)
    ```
    node tools/env/env.mjs set db.auth sql
    node tools/env/env.mjs set db.user e2e_reader

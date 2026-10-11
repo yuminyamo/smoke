@@ -23,9 +23,90 @@ AIに対象の機能を伝えるだけで、次のことを手順書どおりに
 
 ## 2. 準備
 
-- このリポジトリを取得します(skills はリポジトリに含まれています)
-- VS Code の GitHub Copilot(エージェントモード)・Kiro・Claude Code のいずれかで、リポジトリのルートを開きます
-- 作業を始める前に、他のメンバーの変更を取り込みます(`git pull`)
+初めて使うときは、2.1 の動作環境を自分の PC に入れ、2.2 の手順でリポジトリを使えるようにします。2回目からは、作業を始める前に他のメンバーの変更を取り込む(`git pull`)だけです。
+
+### 2.1 動作環境
+
+AI を動かして回帰テストを作る PC(以下「AI 実行PC」)に、次のものを入れます。**表の「要る場面」が「全員」のものは、どの進め方でも必要です。**
+
+| # | ソフトウェア | 版 | 何に使うか | 要る場面 | 入っているかの確かめ方 |
+|---|---|---|---|---|---|
+| 1 | Windows と Windows PowerShell 5.1 | Windows 10/11・Windows Server に標準で入っている | 検証環境のゴールデンイメージへの復元・サーバーのログ収集(`tools/remote/pms-remote.ps1`) | 全員 | `$PSVersionTable.PSVersion`(5.1 と出る) |
+| 2 | Git | 新しいもの | リポジトリの取得・成果物のコミット | 全員 | `git --version` |
+| 3 | Node.js(npm・npx を含む) | **18 以上**(LTS 版を勧める) | 進行役 `pms`・環境情報 `env.mjs`・lint・skills の生成・回帰テストの実行 | 全員 | `node -v` |
+| 4 | IDE と AI のチャット | — | `/pms-regression` で依頼する | 全員(次のどれか1つ) | — |
+|   | ・VS Code + GitHub Copilot(Copilot Chat の拡張機能) | | | | |
+|   | ・Kiro | | | | |
+|   | ・Claude Code | | | | `claude --version` |
+| 5 | playwright-cli(npm パッケージ `@playwright/cli`)とブラウザ | **0.1.22**(進行役が前提にしている版) | 前提状態の準備と探索で画面を操作する(`pms act`・`pms pwcli` が呼ぶ。AI は直接呼ばない) | 全員 | `playwright-cli --version` |
+| 6 | sqlcmd(Go 版 `go-sqlcmd` か ODBC 版のどちらか) | Go 版 v1.10.0・ODBC 版 15.0.4298.1 で確かめ済み | 検証環境の DB を読み取って確かめる(`pms db`。作業10の開始時にも接続を確かめる) | 全員 | `sqlcmd -?`(引数なしの `sqlcmd` は使わない) |
+| 7 | Playwright Test(npm パッケージ `@playwright/test`)とブラウザ | 1.42 以上 | 作業20で作った回帰テストの実行 | 全員(作業20) | `npx playwright --version` |
+|   | `mssql`(npm パッケージ。Windows 認証で DB に入るときは `msnodesqlv8` も) | — | 回帰テストの中で DB を確かめる(付録F) | DB を確かめるテストがあるとき | `npm ls mssql` |
+| 8 | AI の CLI(Copilot CLI `copilot`・Kiro CLI `kiro-cli`・Claude Code `claude` のどれか1つ) | — | 端末の `pms run` が、カードごとに AI のセッションを起こす | 端末で進める人(4. の既定の進め方) | `copilot --version` など |
+
+AI 実行PC のほかに、次のマシンが要ります。**管理者が用意するもので、使う人が入れるものはありません。**
+
+- **PMS サーバー(検証環境。Hyper-V の VM)**: PMS と SQL Server。AI 実行PC から PMS の画面(`pms.url`)・SQL Server のポート(既定 1433)・WinRM(5985)に届くこと(8. の6・10)
+- **Hyper-V ホスト**: PMS サーバーの VM をゴールデンイメージに戻す。AI 実行PC と同じ PC でもよい(`remote/README.md`)
+
+### 2.2 入れ方
+
+PowerShell で、上から順に行います。winget(Windows のパッケージ管理。Windows 10/11 に標準で入っている)を使います。すでに入っているものは飛ばします。
+
+1. **Git・Node.js・VS Code を入れる**
+   ```powershell
+   winget install --id Git.Git --exact --accept-package-agreements --accept-source-agreements
+   winget install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements
+   winget install --id Microsoft.VisualStudioCode --exact --accept-package-agreements --accept-source-agreements   # VS Code を使うとき
+   ```
+   **入れたあとは、端末と VS Code を閉じて開き直します。** PATH(コマンドの置き場所)の変更は、新しく開いた端末にしか効きません。以降の手順でも同じです
+2. **IDE と AI を用意する**(どれか1つ)。VS Code なら拡張機能の GitHub Copilot Chat を入れて GitHub アカウントでサインインし、チャットをエージェントモードにします。Kiro・Claude Code はそれぞれの公式の手順で入れてサインインします(Claude Code は PowerShell で `irm https://claude.ai/install.ps1 | iex`)。組織の設定で使ってよいかは管理者に確かめます
+3. **リポジトリを取得し、コミットの前の検査を有効にする**(8. の4。1回だけ)
+   ```powershell
+   git clone <リポジトリの URL>
+   cd <リポジトリのフォルダ>
+   git config core.hooksPath tools/git-hooks
+   ```
+4. **playwright-cli を入れる**
+   ```powershell
+   npm install -g @playwright/cli@0.1.22
+   playwright-cli --version          # 0.1.22 と出る
+   ```
+   - 版を変えると、進行役が出力を読み取れなくなることがあります(13.)。管理者が別の版に決めたときは、その版を入れます
+   - `config/pms.json` を見本 `config/pms.sample.json` から作った場合は、`playwright_cli` を `["playwright-cli"]` に直します(見本の `["npx", "--no-install", "playwright-cli"]` は、リポジトリの中に入れた場合の書き方です)。`config/pms.json` がなければ、そのままで使えます
+   - playwright-cli はブラウザを自分で起動します。初めての探索で「ブラウザが見つからない」旨のエラーになったら、Google Chrome を入れます(`winget install --id Google.Chrome --exact`)
+5. **sqlcmd を入れる**(Go 版が手軽です)
+   ```powershell
+   winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
+   ```
+   端末を開き直してから `sqlcmd -?` で起動できることを確かめます。ODBC 版を使うとき・DB に接続するまでの準備(ファイアウォール・SQL ログイン・ログイン情報の保存)は 8. の10 にあります。DB の接続先とログインは管理者から聞くか、作業10の始めに AI に聞かれたときに答えます(5. の「環境の情報を聞かれたら」)
+6. **Playwright Test を入れる**(リポジトリのルートで)
+   ```powershell
+   npm install                                            # package.json がすでにあるとき(メンバーが入れたものを揃える)
+   ```
+   リポジトリにまだ `package.json` がない(最初の1人)ときは、次で作り、`package.json`・`package-lock.json` をコミットします(`node_modules/` は git に入りません)
+   ```powershell
+   npm init -y
+   npm install --save-dev @playwright/test mssql
+   ```
+   どちらの場合も、続けて回帰テストが使うブラウザを入れます
+   ```powershell
+   npx playwright install chromium
+   ```
+7. **(端末で進める人)AI の CLI を入れて認証する。** どれか1つを入れ、使う CLI の名前を `config/pms.json` の `default_runner` に書きます。設定の詳細は 8. の11 です
+   - Copilot CLI: `npm install -g @github/copilot` のあと `copilot` を起動してログイン(またはトークン `COPILOT_GITHUB_TOKEN`)
+   - Claude Code: 手順2で入れた `claude` を起動してログイン(または `ANTHROPIC_API_KEY`)
+   - Kiro CLI: Kiro の公式の手順で入れ、非対話の実行のために `KIRO_API_KEY` を設定
+
+入れ終わったら、**端末を開き直して**からリポジトリのルートで次を実行し、どれもエラーにならないことを確かめます。
+
+```powershell
+$PSVersionTable.PSVersion; git --version; node -v; playwright-cli --version; sqlcmd -?; npx playwright --version
+node tools/build-skills/build-skills.mjs --check          # skills_in_sync: OK
+node tools/env/env.mjs check                              # "ok":true
+```
+
+`pms db --check`(DB への接続)は、検証環境の情報を保存したあとに確かめます(8. の9・10)。AI にこの準備を頼むときは、「`docs/skills版_利用説明書.md` の 2. の動作環境を入れて」と伝えれば足ります。ただし、サインイン・ログイン・管理者権限の要るインストール(ODBC 版の sqlcmd など)は、人が画面で行います。
 
 ## 3. 使い方
 
@@ -227,7 +308,7 @@ skills版/
 
 ## 8. 導入手順
 
-1. **リポジトリに置く。** `skills版/` の中身(`procedure/`・`tools/`・`config/`・`work/_common/prohibited-operations.md`・`.github/`・`.kiro/`・`.claude/`・`.gitattributes`)を、回帰テストのリポジトリのルートに置きます。`kb/`・`work/`・`tests/` などの作業場所と同じ階層です。**すでに記入済みの禁止操作リストがある場合は、`work/_common/prohibited-operations.md` を上書きしないでください**(`config/environments.json`・`config/environments.local.json` がすでにある場合も上書きしない)
+1. **リポジトリに置く。** 先に、AI 実行PC に 2.1 の動作環境を入れておきます(入れ方は 2.2)。`skills版/` の中身(`procedure/`・`tools/`・`config/`・`work/_common/prohibited-operations.md`・`.github/`・`.kiro/`・`.claude/`・`.gitattributes`)を、回帰テストのリポジトリのルートに置きます。`kb/`・`work/`・`tests/` などの作業場所と同じ階層です。**すでに記入済みの禁止操作リストがある場合は、`work/_common/prohibited-operations.md` を上書きしないでください**(`config/environments.json`・`config/environments.local.json` がすでにある場合も上書きしない)
 2. **生成できることを確かめる。** Node.js 18 以上で次を実行します(外部パッケージは不要です)
    ```
    node tools/build-skills/build-skills.mjs --check

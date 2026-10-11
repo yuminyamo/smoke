@@ -42,7 +42,7 @@ AI を動かして回帰テストを作る PC(以下「AI 実行PC」)に、次�
 | 6 | sqlcmd(Go 版 `go-sqlcmd` か ODBC 版のどちらか) | Go 版 v1.10.0・ODBC 版 15.0.4298.1 で確かめ済み | 検証環境の DB を読み取って確かめる(`pms db`。作業10の開始時にも接続を確かめる) | 全員 | `sqlcmd -?`(引数なしの `sqlcmd` は使わない) |
 | 7 | Playwright Test(npm パッケージ `@playwright/test`)とブラウザ | 1.64.0(`package.json` で固定。付録F の機能には 1.42 以上が要る) | 作業20で作った回帰テストの実行 | 全員(作業20) | `npx playwright --version` |
 |   | `mssql`(npm パッケージ。Windows 認証で DB に入るときは `msnodesqlv8` も) | — | 回帰テストの中で DB を確かめる(付録F) | DB を確かめるテストがあるとき | `npm ls mssql` |
-| 8 | AI の CLI(Copilot CLI `copilot`・Kiro CLI `kiro-cli`・Claude Code `claude` のどれか1つ) | — | 端末の `pms run` が、カードごとに AI のセッションを起こす | 端末で進める人(4. の既定の進め方) | `copilot --version` など |
+| 8 | AI の CLI(GitHub Copilot CLI `copilot`・Kiro CLI `kiro-cli`・Claude Code の CLI `claude` のどれか1つ。**必須**) | — | 端末の `pms run` が、カードごとに AI のセッションを起こす | 全員(次のどれか1つ) | `copilot --version`・`kiro-cli --version`・`claude --version` |
 
 AI 実行PC のほかに、次のマシンが要ります。**管理者が用意するもので、使う人が入れるものはありません。**
 
@@ -98,7 +98,7 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
    winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
    ```
    端末を開き直してから `sqlcmd -?` で起動できることを確かめます。ODBC 版を使うとき・DB に接続するまでの準備(ファイアウォール・SQL ログイン・ログイン情報の保存)は 8. の10 にあります。DB の接続先とログインは管理者から聞くか、作業10の始めに AI に聞かれたときに答えます(5. の「環境の情報を聞かれたら」)
-7. **(端末で進める人)AI の CLI を入れて認証する。** どれか1つを入れ、使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。設定の詳細は 8. の11 です
+7. **AI の CLI を入れて認証する(全員。必須)。** GitHub Copilot CLI・Kiro CLI・Claude Code の CLI のどれか1つを入れ、使う CLI の名前(`copilot`・`kiro`・`claude`)を `config/pms.json` の `default_runner` に書きます。設定の詳細は 8. の11 です
    - Copilot CLI: グローバルに入っていなければ(`copilot --version` がエラー)、リポジトリの中に入れたものを使います。`package.json` にまだ `@github/copilot` がなければ、管理者に足してもらいます(手順4の「パッケージを足す」。足されたら `git pull` のあと `npm ci` で入ります)
      ```powershell
      npm ci                            # package-lock.json に @github/copilot があれば入る
@@ -185,13 +185,12 @@ node tools/env/env.mjs check                              # "ok":true
 - 正常に終わらなかったものを問い合わせても解決しなかったときは、記録だけを残してコード生成へ進みます(管理者の確認待ちになります)
 - 2回目は**新しいチャット**で頼むのがおすすめです(1回目のやり取りに引きずられず、記録だけを元にテストを作らせるため)
 - 途中で中断しても、`F-xxx の続き` で再開できます(進み具合はファイルに残っています)
-- シナリオを作ったあとの前提状態の準備(ログイン済みにする・テスト用デバイスを登録する など)と、画面での確認(探索)は、進行役のプログラム(`tools/pms/pms.mjs`)が「カード」に分けて行います(前提状態の準備は proc-v017、探索は proc-v018 以降)。**端末で `node tools/pms/pms.mjs run --flow F-xxx` を実行すると、進行役がカードを1枚ずつ、新しいAIのセッション(Copilot CLI か Kiro CLI)に行わせます。** AIが途中で止まっても進行役が同じカードをやり直させ、提出されたかどうかは進行役が記録で確かめます。画面の操作・記録・報告書の数値はプログラムが作るので、AIが記録を書き忘れることはありません。終わったらチャットで「F-xxx の続き」と伝えます
+- シナリオを作ったあとの前提状態の準備(ログイン済みにする・テスト用デバイスを登録する など)と、画面での確認(探索)は、進行役のプログラム(`tools/pms/pms.mjs`)が「カード」に分けて行います(前提状態の準備は proc-v017、探索は proc-v018 以降)。**端末で `node tools/pms/pms.mjs run --flow F-xxx` を実行すると、進行役がカードを1枚ずつ、新しいAIのセッション(Copilot CLI・Kiro CLI・Claude Code の CLI のどれか)に行わせます。** AIが途中で止まっても進行役が同じカードをやり直させ、提出されたかどうかは進行役が記録で確かめます。画面の操作・記録・報告書の数値はプログラムが作るので、AIが記録を書き忘れることはありません。終わったらチャットで「F-xxx の続き」と伝えます
 - `pms run` が使う AI は、`config/pms.json` の `default_runner` で決まります。その回だけ変えるときは `--runner copilot`・`--runner kiro`・`--runner claude` を付けます(例 `node tools/pms/pms.mjs run --flow F-xxx --runner claude`)
 - `pms run` は時間がかかります(1枚の上限は既定で15分)。途中で止めたいときは Ctrl+C で止め、もう一度 `pms run` を実行すれば続きから行います。進み具合は `node tools/pms/pms.mjs status --flow F-xxx` で見られます
 - **進め方は2つから選べます**(proc-v019 以降)。ふだんは**端末で進める**(`pms run`。既定)を使います。人がそばにいなくても進み、AIの会話が長くならないためです。**チャットで進める**は、チャットのエージェントを `pms-runner` に切り替えて「F-xxx を進めて」と伝える方法です。次のときに使います
   - AIの動きを見ながら、おかしければその場で止めたいとき(初めての画面を探索するとき・カードの中身を作り込むとき)
   - 途中で人の判断(環境の情報が足りない・許可が要る操作など)が要りそうで、その場で答えたいとき
-  - Copilot CLI・Kiro CLI・Claude Code の CLI を使えないとき
 - エージェントの切り替え方: VS Code はチャットの **Agent のドロップダウン**で `pms-runner` を選びます。Kiro はチャットの入力欄の行にある**エージェントの選択**で `pms-runner` を選びます。Claude Code は端末で `claude --agent pms-runner` を起動します(Claude Code ではサブエージェントがサブエージェントを呼べないため、チャットの途中で切り替えるのではなく、`pms-runner` をメインにして起動します)。終わったら元のエージェントに戻し、`/pms-regression F-xxx の続き` と伝えます(報告書と記録の検査はそこで行います)
 - チャットで進めていて止まった(「続けますか」と聞かれた・返事が途中で終わった)ときは、`pms-runner` に「続けて」と伝えれば続きから進みます。進み具合はファイルにあるので、やり直しにはなりません。どちらの進め方でも、記録・検査・報告書は同じです
 - IDE でサブエージェントを使えない(`pms-runner` が一覧に出ない・別のAIを呼べない)ときは、`/pms-regression F-xxx の続き。pms-runner を使えない` と伝えてください。チャットの中でカードを順に行います(時間がかかり、長い会話になります)

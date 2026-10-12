@@ -1,0 +1,26 @@
+stage: "40"
+improvement_run: IR-003
+procedure_version: proc-v032
+procedure_version_before: proc-v031
+procedure_version_after: proc-v032
+outcome: success
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 0
+  signals_routed: { 手順: 0, KB: 0, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 0, 見送り: 0 }
+  imp_opened: { A: 0, B: 1, C: 0 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: []
+  imp_revert_recommended: []
+  imp_pending_human: [IMP-003, IMP-004, IMP-005]
+  imp_by_instruction: [IMP-006]
+  guard_alert: none
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-003/report.md
+  diffs: work/_improve/IR-003/diffs/IMP-006.diff
+  ledger: work/_common/procedure-improvement.md
+  metrics: work/_improve/metrics.md
+notes: 人間の指示による改訂(IMP-006。付録E の T13 の記入例を架空の型と ID UIT-9001 に差し替え)のみ。IR-002 以降に完了したフローも新しいシグナルもない。判定期限に達した試行中の改訂はない。lint の ERROR 1件(procedure_version_present。F-001 の成果物)は改訂前からある。

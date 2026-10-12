@@ -1,6 +1,6 @@
 {
   "_comment": "進行役 pms の設定の見本(00_common.md ■進行役と記録の道具。仕様は tools/pms/README.md)。使うときは config/pms.json にコピーして各自の値にする(config/pms.json は git に入れない)。ファイルがなければ runner 以外は下の値が既定として使われる。pms run は runner が要る。",
-  "playwright_cli": ["npx", "--no-install", "playwright-cli"],
+  "playwright_cli": ["node", "node_modules/@playwright/cli/playwright-cli.js"],
   "playwright_cli_version": "0.1.22",
   "session_arg": "-s={session}",
   "open_args": ["--idle-timeout=0"],

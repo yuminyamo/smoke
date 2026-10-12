@@ -233,7 +233,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 
 | キー | 既定 | 内容 |
 |---|---|---|
-| `playwright_cli` | `["playwright-cli"]` | playwright-cli の呼び出し方(コマンドの配列) |
+| `playwright_cli` | `["playwright-cli"]` | playwright-cli の呼び出し方(コマンドの配列)。shell を通さずに起動するので、Windows では `npx`・`.cmd` は使えない。見本の `["node", "node_modules/@playwright/cli/playwright-cli.js"]` はどの OS でも動く |
 | `playwright_cli_version` | null | 想定する版。`open` のときに `--version` と比べ、違えば警告 |
 | `session_arg` | `-s={session}` | セッション名の引数(`{session}` はフローID) |
 | `open_args` | `["--idle-timeout=0"]` | `open` に足す引数 |

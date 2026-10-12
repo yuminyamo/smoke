@@ -85,14 +85,14 @@ PowerShell で、上から順に行います。winget(Windows のパッケージ
      npx --no-install playwright-cli --version     # 0.1.22 と出る
      npx --no-install playwright --version
      ```
-   - **すでにグローバルに playwright-cli が入っている**(`playwright-cli --version` で 0.1.22 と出る)ときは、それを使っても構いません。その場合は手順5の `config/pms.json` で `playwright_cli` を `["playwright-cli"]` にします
+   - **すでにグローバルに playwright-cli が入っている**(`playwright-cli --version` で 0.1.22 と出る)ときは、それを使っても構いません。その場合は手順5の `config/pms.json` で `playwright_cli` を `["playwright-cli"]` にします。**ただし Windows では使えません**(グローバルの `playwright-cli` の実体は `playwright-cli.cmd` で、進行役は shell を通さずにコマンドを起動するため「見つかりません」になります。`npx` も同じです)。Windows ではリポジトリの中に入れたものを見本の形で使います
    - 版を変えると、進行役が出力を読み取れなくなることがあります(13.)。版を変える・パッケージを足すのは管理者です。`npm install --save-dev <パッケージ>@<版>` で `package.json` と `package-lock.json` を一緒に直してコミットし、ほかのメンバーは `git pull` のあと `npm ci` します(`package-lock.json` を手で直さない)
    - playwright-cli はブラウザを自分で起動します。初めての探索で「ブラウザが見つからない」旨のエラーになったら、Google Chrome を入れます(`winget install --id Google.Chrome --exact`)
-5. **進行役の設定 `config/pms.json` を作る。** 進行役 `pms` は、リポジトリの中に入れた playwright-cli を `npx --no-install playwright-cli` で呼びます。この呼び方は見本 `config/pms.sample.json` に書いてあるので、見本を写します(`config/pms.json` は各自のファイルで、git に入りません)
+5. **進行役の設定 `config/pms.json` を作る。** 進行役 `pms` は、リポジトリの中に入れた playwright-cli を `node node_modules/@playwright/cli/playwright-cli.js` で呼びます(Windows・Mac・Linux で同じ。`npx` は Windows では `npx.cmd` で、shell を通さずに起動する進行役からは呼べないため使いません)。この呼び方は見本 `config/pms.sample.json` に書いてあるので、見本を写します(`config/pms.json` は各自のファイルで、git に入りません)
    ```powershell
    if (-not (Test-Path config\pms.json)) { Copy-Item config\pms.sample.json config\pms.json }
    ```
-   `config/pms.json` がないと、進行役は PATH の `playwright-cli`(グローバル)を呼ぶので、リポジトリの中に入れたものが見つからずに失敗します。グローバルのものを使うときは、`"playwright_cli": ["playwright-cli"]` に直します。ほかの項目(`default_runner` など)は手順7と 8. の10・11 で直します
+   `config/pms.json` がないと、進行役は PATH の `playwright-cli`(グローバル)を呼ぶので、リポジトリの中に入れたものが見つからずに失敗します。グローバルのものを使うときは、`"playwright_cli": ["playwright-cli"]` に直します(Mac・Linux のみ。Windows では上の理由で使えません)。ほかの項目(`default_runner` など)は手順7と 8. の10・11 で直します
 6. **sqlcmd を入れる**(Go 版が手軽です)。sqlcmd は npm のパッケージではないので、winget で PC に入れます
    ```powershell
    winget install --id Microsoft.Sqlcmd --exact --accept-package-agreements --accept-source-agreements
@@ -361,7 +361,7 @@ skills版/
    ```
    保存できたかは `node tools/env/env.mjs list` で確かめます(秘密情報は `"set": true`・`"source": "local"` で、値は `****` と出ます)
    共有の `config/environments.json`(パスワードを含まない)はコミットします。1人1台の VM で運用する場合は、各自が `node tools/env/env.mjs use <自分の環境ID>` で既定の環境を決めます(各自の設定に入ります)。回帰テストを回すときは環境変数 `PMS_ENV` で環境を選べます
-10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(例 `["npx", "--no-install", "playwright-cli"]`。2.2 の手順でリポジトリの中に入れたときは、見本の値のままで使えます)。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`。どちらでも動きます)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で、次の順に行います
+10. **進行役(pms)が playwright-cli を呼べるようにする**(proc-v017 以降)。前提状態の準備と探索の画面操作は、AIが playwright-cli を直接呼ばず、進行役 `tools/pms/pms.mjs` が呼びます。playwright-cli の呼び出し方が既定(`playwright-cli`)と違うときは、`config/pms.sample.json` を `config/pms.json` にコピーして `playwright_cli` を直します(見本の値は `["node", "node_modules/@playwright/cli/playwright-cli.js"]`。2.2 の手順でリポジトリの中に入れたときは、見本の値のままで使えます。Windows では `npx` や `.cmd` のコマンドを書かない(進行役は shell を通さずに起動するため見つからない))。版を固定している場合は `playwright_cli_version` に書きます(違うと警告が出ます)。`config/pms.json` は各自のファイルで、git には入りません。設定の意味は `tools/pms/README.md` 7章にあります。DB の確認(`pms db`)には **sqlcmd** が要ります(ODBC 版か Go 版の `go-sqlcmd`。どちらでも動きます)。`sqlcmd` で呼べないときは `db_cli` を直します。DB に接続するための準備は、AI 実行PC とPMS サーバーの両方で、次の順に行います
    - **AI 実行PC: sqlcmd を入れる。** Go 版か ODBC 版のどちらかを入れます(両方入れてもかまいません。`pms db` は `db_cli` の sqlcmd を `-?` の出力で見分け、SQL Server 認証のパスワードの渡し方を変えます。見分けを固定するときは `config/pms.json` の `db_cli_kind` を `odbc` か `go` にします。既定は `auto`。`tools/pms/README.md` 2.7)
      - Go 版(手軽。`C:\Program Files\SqlCmd\sqlcmd.exe` に入ります。すでに入っていれば「利用可能なアップグレードが見つかりませんでした」と出ます)
        ```

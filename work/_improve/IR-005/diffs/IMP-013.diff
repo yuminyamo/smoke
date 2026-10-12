@@ -1,0 +1,67 @@
+diff --git a/procedure/00_common.md b/procedure/00_common.md
+index 58df1ec..7ab542d 100644
+--- a/procedure/00_common.md
++++ b/procedure/00_common.md
+@@ -353,10 +353,11 @@ VM の復元では戻らない環境(複合機などの機器の設定)を、作
+ 
+ 再実行耐性と並列耐性を同時に満たすためのテストデータ規約:
+ 
+-1. **[R-DAT-1]** **作成データの一意化**: テストが作成するデータには、実行のたびに一意になる識別子を含める(書式は `vocab.id_format.test_data`。実行識別子はテスト開始時に1回生成し、そのテスト内で使い回す)
+-2. **アサーションの自データスコープ**: 期待結果を環境全体の件数・状態で書かない(「ジョブ一覧が1件になる」は不可)。自テストが作成したデータに限定して検証する。DB検証もWHERE句で自データに絞る
++1. **[R-DAT-1]** **作成データの一意化**: テストが作成するデータには、実行のたびに一意になる識別子を含める(書式は `vocab.id_format.test_data`。実行識別子はテスト開始時に1回生成し、そのテスト内で使い回す)。**1つのテストで役割の違うデータ(例: ユーザーグループとユーザー)を作るときは、役割ごとに別の値にする**(書式の値の末尾に役割を表す短い語を付ける。例 `AT-SC-USR-02-<実行識別子>-grp` / `-usr`)。同じ値を使うと、画面の検査がどちらのデータで成り立ったかを区別できない
++2. **アサーションの自データスコープ**: 期待結果を環境全体の件数・状態で書かない(「ジョブ一覧が1件になる」は不可)。自テストが作成したデータに限定して検証する。DB検証もWHERE句で自データに絞る。**画面の検査も、自データの行・要素の中で行う**(ページ全体のロケータで、他のデータの表示に一致させない)
+ 3. **前提条件は established check で毎回確認する。** 環境がクリーンであることを暗黙の前提にしない
+ 4. **[R-DAT-2]** 一意化した値を画面上で特定する場合は、生成した値を変数として保持しロケータに渡す(動的文字列のハードコード禁止はロケータ規約の通り。変数参照は決定的であり問題ない)
++5. **[R-DAT-3]** **状態を変える操作・削除の対象は、自データの行・要素の中で取る。** 一覧で対象を選ぶときは、先に自データで絞り込み、自データの行だけが表示されたこと(自データのリンクが見え、表の本体の行が1行 等)を確かめてから、その行の中の要素を操作する。ページ全体で最初に見つかる要素(`.first()`・`.nth()`・行に絞らない role のロケータ)を、状態の変更・削除の対象にしない。前のステップの表示に頼らず、操作の直前に絞り込み直す。探索(`pms act`)とテストコードの両方に当てる
+ 
+ ## ■ 検証環境の情報(接続先・アカウント)
+ 
+diff --git a/procedure/vocab.yaml b/procedure/vocab.yaml
+index 086861d..89b3f18 100644
+--- a/procedure/vocab.yaml
++++ b/procedure/vocab.yaml
+@@ -496,7 +496,7 @@ id_format:
+   gotcha: "GOT-<4桁連番>"
+   ui_tip: "UIT-<4桁連番>"                  # KB T13 UI操作知見(部品の型ごとに1ファイル)
+   open_question: "Q-<3桁連番>"
+-  test_data: "AT-<シナリオID>-<実行識別子>"
++  test_data: "AT-<シナリオID>-<実行識別子>"  # 役割の違うデータを1つのテストで複数作るときは、末尾に -<役割>(例 -grp / -usr)を付ける(00 [R-DAT-1])
+   procedure_version: "proc-v<3桁連番>"     # 手順書一式の版。git のタグと一致させる
+   signal: "SIG-<4桁連番>"                  # 手順改善シグナル
+   improvement: "IMP-<3桁連番>"             # 手順の改訂(案)
+diff --git a/procedure/cards/explore.step.md b/procedure/cards/explore.step.md
+index 59be89a..d01dfe9 100644
+--- a/procedure/cards/explore.step.md
++++ b/procedure/cards/explore.step.md
+@@ -92,6 +92,7 @@ DB の接続: {{db_connection}}
+ {{rule:R-LOC-5}}
+ {{rule:R-LOC-6}}
+ {{rule:R-DAT-1}}
++{{rule:R-DAT-3}}
+ {{rule:R-ENV-1}}
+ {{rule:R-HO-1}}
+ {{rule:R-SIG-1}}
+diff --git a/procedure/cards/setup.build.md b/procedure/cards/setup.build.md
+index fafbe58..f969962 100644
+--- a/procedure/cards/setup.build.md
++++ b/procedure/cards/setup.build.md
+@@ -52,6 +52,7 @@
+ {{rule:R-LOC-5}}
+ {{rule:R-LOC-6}}
+ {{rule:R-DAT-1}}
++{{rule:R-DAT-3}}
+ {{rule:R-ENV-1}}
+ 
+ 外部操作と禁止操作(00_common.md の保護ブロック。文言を変えずに引用する):
+diff --git a/procedure/cards/setup.code.md b/procedure/cards/setup.code.md
+index 8423842..2eabe8a 100644
+--- a/procedure/cards/setup.code.md
++++ b/procedure/cards/setup.code.md
+@@ -43,6 +43,7 @@
+ {{rule:R-LOC-5}}
+ {{rule:R-LOC-6}}
+ {{rule:R-DAT-2}}
++{{rule:R-DAT-3}}
+ {{rule:R-ENV-1}}
+ 
+ ## 出力(この形の JSON を `{{out_file}}` に書く)

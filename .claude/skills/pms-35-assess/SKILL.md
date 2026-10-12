@@ -3,12 +3,12 @@ name: pms-35-assess
 description: "PMS回帰テスト作成の作業35(品質評価)。管理者が指示したときだけ、回帰テストを作ったセッションとは別のセッションで使う。作業20を終えたフローのテストコードと中間成果物(シナリオ・探索記録・報告書・KB)を読み、回帰を検出できるか(検出力)を中心に評価して、証拠付きの指摘・是正リスト・手順改善シグナルを出す。成果物と手順書は書き換えない。"
 disable-model-invocation: true
 metadata:
-  procedure_version: proc-v034
+  procedure_version: proc-v035
   generated_from: "procedure/stages.md §35"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §35 / 手順版: proc-v034 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §35 / 手順版: proc-v035 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業35 品質評価(手順版 proc-v034)
+# 作業35 品質評価(手順版 proc-v035)
 
 この skill は、手順書の正本の `stages.md` §35 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -35,7 +35,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v034` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v035` をそのまま転記する。
 
 ## この作業に固有の注意
 

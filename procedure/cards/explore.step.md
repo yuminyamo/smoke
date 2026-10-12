@@ -70,6 +70,7 @@ DB の接続: {{db_connection}}
 {{rule:R-EXP-13}}
 {{rule:R-EXP-14}}
 {{rule:R-EXP-15}}
+{{rule:R-EXP-20}}
 {{rule:R-JDG-1}}
 {{rule:R-JDG-2}}
 {{rule:R-JDG-3}}
@@ -92,6 +93,7 @@ DB の接続: {{db_connection}}
 {{rule:R-LOC-5}}
 {{rule:R-LOC-6}}
 {{rule:R-DAT-1}}
+{{rule:R-DAT-3}}
 {{rule:R-ENV-1}}
 {{rule:R-HO-1}}
 {{rule:R-SIG-1}}

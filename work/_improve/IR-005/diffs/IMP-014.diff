@@ -1,0 +1,24 @@
+diff --git a/procedure/stages.md b/procedure/stages.md
+index 9be9476..0682d2c 100644
+--- a/procedure/stages.md
++++ b/procedure/stages.md
+@@ -658,6 +658,7 @@ context_updates:
+ - **[R-EXP-13]** `blocked` にするのは実行できないステップ**以降**に限る(このカードのステップより前は探索済み)。`blocked_by` に理由(`vocab.reason_code`)・参照(`禁止操作` は禁止IDか包括原則の番号、`操作手段なし` は既存の需要ID か外部操作需要リストに書く項目。パートBで記録済みの申し送りがあれば `handoff` に)・再開するステップ(`resume_from`)を書く。後続のステップは pms が記録する
+ - **[R-EXP-14]** `assertion_hint` は必ず書く(`blocked` を除く)。作業20への引き継ぎとして、決定的に検証できる形で、**自シナリオのデータにスコープして**書く(環境全体の件数を基準にしない)。決定的な手段がなければ「決定的な検証手段が見つからない」と正直に書く
+ - **[R-EXP-15]** 非同期待機を行ったら、`wait` に待機条件・実測秒数・使ったタイムアウトを書く
++- **[R-EXP-20]** 否定の期待結果(表示されない・含まれない・変わらない 等)は、**操作の前後で差が出る対照を観測できたときだけ** `passed` にする。対照は自テストが作ったデータに限る(環境に残っている他のデータ・実データを対照にしない)。対照がなく前後で差が出ないときは、否定の部分を確かめられていないので `human-check` とし、`notes` に「否定の期待結果の対照なし」と書く(00 [R-JDG-2])。`passed` のときの `assertion_hint` は、対照が表示されない(変わらない)ことを確かめる形で書く
+ 
+ シナリオの終わり(`explore.close`)
+ 
+diff --git a/procedure/cards/explore.step.md b/procedure/cards/explore.step.md
+index 59be89a..196a68f 100644
+--- a/procedure/cards/explore.step.md
++++ b/procedure/cards/explore.step.md
+@@ -70,6 +70,7 @@ DB の接続: {{db_connection}}
+ {{rule:R-EXP-13}}
+ {{rule:R-EXP-14}}
+ {{rule:R-EXP-15}}
++{{rule:R-EXP-20}}
+ {{rule:R-JDG-1}}
+ {{rule:R-JDG-2}}
+ {{rule:R-JDG-3}}

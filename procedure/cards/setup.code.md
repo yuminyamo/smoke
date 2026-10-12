@@ -43,6 +43,7 @@
 {{rule:R-LOC-5}}
 {{rule:R-LOC-6}}
 {{rule:R-DAT-2}}
+{{rule:R-DAT-3}}
 {{rule:R-ENV-1}}
 
 ## 出力(この形の JSON を `{{out_file}}` に書く)

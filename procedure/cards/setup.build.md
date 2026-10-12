@@ -52,6 +52,7 @@
 {{rule:R-LOC-5}}
 {{rule:R-LOC-6}}
 {{rule:R-DAT-1}}
+{{rule:R-DAT-3}}
 {{rule:R-ENV-1}}
 
 外部操作と禁止操作(00_common.md の保護ブロック。文言を変えずに引用する):

@@ -33,7 +33,7 @@ AI を動かして回帰テストを作る PC(以下「AI 実行PC」)に、次�
 |---|---|---|---|---|---|
 | 1 | Windows と Windows PowerShell 5.1 | Windows 10/11・Windows Server に標準で入っている | 検証環境のゴールデンイメージへの復元・サーバーのログ収集(`tools/remote/pms-remote.ps1`) | 全員 | `$PSVersionTable.PSVersion`(5.1 と出る) |
 | 2 | Git | 新しいもの | リポジトリの取得・成果物のコミット | 全員 | `git --version` |
-| 3 | Node.js(npm・npx を含む) | **20 以上**(LTS 版を勧める。Playwright Test 1.64 が 20 以上を求める。進行役などの道具だけなら 18 以上で動く) | 進行役 `pms`・環境情報 `env.mjs`・lint・skills の生成・回帰テストの実行 | 全員 | `node -v` |
+| 3 | Node.js(npm・npx を含む) | **22 以上**(LTS 版を勧める。道具のテスト `npm run test:tools` が、`node --test` に glob を渡す形のため 22 以上を求める(Node 21 から、フォルダを渡しても中のテストを探さなくなった)。Playwright Test 1.64 は 20 以上。進行役などの道具を動かすだけなら 18 以上で動く) | 進行役 `pms`・環境情報 `env.mjs`・lint・skills の生成・回帰テストの実行 | 全員 | `node -v` |
 | 4 | IDE と AI のチャット | — | `/pms-regression` で依頼する | 全員(次のどれか1つ) | — |
 |   | ・VS Code + GitHub Copilot(Copilot Chat の拡張機能) | | | | |
 |   | ・Kiro | | | | |
@@ -320,7 +320,7 @@ skills版/
 ## 8. 導入手順
 
 1. **リポジトリに置く。** 先に、AI 実行PC に 2.1 の動作環境を入れておきます(入れ方は 2.2)。`skills版/` の中身(`procedure/`・`tools/`・`config/`・`work/_common/prohibited-operations.md`・`.github/`・`.kiro/`・`.claude/`・`.gitattributes`)を、回帰テストのリポジトリのルートに置きます。`kb/`・`work/`・`tests/` などの作業場所と同じ階層です。**すでに記入済みの禁止操作リストがある場合は、`work/_common/prohibited-operations.md` を上書きしないでください**(`config/environments.json`・`config/environments.local.json` がすでにある場合も上書きしない)
-2. **生成できることを確かめる。** Node.js 18 以上で次を実行します(外部パッケージは不要です)
+2. **生成できることを確かめる。** 次を実行します(生成は Node.js 18 以上で動き、外部パッケージは不要です。ワークスペースとしては 22 以上を使います)
    ```
    node tools/build-skills/build-skills.mjs --check
    ```

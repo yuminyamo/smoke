@@ -2,7 +2,7 @@
 
 手順版 proc-v017 で入れ(`docs/94_改訂指示/01_共通の土台.md`、段1)、proc-v018 でパートCのカード・`pms run`・`pms report`・`pms stats` を加えた(`02_スクリプト実行.md`、段2)。proc-v019 で IDE 内のループ(B1。入口のエージェント `pms-runner`)のために `next` の出力にエージェントの名前と依頼文を足した(`03_IDE内ループ.md`、段3。14章)。proc-v021 でカードを使わない作業の画面操作のために `pms pwcli` を足した(2.5)。proc-v024 で DB への SELECT のために `pms db` を足した(2.7)。手順書側の規約は `procedure/00_common.md` ■進行役と記録の道具 と `procedure/stages.md` §10 フェーズA・パートC にある。本書は、後の段の改訂を行うセッションが読む**仕様書**である(内部の構成・データの形・判断の根拠)。
 
-- Node.js 18 以上だけで動く(外部パッケージなし)。playwright-cli を呼ぶのは `pms act` と `pms pwcli` だけ、sqlcmd を呼ぶのは `pms db` だけ、AI の CLI を呼ぶのは `pms run` だけ
+- Node.js 18 以上だけで動く(外部パッケージなし)。ただし道具のテスト `npm run test:tools` は Node.js 22 以上が要る(`node --test` に glob を渡すため)。playwright-cli を呼ぶのは `pms act` と `pms pwcli` だけ、sqlcmd を呼ぶのは `pms db` だけ、AI の CLI を呼ぶのは `pms run` だけ
 - テスト: `node --test tools/pms/test/`(playwright-cli・AI の CLI・環境情報は偽物に差し替える。`test-support/`。カードを行うAIの代わりは `test-support/explore-agent.mjs`)
 - 入口: `node tools/pms/pms.mjs <サブコマンド>`。使い方は `--help`(ファイル先頭のコメント)
 

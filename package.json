@@ -4,12 +4,12 @@
   "private": true,
   "description": "PMS 回帰テスト作成のワークスペース。ここにある npm パッケージはリポジトリの node_modules に入れる(docs/skills版_利用説明書.md 2.2)",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "check:skills": "node tools/build-skills/build-skills.mjs --check",
     "lint": "node tools/lint/lint.mjs",
-    "test:tools": "node --test tools/build-skills/test/ tools/env/test/ tools/lint/test/ tools/pms/test/ tools/pre-stage/test/"
+    "test:tools": "node --test \"tools/*/test/*.test.mjs\""
   },
   "devDependencies": {
     "@playwright/cli": "0.1.22",

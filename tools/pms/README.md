@@ -219,7 +219,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
 
 | 差し込み | 中身 |
 |---|---|
-| `{{名前}}` | pms が埋める入力(状態ID・定義・状態需要リストの行・established check の案・KB の該当ページ(`kb/00_索引.md` と状態IDを含む `kb/` のファイル)・現在の画面の URL(直前の記録の `url_after`)・環境情報のキー(`env.mjs list` のキーと種類。値は出さない)・作り直しの説明・出し直しの説明・提出のコマンドなど。`lib/queue.mjs` の `cardVars`) |
+| `{{名前}}` | pms が埋める入力(状態ID・定義・状態需要リストの行・established check の案・KB の該当ページ(`kb/00_索引.md` と状態IDを含む `kb/` のファイル)・UI操作知見(`ui_tips`。KB T13 `kb/ui-tips/` の全ファイルのパスと `kb/00_索引.md` の主題の欄。ID の一致では選ばない。setup.build・setup.code・explore.step・explore.close だけ。`queue.mjs` の `uiTips`)・現在の画面の URL(直前の記録の `url_after`)・環境情報のキー(`env.mjs list` のキーと種類。値は出さない)・作り直しの説明・出し直しの説明・提出のコマンドなど。`lib/queue.mjs` の `cardVars`) |
 | `{{rule:R-XXX-n}}` | `procedure/00_common.md`・`procedure/stages.md` で `**[R-XXX-n]**` を付けた行(箇条書きの記号と目印を外し `- [R-XXX-n] …` にする。表の行は「1列目: 残りの列」)。同じ規則IDが2箇所にあれば終了コード 2 |
 | `{{protected:ID}}` | 保護ブロックの本文を、文言を変えずにブロックごと(00 → stages の順に探す) |
 | `{{vocab:キー}}` | 統制語彙の一覧(値の意味つき) |

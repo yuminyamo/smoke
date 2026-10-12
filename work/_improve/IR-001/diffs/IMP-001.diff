@@ -1,0 +1,164 @@
+diff --git a/config/pms.sample.json b/config/pms.sample.json
+index bdc9b68..adcde13 100644
+--- a/config/pms.sample.json
++++ b/config/pms.sample.json
+@@ -43,7 +43,7 @@
+       "stallWarnSec": 180
+     },
+     "claude": {
+-      "_comment": "Claude Code の CLI(非対話の -p。依頼文は標準入力)。エージェントは .claude/agents/pms-card-*.md、モデルは procedure/cards/agents.yaml の kinds.<種類>.claude_model。使用禁止は生成したエージェントの disallowedTools に書いてあり、ここの deny で CLI にも重ねて渡す(--disallowedTools は --allowedTools より優先する)。-p では確認の要る道具が使えないため、編集は --permission-mode acceptEdits、シェルは --allowedTools Bash で許す。認証は claude へのログインか環境変数 ANTHROPIC_API_KEY。Windows で起動できない(ENOENT)ときは command の先頭を claude.exe の絶対パスにする",
++      "_comment": "Claude Code の CLI(非対話の -p。依頼文は標準入力)。エージェントは .claude/agents/pms-card-*.md、モデルは procedure/cards/agents.yaml の kinds.<種類>.claude_model。使用禁止はここの deny だけで CLI に渡す(--disallowedTools は --allowedTools より優先する)。生成したエージェントには disallowedTools を書かない(規則の形を書くと Bash・Edit の道具そのものが外れる。proc-v029)。-p では確認の要る道具が使えないため、編集は --permission-mode acceptEdits、シェルは --allowedTools Bash で許す。認証は claude へのログインか環境変数 ANTHROPIC_API_KEY。Windows で起動できない(ENOENT)ときは command の先頭を claude.exe の絶対パスにする",
+       "command": ["claude", "-p", "--agent", "{agent}", "--model", "{model}", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--allowedTools", "Bash", "{deny}"],
+       "deny_arg": ["--disallowedTools", "{pattern}"],
+       "deny": [
+diff --git a/procedure/00_common.md b/procedure/00_common.md
+index a087e64..791d9e8 100644
+--- a/procedure/00_common.md
++++ b/procedure/00_common.md
+@@ -3,7 +3,7 @@
+ 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
+ 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
+ 
+-改訂: 2026-10-11 / 版: v28(SQL Server の参照用ユーザー: ■DB への接続 に、検証環境は混合モードで、読み取りだけの参照用ユーザー `e2e_reader` に SQL Server 認証でログインする前提と、参照用ユーザーを作るコマンドを加えた。`db.auth` の既定を `sql` にした(proc-v028)。人間の指示による改訂。前版 v27 は 2026-10-09 の `pms db` のパスワードの渡し方)
++改訂: 2026-10-11 / 版: v29(Claude Code のエージェントの使用禁止: ■進行役と記録の道具 に、Claude Code はエージェントの定義の `disallowedTools` に書かず `runner.claude.deny` だけで止めることを書いた(proc-v029)。人間の指示による改訂。前版 v28 は同日の SQL Server の参照用ユーザー)
+ 
+ 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
+ 
+@@ -131,7 +131,7 @@
+ 
+ **IDE でサブエージェントを使えない場合**(組織の設定で止められている等)だけ、チャットの作業10(`pms-10-explore`)が同じ会話の中で `pms next` のカードを順に行ってよい(`stages.md` §10 パートC)。この形は、カードごとに会話を捨てられないため、会話が長くなる。
+ 
+-**`pms run` が起こすセッションで使用禁止にするもの**(`config/pms.json` の `runner` の使用禁止のパターンと、生成したエージェントの定義で止める):
++**`pms run` が起こすセッションで使用禁止にするもの**(`config/pms.json` の `runner` の使用禁止のパターンと、生成したエージェントの定義で止める。**Claude Code は `runner.claude.deny`(CLI の `--disallowedTools`)だけで止め、エージェントの定義の `disallowedTools` には書かない**。規則の形(`Bash(sqlcmd *)` など)をエージェントの定義に書くと、Bash・Edit の道具そのものが外れて `pms act`・`pms submit` を実行できないため。このため B1 の Claude Code のサブエージェントには使用禁止がなく、記録の検査(`seq_missing`)とカードの規則で止める):
+ 
+ | 使用禁止 | 理由 |
+ |---|---|
+diff --git a/procedure/cards/agents.yaml b/procedure/cards/agents.yaml
+index 6f69732..014995f 100644
+--- a/procedure/cards/agents.yaml
++++ b/procedure/cards/agents.yaml
+@@ -12,7 +12,8 @@
+ # cardTypes.<種類>.model があればそちらを使う)。Kiro はモデルの名前が違うため kiro_model に書く(なければ書かない)。
+ # Claude Code も同じく claude_model に書く(Claude Code のモデルの別名 sonnet・haiku・opus か、モデルID)。エージェントの定義の model と、
+ # pms run --runner claude の {model} の両方に使う(pms run は config/pms.json の cardTypes.<種類>.runners.claude.model があればそちらを使う)。
+-# 使用禁止(Kiro のエージェントの permissions、Claude Code のエージェントの disallowedTools に書く。Copilot は config/pms.json の runner.copilot.deny で CLI に渡す):
++# 使用禁止(Kiro のエージェントの permissions に書く。Copilot は config/pms.json の runner.copilot.deny、Claude Code は runner.claude.deny で CLI に渡す。
++# Claude Code のエージェントの disallowedTools には書かない: 規則の形(Bash(sqlcmd *) など)を書くと Bash・Edit の道具そのものが外れる(SIG-0009)):
+ #   deny_shell: すべての種類に共通のシェルのパターン / deny_write: 書き込みを禁止するパス
+ #   kinds.<種類>.deny_shell_extra: その種類だけに足すパターン
+ #
+diff --git a/procedure/docs/000_overview.md b/procedure/docs/000_overview.md
+index c1a23d3..5f349ea 100644
+--- a/procedure/docs/000_overview.md
++++ b/procedure/docs/000_overview.md
+@@ -238,6 +238,29 @@ DB不変条件の違反は自動リトライで処理せず、人間の判断へ
+ 
+ # 改訂履歴
+ 
++## 39. 2026-10-11 改訂(Claude Code のエージェントの使用禁止)— 手順版 proc-v029
++
++**人間の指示による改訂である**(作業40 IR-001。改訂 IMP-001、状態 `指示適用`)。F-001 の作業10で、`pms run --runner claude` のカード C-0001(setup.build)のセッションに Bash・Edit の道具がなく、`pms act`・`pms submit` を実行できずに STOP(issue_limit)になった(SIG-0009)。生成したカードのエージェント(`.claude/agents/pms-card-*.md`)の `disallowedTools` に規則の形(`Bash(sqlcmd *)` など)を書くと、Claude Code(2.1.296)は Bash・Edit の道具そのものを外す。CLI の `--disallowedTools` に同じ規則を渡したときは Bash は残る。
++
++指示の原文:
++
++> SIG-0009の改善を実施して。処理途中ですが気にせず修正して
++
++(SIG-0009 の改善案: 「Claude Code のエージェントの disallowedTools には規則の形を書かず、使用禁止は config/pms.json の runner.claude.deny(CLI の --disallowedTools)だけで渡す(tools/build-skills/build-skills.mjs の Claude Code のエージェントの生成)」)
++
++| # | 修正 | 対象 |
++|---|---|---|
++| 39.1 | IMP-001(CM/進行役と記録の道具(pms)): **Claude Code のカードのエージェントに `disallowedTools` を書かないようにした。** 使用禁止は `config/pms.json` の `runner.claude.deny` を `pms run` が `--disallowedTools` で渡すだけにする。■進行役と記録の道具 の「`pms run` が起こすセッションで使用禁止にするもの」に、その旨と、B1 の Claude Code のサブエージェントには使用禁止がなく記録の検査(`seq_missing`)とカードの規則で止めることを書いた。理由: SIG-0009 | 00 / tools/build-skills / cards/agents.yaml(注記) |
++| 39.2 | `tools/build-skills/test/build-skills.test.mjs`: Claude Code のカードのエージェントに `disallowedTools` がないことを確かめる形にした | tools/build-skills/test |
++| 39.3 | 見本 `config/pms.sample.json` の `runner.claude._comment` と `tools/pms/README.md` の実物で確かめることを、使用禁止は CLI だけで渡す書き方にした | config / tools/pms |
++| 39.4 | 手順版を `proc-v029` に更新し、skills とエージェントを生成し直した | vocab / skills |
++
++### 変更していないもの
++
++- `config/pms.json`(各自。git に入れない)の `runner.claude.deny` と `cardTypes.<種類>.runners.claude.deny` は、これまでどおり使用禁止のパターンを持つ。各自の設定に `runner.claude.deny` がなければ、見本から写す(写さないと B2 の Claude Code のセッションで使用禁止が効かない)
++- Kiro(`permissions`)・Copilot(`runner.copilot.deny`)の使用禁止の渡し方は変えていない
++- **配備の時機**: ■手順書の版と配備 はフローの境界でのみ配備するとするが、F-001(proc-v028 で開始。作業10の途中)の最中に配備した(指示の「処理途中ですが気にせず修正して」による)。F-001 の flow.md・フロー台帳の手順版は proc-v028 のまま。作業20の開始時の版の照合で食い違いが報告される見込み
++
+ ## 38. 2026-10-11 改訂(`db.auth` の既定を `sql` に)— 手順版 proc-v028
+ 
+ **人間の指示による改訂である。** 37章で検証環境は参照用ユーザーの SQL Server 認証を前提としたが、`db.auth` の既定は `windows` のまま残していた(37章「変更していないもの」)。その既定そのものを `sql` にする。
+diff --git a/procedure/vocab.yaml b/procedure/vocab.yaml
+index 39c1765..0fdd6d6 100644
+--- a/procedure/vocab.yaml
++++ b/procedure/vocab.yaml
+@@ -12,7 +12,8 @@
+ #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
+ #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
+ #
+-# 改訂: 2026-10-11 / 版: v30(db.auth の既定を sql に: 手順版を proc-v028 に更新、env_optional_keys.db.auth の default を windows から sql にした。人間の指示による改訂。前版 v29 は同日の SQL Server の参照用ユーザー)
++# 改訂: 2026-10-11 / 版: v31(Claude Code のエージェントの使用禁止: 手順版を proc-v029 に更新。語彙の変更なし。人間の指示による改訂。前版 v30 は同日の db.auth の既定)
++#       2026-10-11 / 版: v30(db.auth の既定を sql に: 手順版を proc-v028 に更新、env_optional_keys.db.auth の default を windows から sql にした。人間の指示による改訂。前版 v29 は同日の SQL Server の参照用ユーザー)
+ #       2026-10-11 / 版: v29(SQL Server の参照用ユーザー: 手順版を proc-v027 に更新、db.auth の説明に検証環境は sql(参照用ユーザー e2e_reader)を前提とすることを書いた。既定値は windows のまま。前版 v28 は 2026-10-10 の Claude Code への配備)
+ #       2026-10-10 / 版: v28(Claude Code への配備: 手順版を proc-v026 に更新。前版 v27 は 2026-10-09 の pms db のパスワードの渡し方)
+ #       2026-10-09 / 版: v27(pms db のパスワードの渡し方: 手順版を proc-v025 に更新、db.password の説明を標準入力で渡す形に直した。前版 v26 は 2026-10-08 の DB への接続を pms db に集約)
+@@ -43,8 +44,8 @@
+ 
+ meta:
+   step: 1                       # 本語彙が対象とするステップ
+-  revision: "2026-10-08"
+-  procedure_version: proc-v028  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
++  revision: "2026-10-11"
++  procedure_version: proc-v029  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+ 
+ # ── テスト種別 ───────────────────────────────────────────
+ test_type:
+diff --git a/tools/build-skills/build-skills.mjs b/tools/build-skills/build-skills.mjs
+index f701042..a93e922 100644
+--- a/tools/build-skills/build-skills.mjs
++++ b/tools/build-skills/build-skills.mjs
+@@ -398,13 +398,12 @@ function buildAgents(target) {
+       const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
+       put(`${dir}/${name}.agent.md`, fm + notice + instruction);
+     } else if (target.frontmatter === 'claude') {
+-      // Claude Code のサブエージェント(.claude/agents/<名前>.md)。使用禁止は disallowedTools に権限の規則の形で書く
+-      const shell = [...(agentsDef.deny_shell ?? []), ...(k.deny_shell_extra ?? [])];
+-      const disallowed = [...shell.map((p) => `Bash(${p})`), ...(agentsDef.deny_write ?? []).map((p) => `Edit(${p})`)];
++      // Claude Code のサブエージェント(.claude/agents/<名前>.md)。disallowedTools は書かない:
++      // 規則の形(Bash(sqlcmd *) など)を書くと Claude Code は Bash・Edit の道具そのものを外す(SIG-0009)。
++      // 使用禁止は config/pms.json の runner.claude.deny を pms run が CLI の --disallowedTools で渡す
+       const fm = ['---', `name: ${name}`, `description: ${yamlString(k.description)}`,
+         ...(k.claude_model ? [`model: ${k.claude_model}`] : []),
+-        `tools: ${(agentsDef.tools_claude ?? []).join(', ')}`,
+-        ...(disallowed.length ? [`disallowedTools: [${disallowed.map(yamlString).join(', ')}]`] : []), '---', ''].join('\n');
++        `tools: ${(agentsDef.tools_claude ?? []).join(', ')}`, '---', ''].join('\n');
+       const notice = `<!-- 自動生成。このファイルを直接編集しないこと。正本: ${agentsDef.rel}(カードの種類 ${kind})/ 手順版: ${VERSION} / 生成: tools/build-skills/build-skills.mjs -->\n\n`;
+       put(`${dir}/${name}.md`, fm + notice + instruction);
+     } else {
+diff --git a/tools/build-skills/test/build-skills.test.mjs b/tools/build-skills/test/build-skills.test.mjs
+index bcb6455..cd4fac8 100644
+--- a/tools/build-skills/test/build-skills.test.mjs
++++ b/tools/build-skills/test/build-skills.test.mjs
+@@ -102,16 +102,12 @@ test('build: 入口のエージェント pms-runner とカードの種類ごと
+   assert.equal(cfm.tools, `Bash, Agent(${kinds.map(cardAgent).join(', ')})`);
+   assert.equal(cmd.replace(/^---\n[\s\S]*?\n---\n/, ''), md.replace(/^---\n[\s\S]*?\n---\n/, ''));
+ 
+-  // Claude Code のカードのエージェント: 使用禁止を disallowedTools に書く(種類だけの禁止も足す)
++  // Claude Code のカードのエージェント: disallowedTools を書かない(規則の形を書くと Bash・Edit が外れる。SIG-0009)。
++  // 使用禁止は config/pms.json の runner.claude.deny を pms run が --disallowedTools で渡す
+   const cstep = frontmatter(fs.readFileSync(path.join(root, '.claude/agents/pms-card-explore-step.md'), 'utf8'));
+   assert.equal(cstep.name, 'pms-card-explore-step');
+   assert.equal(cstep.tools, 'Read, Edit, Write, Grep, Glob, Bash');
+-  assert.ok(cstep.disallowedTools.includes('Bash(sqlcmd *)'), cstep.disallowedTools.join(' '));
+-  assert.ok(cstep.disallowedTools.includes('Bash(npx *)'));
+-  assert.ok(cstep.disallowedTools.includes('Edit(procedure/**)'));
+-  assert.ok(cstep.disallowedTools.includes('Edit(.claude/agents/**)'));
+-  const ccode = frontmatter(fs.readFileSync(path.join(root, '.claude/agents/pms-card-setup-code.md'), 'utf8'));
+-  assert.ok(!ccode.disallowedTools.includes('Bash(npx *)'));
++  assert.equal(cstep.disallowedTools, undefined);
+ });
+ 
+ test('build: skills を Claude Code にも生成し、手動の skill には disable-model-invocation を付ける', () => {
+diff --git a/tools/pms/README.md b/tools/pms/README.md
+index 133812d..ede5e80 100644
+--- a/tools/pms/README.md
++++ b/tools/pms/README.md
+@@ -378,4 +378,4 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
+ - サブエージェントの端末で `PMS_RUNNER` が設定されず、提出の記録が `b1` になるか(`pms stats` で `b1` と `b2` が分かれるか)
+ - Kiro IDE で、Workflows を有効にしているときに、入口がサブエージェントの終わりを待たずに `pms next` を呼ばないか。呼ぶと、同じカードが二重に出る(出し直しの回数が増え、上限で STOP になる)。待たない場合は、`pms-runner` を使うあいだ Workflows を無効にする(利用説明書の既知の制約)
+ - Kiro IDE で、`permissions` の `allow` と `toolsSettings` の旧形式を併記した `pms-runner.json` を読めるか
+-- Claude Code で、`claude --agent pms-runner` が `Agent(pms-card-…)` に並べたカードのエージェントだけを呼べるか。カードのエージェントの `disallowedTools`(`Bash(sqlcmd *)`・`Edit(procedure/**)` など)で、使用禁止のコマンドと書き込みが実際に拒まれるか。拒まれないときは、パターンの書き方(`Bash(sqlcmd:*)` など)を生成スクリプトで直す
++- Claude Code で、`claude --agent pms-runner` が `Agent(pms-card-…)` に並べたカードのエージェントだけを呼べるか。`pms run --runner claude` が渡す `--disallowedTools`(`Bash(sqlcmd *)`・`Edit(procedure/**)` など)で、使用禁止のコマンドと書き込みが実際に拒まれるか。拒まれないときは、`config/pms.json` の `runner.claude.deny` のパターンの書き方を直す。**カードのエージェントの定義には `disallowedTools` を書かない**(Claude Code 2.1.296 では、規則の形を書くと Bash・Edit の道具そのものが外れた。CLI の `--disallowedTools` では Bash は残る。proc-v029)

@@ -12,7 +12,8 @@
 #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
 #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
 #
-# 改訂: 2026-10-11 / 版: v32(DB不変条件の定義を撤回: 手順版を proc-v030 に更新、invariant を定義対象なし(空)にし、invariant_note を書き直した。人間の指示による改訂。前版 v31 は同日の Claude Code のエージェントの使用禁止)
+# 改訂: 2026-10-12 / 版: v33(KB カテゴリ T13 UI操作知見の新設: 手順版を proc-v031 に更新、kb_category に T13、id_format に ui_tip、reflection_target.kb の反映先に T13 を加え、T10 の説明に T13 との分け方を書いた。人間の指示による改訂。前版 v32 は 2026-10-11 の DB不変条件の定義の撤回)
+#       2026-10-11 / 版: v32(DB不変条件の定義を撤回: 手順版を proc-v030 に更新、invariant を定義対象なし(空)にし、invariant_note を書き直した。人間の指示による改訂。前版 v31 は同日の Claude Code のエージェントの使用禁止)
 #       2026-10-11 / 版: v31(Claude Code のエージェントの使用禁止: 手順版を proc-v029 に更新。語彙の変更なし。人間の指示による改訂。前版 v30 は同日の db.auth の既定)
 #       2026-10-11 / 版: v30(db.auth の既定を sql に: 手順版を proc-v028 に更新、env_optional_keys.db.auth の default を windows から sql にした。人間の指示による改訂。前版 v29 は同日の SQL Server の参照用ユーザー)
 #       2026-10-11 / 版: v29(SQL Server の参照用ユーザー: 手順版を proc-v027 に更新、db.auth の説明に検証環境は sql(参照用ユーザー e2e_reader)を前提とすることを書いた。既定値は windows のまま。前版 v28 は 2026-10-10 の Claude Code への配備)
@@ -45,8 +46,8 @@
 
 meta:
   step: 1                       # 本語彙が対象とするステップ
-  revision: "2026-10-11"
-  procedure_version: proc-v030  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+  revision: "2026-10-12"
+  procedure_version: proc-v031  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
 
 # ── テスト種別 ───────────────────────────────────────────
 test_type:
@@ -377,9 +378,10 @@ kb_category:
   T07: 権限・ロール知見 (kb/roles/)
   T08: ドメイン用語集 (kb/glossary/)
   T09: 環境・構成知見 (kb/env/)
-  T10: 落とし穴集 (kb/gotchas/)
+  T10: 落とし穴集 (kb/gotchas/) — 他のカテゴリに入らない知見。画面の部品の型による操作のコツは T13 に書く
   T11: 文書ポインタ集 (kb/docs/)
   T12: ログID知見 (kb/log-ids/) — PMS がログメッセージの種別ごとに割り当てたログIDを主キーに、観測した事象・原因・対処を蓄積する
+  T13: UI操作知見 (kb/ui-tips/) — 画面の部品の型(遅れて描画される一覧・一過性のメニュー・ツリー 等)ごとに1ファイル。その型で操作が失敗する事象と、探索(pms act・pms pwcli)とコードでの扱いを書く
 
 kb_source:                      # 出所コード。優先順位 OBS > GEN > DOC
   DOC: 文書由来
@@ -468,6 +470,7 @@ id_format:
   state: "S-<対象>-<状態>"
   state_demand: "SD-<3桁連番>"             # 状態需要リストの需要ID
   gotcha: "GOT-<4桁連番>"
+  ui_tip: "UIT-<4桁連番>"                  # KB T13 UI操作知見(部品の型ごとに1ファイル)
   open_question: "Q-<3桁連番>"
   test_data: "AT-<シナリオID>-<実行識別子>"
   procedure_version: "proc-v<3桁連番>"     # 手順書一式の版。git のタグと一致させる
@@ -601,7 +604,7 @@ reflection_target:              # 探索で確立した操作の反映先(explor
   fixture: 前提状態を作る操作 → fixture とシナリオ部品(tests/fixtures/・tests/flows/)
   flow: 2つ以上のシナリオで使う操作列 → シナリオ部品(tests/flows/)
   page: ロケータ → ページオブジェクト(tests/pages/)
-  kb: それ以外 → KB(該当画面・T05・kb/gotchas/)
+  kb: それ以外 → KB(画面ごとの事実は該当画面 T01、外部操作は T05、部品の型による操作のコツは T13、どれにも入らないものは T10)
   none: 反映するものがない
 
 # ── pipeline.dot が参照するコンテキストキー ──────────────────

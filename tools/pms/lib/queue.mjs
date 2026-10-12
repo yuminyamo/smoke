@@ -8,6 +8,7 @@ import { readAllEntries, upsertEntry } from './setup-log.mjs';
 import { adoptedStates, stateDemandRow, appendHandoff, ledgerFormatErrors } from './ledgers.mjs';
 import { classifyLocator, ENV_SCRIPT } from './cli.mjs';
 import { timestamp, today, writeText, UsageError, flowNum, blank, readText, readJson } from './util.mjs';
+import { tables, isBlank } from '../../lint/lib/markdown.mjs';
 import { TEMP_REF } from './checks.mjs';
 import { dbConnection } from './db.mjs';
 import { DONE_STATUS } from './store.mjs';
@@ -239,6 +240,32 @@ export function kbPages(root, ...needles) {
   return [...new Set(out)];
 }
 
+/**
+ * KB T13 UI操作知見(kb/ui-tips/)の全ファイルのパスと、索引の主題の欄(1行要約)。
+ * ID やシナリオIDの一致では選ばない(どの部品の型が要るかは、カードのAIが要約を見て決める。00 R-LOC-5)
+ */
+export function uiTips(root) {
+  const dir = path.join(root, 'kb', 'ui-tips');
+  if (!fs.existsSync(dir)) return [];
+  const idx = path.join(root, 'kb', '00_索引.md');
+  const rows = fs.existsSync(idx) ? tables(readText(idx).split(/\r?\n/)).flatMap((t) => t.rows) : [];
+  const norm = (x) => x.replace(/`/g, '').trim().replace(/^kb\//, '');
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.md'))
+    .map((e) => e.name)
+    .sort()
+    .map((name) => {
+      const row = rows.find((r) => r.cells.some((x) => norm(x) === `ui-tips/${name}`));
+      const summary = row && !isBlank(row.obj['主題']) ? row.obj['主題'] : '(索引に行がない)';
+      return `kb/ui-tips/${name} — ${summary}`;
+    });
+}
+
+export function uiTipsList(root) {
+  const items = uiTips(root);
+  return items.length ? list(items) : 'なし(kb/ui-tips/ にファイルがない)';
+}
+
 export function envKeys(root) {
   const r = spawnSync(process.execPath, [ENV_SCRIPT, '--root', root, 'list'], { encoding: 'utf8' });
   if (r.status !== 0) return null;
@@ -293,6 +320,8 @@ function setupVars(ctx, q, c, acts) {
     kb_pages: list(kbPages(root, c.state_id)),
     rebuild: 'なし',
   };
+  // KB T13 の一覧は setup.build・setup.code にだけ渡す(setup.reuse は既存の fixture を実行するだけ)
+  if (c.kind !== 'setup.reuse') v.ui_tips = uiTipsList(root);
   if (c.rebuild) {
     const r = c.rebuild;
     v.rebuild = r.reason === 'broken'

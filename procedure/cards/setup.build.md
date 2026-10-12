@@ -16,6 +16,8 @@
 - 現在の画面の URL: {{current_url}}
 - 参考になる資料(必要なら読む):
 {{kb_pages}}
+- UI操作知見(KB T13。画面の部品の型ごとに1ファイル。**操作する部品に合う型があれば、操作の前にそのファイルを読み、「探索での扱い」に従う。** 合う型がなければ読まない。R-LOC-5):
+{{ui_tips}}
 - 使える環境情報のキー(値は `<env:キー>` と書けば pms が取り出す。値を調べて書かない):
 {{env_keys}}
 - 禁止操作リスト: `work/_common/prohibited-operations.md`(外部操作を使うときに読む)
@@ -47,6 +49,8 @@
 {{rule:R-LOC-2}}
 {{rule:R-LOC-3}}
 {{rule:R-LOC-4}}
+{{rule:R-LOC-5}}
+{{rule:R-LOC-6}}
 {{rule:R-DAT-1}}
 {{rule:R-ENV-1}}
 

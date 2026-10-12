@@ -1,0 +1,485 @@
+diff --git a/procedure/00_common.md b/procedure/00_common.md
+index 6fc0389..f6977f3 100644
+--- a/procedure/00_common.md
++++ b/procedure/00_common.md
+@@ -3,7 +3,7 @@
+ 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
+ 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
+ 
+-改訂: 2026-10-11 / 版: v30(DB不変条件の定義を撤回: ■DB不変条件 に、現時点では定義対象なしであることを書き、R-INV-4 を「定義のない条件を検査しない。定義が1件もなければ SQL を起草・実行しない」に書き直した(proc-v030)。人間の指示による改訂。前版 v29 は同日の Claude Code のエージェントの使用禁止)
++改訂: 2026-10-12 / 版: v31(KB カテゴリ T13 UI操作知見の新設: ■ロケータ規約 の操作のコツの記録先を kb/gotchas/ から T13 に変え、R-LOC-5(読む)・R-LOC-6(書く)にした。■ディレクトリ構成 に kb/ui-tips/ を加えた(proc-v031)。人間の指示による改訂。前版 v30 は 2026-10-11 の DB不変条件の定義の撤回)
+ 
+ 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
+ 
+@@ -790,7 +790,8 @@ AIは各報告書に**優先レビュー推奨リスト**を出す。上位5件
+ - **[R-LOC-2]** **動的に変わる文字列をロケータの name に含めない。** 含めざるを得ない場合は正規表現化する(`パターン一致` 対象がここに該当)
+ - **[R-LOC-3]** 1〜5で取れない要素はCSSで暫定記録した上で `work/_common/testid-requests.md` に画面名・要素の役割・暫定セレクタを記載する。**この依頼は開発側で処理される。** 反映されたら暫定CSSを `getByTestId()` に置換し `// FRAGILE:` を除去する
+ - **[R-LOC-4]** 作業10のフェーズAとパートCでは、ロケータは `pms act` が操作の前に `generate-locator` で取り、区分(`vocab.locator_class`)と一意性を記録する。**AIはロケータを手で書かない。** 安定でない・一意でないと警告されたら、別の要素で操作し直すか、6のとおり CSS を暫定で使い、カードの出力の `fragile` に挙げて `testid-requests.md` に記載する(■進行役と記録の道具)
+-- 特殊な操作で発見したコツは、KBの該当画面カタログまたは `kb/gotchas/` に記録する
++- **[R-LOC-5]** 画面の部品の型(遅れて描画される一覧・一過性のメニュー・ツリー など)のせいで操作が失敗しやすいときのコツは、KB T13 UI操作知見(`kb/ui-tips/`。型ごとに1ファイル)にある。一覧(カードでは入力「UI操作知見」、カードを使わない作業では `kb/00_索引.md` の T13 の行)の1行要約を操作の前に見て、**操作する部品に合う型のファイルだけを読む。** 探索では「探索での扱い」に、コードでは「コードでの扱い」に従う。「試して効かなかったこと」は繰り返さない。合う型がなければ読まない
++- **[R-LOC-6]** 部品の型による操作のコツを新しく見つけたら、KB T13 に記録する。同じ型のファイルがあれば追記し、なければ作る(書式は `stages.md` 付録E の T13)。画面ごとの事実(到達方法・要素・ロケータ)は T01、待機の条件と実測は T06 に書く
+ 
+ ## ■ ページオブジェクト規約
+ 
+@@ -1049,7 +1050,7 @@ playwright.readiness.config.ts        # 起動確認テストだけを実行す
+ kb/                                   # 知見ベース(作業01の成果物。全作業が参照・更新)
+   00_索引.md                          # 後段AIが最初に読む唯一のファイル
+   01_知見対象レジストリ.md
+-  screens/ transitions/ db/ routes/ external-ops/ async/ roles/ glossary/ env/ docs/ gotchas/ log-ids/
++  screens/ transitions/ db/ routes/ external-ops/ async/ roles/ glossary/ env/ docs/ gotchas/ log-ids/ ui-tips/
+   _archived/
+ logs/
+   discovery-log_YYYYMMDD.md           # 発見ログ(全作業が追記)
+diff --git a/procedure/cards/explore.close.md b/procedure/cards/explore.close.md
+index d7b34e4..bd08a23 100644
+--- a/procedure/cards/explore.close.md
++++ b/procedure/cards/explore.close.md
+@@ -14,6 +14,8 @@
+ - 持ち回ったデータ(このシナリオが作ったデータ。DB不変条件の検査はこのデータに限る): {{carried_data}}
+ - 既存のシナリオ部品・fixture・ページオブジェクト:
+ {{existing_code}}
++- UI操作知見の一覧(KB T13。部品の型ごとに1ファイル。反映先 `kb` で部品の型による操作のコツを書くとき、同じ型のファイルがあればそこに追記し、なければ作る。ファイルを開くのは書くときだけ。R-LOC-6):
++{{ui_tips}}
+ - DB不変条件の注記: {{invariant_note}}
+ - DB の接続: {{db_connection}}
+ 
+@@ -32,6 +34,7 @@ DB不変条件(`vocab.invariant`。次の一覧が空なら定義対象なし。
+ {{rule:R-PMS-5}}
+ {{rule:R-EXP-16}}
+ {{rule:R-EXP-17}}
++{{rule:R-LOC-6}}
+ {{rule:R-EXP-18}}
+ {{rule:R-INV-1}}
+ {{rule:R-INV-2}}
+diff --git a/procedure/cards/explore.step.md b/procedure/cards/explore.step.md
+index d08af16..59be89a 100644
+--- a/procedure/cards/explore.step.md
++++ b/procedure/cards/explore.step.md
+@@ -25,6 +25,8 @@
+ {{ledger_refs}}
+ - 参考になる資料(必要なら読む):
+ {{kb_pages}}
++- UI操作知見(KB T13。画面の部品の型ごとに1ファイル。**操作する部品に合う型があれば、操作の前にそのファイルを読み、「探索での扱い」に従う。** 合う型がなければ読まない。R-LOC-5):
++{{ui_tips}}
+ - 非決定値カタログ: {{nd_catalog}}
+ - 禁止操作リスト: `work/_common/prohibited-operations.md`(外部操作を使う前に読む)
+ - 使える環境情報のキー(値は `<env:キー>` と書けば pms が取り出す。値を調べて書かない):
+@@ -87,6 +89,8 @@ DB の接続: {{db_connection}}
+ {{rule:R-LOC-2}}
+ {{rule:R-LOC-3}}
+ {{rule:R-LOC-4}}
++{{rule:R-LOC-5}}
++{{rule:R-LOC-6}}
+ {{rule:R-DAT-1}}
+ {{rule:R-ENV-1}}
+ {{rule:R-HO-1}}
+diff --git a/procedure/cards/setup.build.md b/procedure/cards/setup.build.md
+index 518535c..fafbe58 100644
+--- a/procedure/cards/setup.build.md
++++ b/procedure/cards/setup.build.md
+@@ -16,6 +16,8 @@
+ - 現在の画面の URL: {{current_url}}
+ - 参考になる資料(必要なら読む):
+ {{kb_pages}}
++- UI操作知見(KB T13。画面の部品の型ごとに1ファイル。**操作する部品に合う型があれば、操作の前にそのファイルを読み、「探索での扱い」に従う。** 合う型がなければ読まない。R-LOC-5):
++{{ui_tips}}
+ - 使える環境情報のキー(値は `<env:キー>` と書けば pms が取り出す。値を調べて書かない):
+ {{env_keys}}
+ - 禁止操作リスト: `work/_common/prohibited-operations.md`(外部操作を使うときに読む)
+@@ -47,6 +49,8 @@
+ {{rule:R-LOC-2}}
+ {{rule:R-LOC-3}}
+ {{rule:R-LOC-4}}
++{{rule:R-LOC-5}}
++{{rule:R-LOC-6}}
+ {{rule:R-DAT-1}}
+ {{rule:R-ENV-1}}
+ 
+diff --git a/procedure/cards/setup.code.md b/procedure/cards/setup.code.md
+index f01ee66..8423842 100644
+--- a/procedure/cards/setup.code.md
++++ b/procedure/cards/setup.code.md
+@@ -16,6 +16,8 @@
+ {{draft}}
+ - 既存のコード(同じ操作の部品・ページオブジェクトがあれば使う):
+ {{existing_code}}
++- UI操作知見(KB T13。画面の部品の型ごとに1ファイル。**コードにする操作の部品に合う型があれば、書く前にそのファイルを読み、「コードでの扱い」に従う。** 合う型がなければ読まない。R-LOC-5):
++{{ui_tips}}
+ - 起動確認テスト: {{readiness}}
+ - 環境情報の読み方: テストコードは `tests/helpers/env.ts` の `envValue('<キー>')` で値を読む
+ 
+@@ -38,6 +40,8 @@
+ {{rule:R-PO-3}}
+ {{rule:R-PO-4}}
+ {{rule:R-PO-5}}
++{{rule:R-LOC-5}}
++{{rule:R-LOC-6}}
+ {{rule:R-DAT-2}}
+ {{rule:R-ENV-1}}
+ 
+diff --git a/procedure/stages.md b/procedure/stages.md
+index 1c2c652..0148615 100644
+--- a/procedure/stages.md
++++ b/procedure/stages.md
+@@ -2,7 +2,7 @@
+ 
+ 本書は**各作業に固有な内容だけ**を持つ。原則・規約は `00_common.md`、統制語彙は `vocab.yaml`、実行順序と分岐は `pipeline.dot` を参照する。**それらの再掲を本書に書かない。**
+ 
+-改訂: 2026-10-11 / 版: v21(DB不変条件の定義を撤回: §10 の R-EXP-16・R-EXP-19・R-RPT-3、§20 の報告書の DB不変条件の実装状況、付録F の DB不変条件に、定義がないときは検査しない・実装しないことを書いた。付録A・付録E の記入例から INV-001〜005 を外した。人間の指示による改訂。前版 v20 は同日の db.auth の既定を sql に)
++改訂: 2026-10-12 / 版: v22(KB カテゴリ T13 UI操作知見の新設: §01 の逆算の表とカテゴリの拡張機構、§02 の入力と工程4、§10 の入力・R-EXP-6・R-EXP-17、§15 の入力と操作の変更、§20 の入力と固有の禁止事項(記録にない操作を足すとき)で T13 を参照するようにし、付録E に T13 の書式を加えた(proc-v031)。人間の指示による改訂。前版 v21 は 2026-10-11 の DB不変条件の定義の撤回)
+ 
+ ---
+ 
+@@ -85,10 +85,10 @@
+ 
+ | 後段の作業 | その作業が必要とする知見 | KBカテゴリ |
+ |---|---|---|
+-| **02 非決定値カタログ** | 値が画面のどこに出るか、DBのどの列に入るか、操作の反復に必要な操作列、環境の癖 | T01 / T03 / T09 |
++| **02 非決定値カタログ** | 値が画面のどこに出るか、DBのどの列に入るか、操作の反復に必要な操作列、環境の癖、部品の型による操作のコツ | T01 / T03 / T09 / T13 |
+ | **10 シナリオ生成(パートB)** | 業務用語と画面表記とDB名称の対応、画面の所在と到達経路、ロール別の可視性、外部操作の可否(確立済みか、使える skill があるか)、根拠にできる文書の章番号 | T08 / T01 / T07 / T05 / T11 |
+-| **10 探索的実行(パートC)** | 画面の到達方法・主要要素と安定ロケータ、操作起因の遷移、**確立済み操作の台帳(再探索の回避)**、外部操作の前提と挙動、非同期の完了判定条件と実測時間、既知の落とし穴 | T01 / T02 / T05 / T06 / T10 |
+-| **20 コード生成** | 待機条件とタイムアウト根拠、アサーションに使えるDB列、セレクタ | T06 / T03 / T01 |
++| **10 探索的実行(パートC)** | 画面の到達方法・主要要素と安定ロケータ、操作起因の遷移、**確立済み操作の台帳(再探索の回避)**、外部操作の前提と挙動、非同期の完了判定条件と実測時間、部品の型による操作のコツ、既知の落とし穴 | T01 / T02 / T05 / T06 / T13 / T10 |
++| **20 コード生成** | 待機条件とタイムアウト根拠、アサーションに使えるDB列、セレクタ、部品の型ごとのコードでの扱い | T06 / T03 / T01 / T13 |
+ | **30 状態カタログ** | 状態がどの操作で成立するか、状態をどこで確認できるか(画面/DB) | T01 / T02 / T03 / T07 |
+ | **DB不変条件(INV)** | テーブル・列の意味、主キー・外部キー、NULL可否、1対Nの関係 | T03 |
+ | **15 健全性の是正** | ログIDの意味と、文書に載っている代表的な原因・対処の所在(文書の記載は一例にとどまるため、観測で T12 に蓄積する) | T11 / T12 |
+@@ -140,7 +140,7 @@
+ 
+ ### カテゴリの拡張機構
+ 
+-カテゴリ(T01〜T11)は統制語彙だが、**AIによる暫定追加を認める。** 追加してよい条件(いずれか):
++カテゴリ(`vocab.kb_category`)は統制語彙だが、**AIによる暫定追加を認める。** 追加してよい条件(いずれか):
+ 
+ 1. 既存カテゴリに割り当てられない発見ログエントリが累計3件以上になった
+ 2. `gotchas/` 内に同種とみなせるエントリが2件以上再発した
+@@ -246,7 +246,7 @@ context_updates:
+ | `ext-demand` | `work/_common/external-op-demand.md`(外部操作需要リスト) |
+ | 外部操作 skill | skills の機構で確認する(00 ■外部操作) |
+ | 既存資産 | `tests/fixtures/`・`tests/flows/`(観測の反復に使う前提状態・操作列) |
+-| `kb` | `kb/00_索引.md` 経由。T01画面 / T03 DB / T06非同期 / T09環境 |
++| `kb` | `kb/00_索引.md` 経由。T01画面 / T03 DB / T06非同期 / T09環境 / T13 UI操作知見(操作が素直に通らない部品があれば、型の合うファイルを読む。00 [R-LOC-5]) |
+ | 環境情報 | `node tools/env/env.mjs`(接続先・アカウント。開始時に `require` で確かめ、足りなければまとめて人間に聞く。00 ■検証環境の情報) |
+ | 環境 | ゴールデンイメージ復元手段 |
+ 
+@@ -301,7 +301,7 @@ context_updates:
+ - 操作に成功した画面ごとに、操作列と安定ロケータを `kb/screens/` へ
+ - 非同期完了を待った箇所は、待機条件と実測所要時間を `kb/async/` へ
+ - 値がDBのどの列に入るかを `kb/db/` へ
+-- 素直に操作できなかった要素の攻略法を `kb/gotchas/` へ
++- 素直に操作できなかった要素の攻略法を、部品の型ごとに `kb/ui-tips/`(T13。00 [R-LOC-6])へ
+ 
+ ### 増分実施の規約
+ 
+@@ -407,7 +407,7 @@ context_updates:
+ |---|---|
+ | 領域指示 | 人間の指示、または既存の `work/_flows/F-<番号>/flow.md`(再開時はチェック状態から現在地を確認)。再探索フローでは、対象の需要IDを含む再探索指示 |
+ | 既存資産 | `tests/` 配下(fixtures / flows / pages / external / helpers)、過去フローの scenarios.md・exploration-log・setup-log |
+-| `kb` | `kb/00_索引.md` 経由。**T05 が確立済み操作の台帳。** 本作業で特に有用なのは T01 / T02 / T05 / T06 / T09 / T10 |
++| `kb` | `kb/00_索引.md` 経由。**T05 が確立済み操作の台帳。** 本作業で特に有用なのは T01 / T02 / T05 / T06 / T09 / T10 / T13。**T13 UI操作知見は、カードの入力「UI操作知見」に全ファイルの一覧が載る**(00 [R-LOC-5]) |
+ | `nd-catalog` | `work/_common/nondeterministic-catalog.md` |
+ | `prohibited-ops` | `work/_common/prohibited-operations.md`。記入状態と版は照合スクリプト `tools/checks/prohibited-ops.mjs` で取る(00 ■外部操作) |
+ | `handoff-register` | `work/_common/handoff-register.md` |
+@@ -637,7 +637,7 @@ context_updates:
+ - **[R-EXP-3]** 試行錯誤してよいが、**最終的に成功した最短の操作列**だけを `seqs` に `pms act` の連番で示す(失敗した試行は `notes` に要点だけ書く)
+ - **[R-EXP-4]** 外部操作は 00 ■外部操作 に従い、skill の実行体を `pms act ext` で呼ぶ。**実行前に必ず禁止操作リストを参照し、迷ったら実行しない**(リストが `unfilled` / `absent` のときは、包括原則に照らして判断する)
+ - **[R-EXP-5]** skill を使って新たに確立した外部操作は、ステップとして使う前に KB T05 へ登録する(KB T05 の索引で同等の操作を先に探す → 禁止操作リストとの適合を確かめる → コードから呼べる実行体が同梱されていることを確かめる → 引数・前提条件・完了判定・所要時間を確立する(`vocab.default.investigation_limit` 回まで)→ KB T05 に登録する → `tests/external/` にラッパを書く → 需要リストの行を `確立済` にする。00 ■外部操作 操作の資産化)。登録した操作IDを `ops_registered` に書く。skill がない・実行体がない・確立できないときは、確立を試みず `blocked`(`操作手段なし`)で提出する
+-- **[R-EXP-6]** 詰まったらまず KB(該当画面・`kb/gotchas/`)を参照する。自力で見つけた攻略法はその場で KB へ反映し、KB に無く自分で調べた事項は発見ログへ記録する
++- **[R-EXP-6]** 詰まったらまず KB(該当画面 T01・部品の型 T13・`kb/gotchas/`)を参照する。自力で見つけた攻略法はその場で KB へ反映し、KB に無く自分で調べた事項は発見ログへ記録する
+ - **[R-EXP-7]** 新たに環境情報が要ると分かったら `node tools/env/env.mjs require --keys <キー>:<種類>` で確かめる。足りなければ値を推測せず、`cannot_proceed` で提出して、足りないキーを `notes` に書く(人間に聞くのは pms の STOP から)。出力・KB・テストコードには値ではなく `<env:キー>` を書く
+ - **[R-EXP-8]** 作成データは 00 の一意化規約に従う。実値を `carried_data` に書く(探索時から一意化しておくことで、作業20のコードがそのまま再実行耐性を持つ)
+ - **[R-EXP-9]** 指定された検証手段で確認する。`両方` は画面(`pms act assert`)と DB(SELECT)の両方を必ず実施する。`画面` に DB を足すのはよい。`両方` で画面に露出しないと判明したら `DB` に変え、理由を `verification.reason` に書き、DISC の候補とする
+@@ -658,7 +658,7 @@ context_updates:
+ シナリオの終わり(`explore.close`)
+ 
+ - **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く。`vocab.invariant` に定義がなければ検査しない(`invariants` は `{}`。R-INV-4)
+-- **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(該当画面・T05・`kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
++- **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(画面ごとの事実は該当画面 T01、外部操作は T05、部品の型による操作のコツは T13、どれにも入らないものは `kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
+ - **[R-EXP-18]** マニュアルに、このシナリオの操作手順の記載がなかったら `manual_gap` を true にする
+ 
+ 探索セッションの終わり(`explore.session_close`)
+@@ -935,7 +935,7 @@ context_updates:
+ | `exploration-log` / `setup-log` | `work/<feature_code>/exploration/`(対象シナリオの最新の記録の `health_signal`) |
+ | `scenarios` | `work/<feature_code>/scenarios.md`(期待結果の参照元。変更しない) |
+ | 既存資産 | `tests/` 配下(fixtures / flows / pages / external / helpers) |
+-| `kb` | `kb/00_索引.md` 経由。本作業で特に有用なのは T05 / T09 / T10 / T12(ログID知見) |
++| `kb` | `kb/00_索引.md` 経由。本作業で特に有用なのは T05 / T09 / T10 / T12(ログID知見)/ T13(UI操作知見。操作の変更を試すとき) |
+ | `prohibited-ops` | `work/_common/prohibited-operations.md`(00 ■外部操作) |
+ | `ext-demand` | `work/_common/external-op-demand.md` |
+ | 問い合わせ skill | skills の機構で確認する(00 ■健全性シグナルと問い合わせ) |
+@@ -1019,7 +1019,7 @@ skills の機構で、問い合わせ skill(00 ■健全性シグナルと問い
+ **操作の変更を試すとき**
+ 
+ - 対象シナリオを**最初のステップから**探索し直す(ステップは前の結果を引き継ぐため)。§10 パートCの規約(探索の進め方・安定ロケータの解決・検証と判定・DB不変条件・記録)に従う。**期待結果・判定基準は変えない**
+-- 試すのは回答が示した操作に限る(ロケータの解決など、実行に要る最小限の調整を除く)。回答から外れた独自の試行錯誤に広げず、うまくいかなければ次の問い合わせで聞く
++- 試すのは回答が示した操作に限る(ロケータの解決や、KB T13 の「探索での扱い」に従った待ち・確認など、実行に要る最小限の調整を除く。00 [R-LOC-5])。回答から外れた独自の試行錯誤に広げず、うまくいかなければ次の問い合わせで聞く
+ - 新たな外部操作は §10 パートCの手順(KB T05 への登録・禁止操作リストの照合)に従う。使える skill がない、または `禁止` に当たる操作は実行せず、外部操作需要リスト・申し送り台帳に §10 と同じく記録し、そのシナリオを `unresolved` とする。`要許可` / 包括原則に当たる操作は、下の「禁止操作リストの扱い」に従う
+ 
+ **環境の変更を試すとき**
+@@ -1209,7 +1209,7 @@ lint の指摘による差し戻しのときも、status.yaml は同じ所在に
+ | `exploration-log` / `setup-log` | `work/<feature_code>/exploration/` |
+ | 実装済み資産 | `tests/fixtures/`, `tests/flows/`, `tests/pages/`, `tests/external/`, `tests/helpers/` |
+ | `nd-catalog` | `work/_common/nondeterministic-catalog.md` |
+-| `kb` | **待機条件とタイムアウト根拠は `kb/async/`(T06)を正として参照する。** DB列の意味は T03、セレクタは T01、外部操作の skill名と実行体の呼び出し方は T05 |
++| `kb` | **待機条件とタイムアウト根拠は `kb/async/`(T06)を正として参照する。** DB列の意味は T03、セレクタは T01、外部操作の skill名と実行体の呼び出し方は T05、部品の型ごとのコードでの扱い(表示の確認を挟む・強制クリック 等)は T13 の「コードでの扱い」(00 [R-LOC-5]) |
+ | 外部操作 skill | skills の機構で確認する(T05 の skill名を手がかりにする) |
+ | `ext-demand` | `work/_common/external-op-demand.md`(外部操作 skill に不備があった場合に更新) |
+ | `scenarios` | 期待結果・検証手段の参照元。レビュー状況を問わず参照してよい |
+@@ -1353,7 +1353,7 @@ Playwright のコード規約は**付録F**を正とする。本節では規約
+ 
+ <!-- /protected:NO_AI_AT_RUNTIME -->
+ 
+-- 作業10の `actions` に無い操作をコードに追加しない。どうしても必要な場合(スクロール等)はコード内コメントと報告書の両方に逸脱として記録する
++- 作業10の `actions` に無い操作をコードに追加しない。どうしても必要な場合(スクロール・表示の確認等)は、KB T13 に操作する部品の型のファイルがあればその「コードでの扱い」に従って足し、コード内コメントと報告書の両方に逸脱として記録する(T13 に従った場合も逸脱である)
+ - **禁止操作リストの照合を省略しない。** 照合スクリプトの終了コードが 0 以外のときに作業を始めない。「関係のない変更だ」と自分で判断して進めない
+ - **作業10・15の成果物の lint を省略しない。** ランナーの終了コードが 0 以外のときに作業を始めない
+ - **lint の ERROR が残ったまま、報告書 §6 に書かずに完了報告を出さない。** lint の指摘を消すために、突合表の行を消す・記録を事実と違えて書くことをしない
+@@ -2304,7 +2304,7 @@ skill の正本は skills の機構である。ここに書く skill名は、動
+ 
+ ## T10 落とし穴集 — `kb/gotchas/`(1件1エントリ)
+ 
+-分類しにくいが再発すると高くつく知見の受け皿。ここが肥大したらカテゴリ追加のシグナルとみなす。
++分類しにくいが再発すると高くつく知見の受け皿。ここが肥大したらカテゴリ追加のシグナルとみなす。**画面の部品の型による操作のコツは T13 に書く**(ここには書かない)。
+ 
+ ```markdown
+ # GOT-0007: 保存ボタンのダブルクリックで二重登録
+@@ -2350,6 +2350,32 @@ skill の正本は skills の機構である。ここに書く skill名は、動
+ - 事象の行は追記する。既存の行と食い違う観測は、旧記述を残したまま行を足す(00 ■知見ベース 更新規約)
+ - ログの本文(メッセージの全文・スタックトレース)を転記しない。事象・原因・対処は要点を1〜2文で書く
+ 
++## T13 UI操作知見 — `kb/ui-tips/`(部品の型ごとに1ファイル)
++
++**画面の部品の型**(遅れて描画される一覧・一過性のメニュー・ツリー・確認ダイアログ など)のせいで操作が失敗しやすい点と、その扱いを書く。1つの画面だけの事実(到達方法・要素・ロケータ)は T01、待機の条件と実測は T06 に書く。
++
++- ファイル名は `UIT-<4桁>_<型の名前>.md`、共通メタデータの `id` は `UIT-<4桁>`(`vocab.id_format.ui_tip`)。**1つの型に1ファイル。** 同じ型の事象は、新しいファイルを作らず、そのファイルに追記する
++- `kb/00_索引.md` の主題の欄に、**型と事象を1行で**書く(進行役 pms は、この1行と全ファイルのパスをカードの入力「UI操作知見」に載せる。00 [R-LOC-5])
++- 書くのは観測した事実と、試して効いた扱いである。効かなかった扱いも消さずに書く(後の作業が同じことを試さないため)
++
++```markdown
++# UIT-0002: 一過性のメニュー(開いた直後に閉じる)
++## 型
++- ボタンを押すと開くドロップダウンのメニュー。jQuery UI 系。画面の描画が終わる前に押すと、開いた直後に閉じる
++## 事象
++- 画面に遷移した直後にメニューのボタンを押すと、メニューは一瞬開いて閉じる。項目を押すと「要素が見えない」で失敗する
++## 出る画面
++- SCR-0005(ユーザー詳細)・SCR-0012(デバイス詳細)
++## 探索での扱い(pms act・pms pwcli)
++- メニューのボタンを押す前に `assert <ボタンの ref> visible` を記録する。押したあと、項目を押す前に `assert <項目の ref> visible` を記録する(待ちを記録に残すため。snapshot を挟んで通っただけでは、コードで失敗する)
++## コードでの扱い
++- `await expect(menuButton).toBeVisible()` → `click()` → `await expect(menuItem).toBeVisible()` → `click()`。固定待機は使わない
++## 試して効かなかったこと
++- 押す前に `page.waitForTimeout(1000)` を挟む: 遅いときは足りず、失敗が残った(固定待機は付録F で禁止)
++## 確度・出所
++- 確度 高 / 出所 OBS / F-002 SC-DEV-01-S2(探索)・F-002 作業20(コード)/ 2026-10-20
++```
++
+ # 付録F: Playwright コード規約
+ 
+ 作業20が参照する。他作業には渡さない。
+diff --git a/procedure/vocab.yaml b/procedure/vocab.yaml
+index 2da7ec3..b820234 100644
+--- a/procedure/vocab.yaml
++++ b/procedure/vocab.yaml
+@@ -12,7 +12,8 @@
+ #   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
+ #   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
+ #
+-# 改訂: 2026-10-11 / 版: v32(DB不変条件の定義を撤回: 手順版を proc-v030 に更新、invariant を定義対象なし(空)にし、invariant_note を書き直した。人間の指示による改訂。前版 v31 は同日の Claude Code のエージェントの使用禁止)
++# 改訂: 2026-10-12 / 版: v33(KB カテゴリ T13 UI操作知見の新設: 手順版を proc-v031 に更新、kb_category に T13、id_format に ui_tip、reflection_target.kb の反映先に T13 を加え、T10 の説明に T13 との分け方を書いた。人間の指示による改訂。前版 v32 は 2026-10-11 の DB不変条件の定義の撤回)
++#       2026-10-11 / 版: v32(DB不変条件の定義を撤回: 手順版を proc-v030 に更新、invariant を定義対象なし(空)にし、invariant_note を書き直した。人間の指示による改訂。前版 v31 は同日の Claude Code のエージェントの使用禁止)
+ #       2026-10-11 / 版: v31(Claude Code のエージェントの使用禁止: 手順版を proc-v029 に更新。語彙の変更なし。人間の指示による改訂。前版 v30 は同日の db.auth の既定)
+ #       2026-10-11 / 版: v30(db.auth の既定を sql に: 手順版を proc-v028 に更新、env_optional_keys.db.auth の default を windows から sql にした。人間の指示による改訂。前版 v29 は同日の SQL Server の参照用ユーザー)
+ #       2026-10-11 / 版: v29(SQL Server の参照用ユーザー: 手順版を proc-v027 に更新、db.auth の説明に検証環境は sql(参照用ユーザー e2e_reader)を前提とすることを書いた。既定値は windows のまま。前版 v28 は 2026-10-10 の Claude Code への配備)
+@@ -45,8 +46,8 @@
+ 
+ meta:
+   step: 1                       # 本語彙が対象とするステップ
+-  revision: "2026-10-11"
+-  procedure_version: proc-v030  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
++  revision: "2026-10-12"
++  procedure_version: proc-v031  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+ 
+ # ── テスト種別 ───────────────────────────────────────────
+ test_type:
+@@ -377,9 +378,10 @@ kb_category:
+   T07: 権限・ロール知見 (kb/roles/)
+   T08: ドメイン用語集 (kb/glossary/)
+   T09: 環境・構成知見 (kb/env/)
+-  T10: 落とし穴集 (kb/gotchas/)
++  T10: 落とし穴集 (kb/gotchas/) — 他のカテゴリに入らない知見。画面の部品の型による操作のコツは T13 に書く
+   T11: 文書ポインタ集 (kb/docs/)
+   T12: ログID知見 (kb/log-ids/) — PMS がログメッセージの種別ごとに割り当てたログIDを主キーに、観測した事象・原因・対処を蓄積する
++  T13: UI操作知見 (kb/ui-tips/) — 画面の部品の型(遅れて描画される一覧・一過性のメニュー・ツリー 等)ごとに1ファイル。その型で操作が失敗する事象と、探索(pms act・pms pwcli)とコードでの扱いを書く
+ 
+ kb_source:                      # 出所コード。優先順位 OBS > GEN > DOC
+   DOC: 文書由来
+@@ -468,6 +470,7 @@ id_format:
+   state: "S-<対象>-<状態>"
+   state_demand: "SD-<3桁連番>"             # 状態需要リストの需要ID
+   gotcha: "GOT-<4桁連番>"
++  ui_tip: "UIT-<4桁連番>"                  # KB T13 UI操作知見(部品の型ごとに1ファイル)
+   open_question: "Q-<3桁連番>"
+   test_data: "AT-<シナリオID>-<実行識別子>"
+   procedure_version: "proc-v<3桁連番>"     # 手順書一式の版。git のタグと一致させる
+@@ -601,7 +604,7 @@ reflection_target:              # 探索で確立した操作の反映先(explor
+   fixture: 前提状態を作る操作 → fixture とシナリオ部品(tests/fixtures/・tests/flows/)
+   flow: 2つ以上のシナリオで使う操作列 → シナリオ部品(tests/flows/)
+   page: ロケータ → ページオブジェクト(tests/pages/)
+-  kb: それ以外 → KB(該当画面・T05・kb/gotchas/)
++  kb: それ以外 → KB(画面ごとの事実は該当画面 T01、外部操作は T05、部品の型による操作のコツは T13、どれにも入らないものは T10)
+   none: 反映するものがない
+ 
+ # ── pipeline.dot が参照するコンテキストキー ──────────────────
+diff --git a/tools/pms/README.md b/tools/pms/README.md
+index ede5e80..eb1726e 100644
+--- a/tools/pms/README.md
++++ b/tools/pms/README.md
+@@ -219,7 +219,7 @@ explore.step はほかに、`seq_missing`(seqs・`verification.screen_seqs`(asse
+ 
+ | 差し込み | 中身 |
+ |---|---|
+-| `{{名前}}` | pms が埋める入力(状態ID・定義・状態需要リストの行・established check の案・KB の該当ページ(`kb/00_索引.md` と状態IDを含む `kb/` のファイル)・現在の画面の URL(直前の記録の `url_after`)・環境情報のキー(`env.mjs list` のキーと種類。値は出さない)・作り直しの説明・出し直しの説明・提出のコマンドなど。`lib/queue.mjs` の `cardVars`) |
++| `{{名前}}` | pms が埋める入力(状態ID・定義・状態需要リストの行・established check の案・KB の該当ページ(`kb/00_索引.md` と状態IDを含む `kb/` のファイル)・UI操作知見(`ui_tips`。KB T13 `kb/ui-tips/` の全ファイルのパスと `kb/00_索引.md` の主題の欄。ID の一致では選ばない。setup.build・setup.code・explore.step・explore.close だけ。`queue.mjs` の `uiTips`)・現在の画面の URL(直前の記録の `url_after`)・環境情報のキー(`env.mjs list` のキーと種類。値は出さない)・作り直しの説明・出し直しの説明・提出のコマンドなど。`lib/queue.mjs` の `cardVars`) |
+ | `{{rule:R-XXX-n}}` | `procedure/00_common.md`・`procedure/stages.md` で `**[R-XXX-n]**` を付けた行(箇条書きの記号と目印を外し `- [R-XXX-n] …` にする。表の行は「1列目: 残りの列」)。同じ規則IDが2箇所にあれば終了コード 2 |
+ | `{{protected:ID}}` | 保護ブロックの本文を、文言を変えずにブロックごと(00 → stages の順に探す) |
+ | `{{vocab:キー}}` | 統制語彙の一覧(値の意味つき) |
+diff --git a/tools/pms/lib/explore.mjs b/tools/pms/lib/explore.mjs
+index 245936a..22eafdd 100644
+--- a/tools/pms/lib/explore.mjs
++++ b/tools/pms/lib/explore.mjs
+@@ -7,7 +7,7 @@
+ import fs from 'node:fs';
+ import path from 'node:path';
+ import { timestamp, today, blank, readText, TIMESTAMP_RE } from './util.mjs';
+-import { skipCard, stopCard, chainStop, kbPages, list, mdTable, isDone } from './queue.mjs';
++import { skipCard, stopCard, chainStop, kbPages, uiTipsList, list, mdTable, isDone } from './queue.mjs';
+ import { scenarioDefs } from './scenarios.mjs';
+ import { readEntries } from './setup-log.mjs';
+ import { upsertScenario, readScenarios, scenarioVerdict, orderStep, sameTag } from './exploration-log.mjs';
+@@ -209,6 +209,7 @@ export function exploreVars(ctx, q, c, acts) {
+         }).join('\n') || 'なし'
+         : '前のステップのあとの画面から続ける(画面がずれていたら snapshot で確かめる)',
+       kb_pages: list(kbPages(root, c.scenario, c.step_id, ...ops)),
++      ui_tips: uiTipsList(root),
+       ledger_refs: refs.length ? refs.map((h) => `- ${h.ID}(${h['理由コード']}): ${h['対象']}${h['想定手段'] ? ` / 想定手段 ${h['想定手段']}` : ''}`).join('\n') : 'なし',
+       nd_catalog: fs.existsSync(paths.abs(paths.ndCatalog())) ? `\`${paths.ndCatalog()}\`` : 'なし(ファイルがない。値はすべて 未登録 として追加候補にする)',
+     });
+@@ -222,6 +223,7 @@ export function exploreVars(ctx, q, c, acts) {
+       steps_summary: (sc?.steps ?? []).map((s) => `- ${s.step_id}: ${s.verdict}。操作: ${(s.actions ?? []).map(actionText).join(' → ') || 'なし'}`).join('\n') || 'なし',
+       carried_data: sc && Object.keys(sc.carried_data ?? {}).length ? '```json\n' + JSON.stringify(sc.carried_data, null, 2) + '\n```' : 'なし(データを作っていない)',
+       existing_code: list([...ls('tests/flows'), ...ls('tests/fixtures'), ...ls('tests/pages')]),
++      ui_tips: uiTipsList(root),
+       invariant_note: proc.vocab.invariant_note ?? '',
+     });
+   } else if (c.kind === 'explore.session_close') {
+diff --git a/tools/pms/lib/queue.mjs b/tools/pms/lib/queue.mjs
+index ea33d97..461a617 100644
+--- a/tools/pms/lib/queue.mjs
++++ b/tools/pms/lib/queue.mjs
+@@ -8,6 +8,7 @@ import { readAllEntries, upsertEntry } from './setup-log.mjs';
+ import { adoptedStates, stateDemandRow, appendHandoff, ledgerFormatErrors } from './ledgers.mjs';
+ import { classifyLocator, ENV_SCRIPT } from './cli.mjs';
+ import { timestamp, today, writeText, UsageError, flowNum, blank, readText, readJson } from './util.mjs';
++import { tables, isBlank } from '../../lint/lib/markdown.mjs';
+ import { TEMP_REF } from './checks.mjs';
+ import { dbConnection } from './db.mjs';
+ import { DONE_STATUS } from './store.mjs';
+@@ -239,6 +240,32 @@ export function kbPages(root, ...needles) {
+   return [...new Set(out)];
+ }
+ 
++/**
++ * KB T13 UI操作知見(kb/ui-tips/)の全ファイルのパスと、索引の主題の欄(1行要約)。
++ * ID やシナリオIDの一致では選ばない(どの部品の型が要るかは、カードのAIが要約を見て決める。00 R-LOC-5)
++ */
++export function uiTips(root) {
++  const dir = path.join(root, 'kb', 'ui-tips');
++  if (!fs.existsSync(dir)) return [];
++  const idx = path.join(root, 'kb', '00_索引.md');
++  const rows = fs.existsSync(idx) ? tables(readText(idx).split(/\r?\n/)).flatMap((t) => t.rows) : [];
++  const norm = (x) => x.replace(/`/g, '').trim().replace(/^kb\//, '');
++  return fs.readdirSync(dir, { withFileTypes: true })
++    .filter((e) => e.isFile() && e.name.endsWith('.md'))
++    .map((e) => e.name)
++    .sort()
++    .map((name) => {
++      const row = rows.find((r) => r.cells.some((x) => norm(x) === `ui-tips/${name}`));
++      const summary = row && !isBlank(row.obj['主題']) ? row.obj['主題'] : '(索引に行がない)';
++      return `kb/ui-tips/${name} — ${summary}`;
++    });
++}
++
++export function uiTipsList(root) {
++  const items = uiTips(root);
++  return items.length ? list(items) : 'なし(kb/ui-tips/ にファイルがない)';
++}
++
+ export function envKeys(root) {
+   const r = spawnSync(process.execPath, [ENV_SCRIPT, '--root', root, 'list'], { encoding: 'utf8' });
+   if (r.status !== 0) return null;
+@@ -293,6 +320,8 @@ function setupVars(ctx, q, c, acts) {
+     kb_pages: list(kbPages(root, c.state_id)),
+     rebuild: 'なし',
+   };
++  // KB T13 の一覧は setup.build・setup.code にだけ渡す(setup.reuse は既存の fixture を実行するだけ)
++  if (c.kind !== 'setup.reuse') v.ui_tips = uiTipsList(root);
+   if (c.rebuild) {
+     const r = c.rebuild;
+     v.rebuild = r.reason === 'broken'
+diff --git a/tools/pms/test/explore.test.mjs b/tools/pms/test/explore.test.mjs
+index afb7ca5..7ae2712 100644
+--- a/tools/pms/test/explore.test.mjs
++++ b/tools/pms/test/explore.test.mjs
+@@ -273,6 +273,38 @@ test('explore: カードの入力に、前のステップの記録の抜粋・
+   assert.match(n2.json.body, /前のステップのあとの画面から続ける/);
+ });
+ 
++test('カードの入力「UI操作知見」: KB T13 の全ファイルのパスと索引の主題を、setup.build・explore.step・explore.close に載せる(ID の一致では選ばない)。setup.reuse・report.findings には載せない', async () => {
++  const root = repo({
++    'kb/00_索引.md': '# KB 索引\n\n| ID | カテゴリ | ファイル | 主題 | review_status | 更新日 |\n|---|---|---|---|---|---|\n'
++      + '| UIT-0001 | T13 UI操作知見 | ui-tips/UIT-0001_遅れて描画される一覧.md | 遅れて描画される一覧: 開いた直後は行がない | unreviewed | 2026-10-12 |\n',
++    'kb/ui-tips/UIT-0001_遅れて描画される一覧.md': '# UIT-0001\n',
++    'kb/ui-tips/UIT-0002_一過性のメニュー.md': '# UIT-0002\n',
++  });
++  build(root);
++  const bodies = {};
++  for (let i = 0; i < 30; i++) {
++    const n = await doNext(root);
++    if (n.json?.state !== 'card') break;
++    bodies[n.json.kind] ??= n.json.body;
++  }
++  for (const kind of ['setup.build', 'explore.step', 'explore.close']) {
++    assert.ok(bodies[kind], `${kind} のカードが出ていない`);
++    assert.match(bodies[kind], /- kb\/ui-tips\/UIT-0001_遅れて描画される一覧\.md — 遅れて描画される一覧: 開いた直後は行がない/, kind);
++    assert.match(bodies[kind], /- kb\/ui-tips\/UIT-0002_一過性のメニュー\.md — \(索引に行がない\)/, kind);
++    assert.match(bodies[kind], /- \[R-LOC-6\] 部品の型による操作のコツを新しく見つけたら/, kind);
++  }
++  assert.match(bodies['explore.step'], /- \[R-LOC-5\] 画面の部品の型/);
++  for (const kind of ['setup.reuse', 'report.findings']) {
++    assert.ok(bodies[kind], `${kind} のカードが出ていない`);
++    assert.ok(!bodies[kind].includes('kb/ui-tips/'), kind);
++  }
++  // kb/ui-tips/ がなければ「なし」
++  const empty = repo();
++  build(empty);
++  await doNext(empty); // setup.reuse
++  assert.match(pms(empty, ['next', '--flow', 'F-003']).json.body, /なし\(kb\/ui-tips\/ にファイルがない\)/);
++});
++
+ test('explore.step の検査: 期待結果の書き換え・証跡なし・健全性シグナルの時刻・blocked の参照・別のカードの連番・検証手段の欠け', async () => {
+   const root = repo({}, { config: { max_rejections: 10 } });
+   build(root);
+diff --git a/tools/pms/test/pms.test.mjs b/tools/pms/test/pms.test.mjs
+index 9d854b7..b7aafd4 100644
+--- a/tools/pms/test/pms.test.mjs
++++ b/tools/pms/test/pms.test.mjs
+@@ -396,6 +396,9 @@ test('submit: 合格すると setup-log に付録Bの形の built-by-ui を書
+   const next = pms(root, ['next', '--flow', 'F-003']);
+   assert.equal(next.json.kind, 'setup.code');
+   assert.match(next.json.body, /getByLabel\('ユーザーID'\)\.fill\(envValue\('pms\.admin\.user'\)\)/);
++  // KB T13 の一覧(kb/ui-tips/ がなければ「なし」)と、コードでの扱いの規則
++  assert.match(next.json.body, /UI操作知見\(KB T13。[^\n]*\nなし\(kb\/ui-tips\/ にファイルがない\)/);
++  assert.match(next.json.body, /- \[R-LOC-5\] 画面の部品の型/);
+   codeFiles(root);
+   const c = submitOut(root, 'C-0002', CODED);
+   assert.equal(c.code, 0, c.stdout);

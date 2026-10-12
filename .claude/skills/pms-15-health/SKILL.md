@@ -2,12 +2,12 @@
 name: pms-15-health
 description: "PMS回帰テスト作成の作業15(健全性の是正)。通常は入口skill pms-regression から使う。作業10の探索で健全性シグナル(期待結果は満たしたが自データのジョブがエラーになっている等)が出たシナリオについて、問い合わせskillに再現手順と解決してほしいことを渡し、回答を踏まえて正常な結果が得られる操作を編み出し直す。解消しなければ記録を残して作業20へ進む。"
 metadata:
-  procedure_version: proc-v030
+  procedure_version: proc-v031
   generated_from: "procedure/stages.md §15"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §15 / 手順版: proc-v030 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §15 / 手順版: proc-v031 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業15 健全性の是正(手順版 proc-v030)
+# 作業15 健全性の是正(手順版 proc-v031)
 
 この skill は、手順書の正本の `stages.md` §15 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -38,7 +38,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v030` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v031` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -95,7 +95,7 @@ metadata:
 | `exploration-log` / `setup-log` | `work/<feature_code>/exploration/`(対象シナリオの最新の記録の `health_signal`) |
 | `scenarios` | `work/<feature_code>/scenarios.md`(期待結果の参照元。変更しない) |
 | 既存資産 | `tests/` 配下(fixtures / flows / pages / external / helpers) |
-| `kb` | `kb/00_索引.md` 経由。本作業で特に有用なのは T05 / T09 / T10 / T12(ログID知見) |
+| `kb` | `kb/00_索引.md` 経由。本作業で特に有用なのは T05 / T09 / T10 / T12(ログID知見)/ T13(UI操作知見。操作の変更を試すとき) |
 | `prohibited-ops` | `work/_common/prohibited-operations.md`(00 ■外部操作) |
 | `ext-demand` | `work/_common/external-op-demand.md` |
 | 問い合わせ skill | skills の機構で確認する(00 ■健全性シグナルと問い合わせ) |
@@ -179,7 +179,7 @@ skills の機構で、問い合わせ skill(00 ■健全性シグナルと問い
 **操作の変更を試すとき**
 
 - 対象シナリオを**最初のステップから**探索し直す(ステップは前の結果を引き継ぐため)。§10 パートCの規約(探索の進め方・安定ロケータの解決・検証と判定・DB不変条件・記録)に従う。**期待結果・判定基準は変えない**
-- 試すのは回答が示した操作に限る(ロケータの解決など、実行に要る最小限の調整を除く)。回答から外れた独自の試行錯誤に広げず、うまくいかなければ次の問い合わせで聞く
+- 試すのは回答が示した操作に限る(ロケータの解決や、KB T13 の「探索での扱い」に従った待ち・確認など、実行に要る最小限の調整を除く。00 [R-LOC-5])。回答から外れた独自の試行錯誤に広げず、うまくいかなければ次の問い合わせで聞く
 - 新たな外部操作は §10 パートCの手順(KB T05 への登録・禁止操作リストの照合)に従う。使える skill がない、または `禁止` に当たる操作は実行せず、外部操作需要リスト・申し送り台帳に §10 と同じく記録し、そのシナリオを `unresolved` とする。`要許可` / 包括原則に当たる操作は、下の「禁止操作リストの扱い」に従う
 
 **環境の変更を試すとき**

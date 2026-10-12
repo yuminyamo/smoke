@@ -14,6 +14,8 @@
 - 持ち回ったデータ(このシナリオが作ったデータ。DB不変条件の検査はこのデータに限る): {{carried_data}}
 - 既存のシナリオ部品・fixture・ページオブジェクト:
 {{existing_code}}
+- UI操作知見の一覧(KB T13。部品の型ごとに1ファイル。反映先 `kb` で部品の型による操作のコツを書くとき、同じ型のファイルがあればそこに追記し、なければ作る。ファイルを開くのは書くときだけ。R-LOC-6):
+{{ui_tips}}
 - DB不変条件の注記: {{invariant_note}}
 - DB の接続: {{db_connection}}
 
@@ -32,6 +34,7 @@ DB不変条件(`vocab.invariant`。次の一覧が空なら定義対象なし。
 {{rule:R-PMS-5}}
 {{rule:R-EXP-16}}
 {{rule:R-EXP-17}}
+{{rule:R-LOC-6}}
 {{rule:R-EXP-18}}
 {{rule:R-INV-1}}
 {{rule:R-INV-2}}

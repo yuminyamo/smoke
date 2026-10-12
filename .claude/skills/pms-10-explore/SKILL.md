@@ -2,12 +2,12 @@
 name: pms-10-explore
 description: "PMS回帰テスト作成の作業10(シナリオ生成と探索)。通常は入口skill pms-regression から使う。指示された対象領域について、シナリオ策定方式(マニュアル起点・既存テストスクリプト起点・新機能の仕様書起点など)に従って単機能シナリオを作り、進行役 pms のカード(pms run がカードごとにAIのセッションを、チャットではエージェント pms-runner がカードごとにサブエージェントを起こす)で探索して、作業20がコード化できる記録を残す。再探索フロー(skill整備後のblockedシナリオ)と、禁止操作リストが変わったあとの blocked ステップの再判定(パートP)も扱う。"
 metadata:
-  procedure_version: proc-v030
+  procedure_version: proc-v031
   generated_from: "procedure/stages.md §10"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v030 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §10 / 手順版: proc-v031 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業10 シナリオ生成と探索(手順版 proc-v030)
+# 作業10 シナリオ生成と探索(手順版 proc-v031)
 
 この skill は、手順書の正本の `stages.md` §10 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -43,7 +43,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v030` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v031` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -104,7 +104,7 @@ metadata:
 |---|---|
 | 領域指示 | 人間の指示、または既存の `work/_flows/F-<番号>/flow.md`(再開時はチェック状態から現在地を確認)。再探索フローでは、対象の需要IDを含む再探索指示 |
 | 既存資産 | `tests/` 配下(fixtures / flows / pages / external / helpers)、過去フローの scenarios.md・exploration-log・setup-log |
-| `kb` | `kb/00_索引.md` 経由。**T05 が確立済み操作の台帳。** 本作業で特に有用なのは T01 / T02 / T05 / T06 / T09 / T10 |
+| `kb` | `kb/00_索引.md` 経由。**T05 が確立済み操作の台帳。** 本作業で特に有用なのは T01 / T02 / T05 / T06 / T09 / T10 / T13。**T13 UI操作知見は、カードの入力「UI操作知見」に全ファイルの一覧が載る**(00 [R-LOC-5]) |
 | `nd-catalog` | `work/_common/nondeterministic-catalog.md` |
 | `prohibited-ops` | `work/_common/prohibited-operations.md`。記入状態と版は照合スクリプト `tools/checks/prohibited-ops.mjs` で取る(00 ■外部操作) |
 | `handoff-register` | `work/_common/handoff-register.md` |
@@ -334,7 +334,7 @@ metadata:
 - **[R-EXP-3]** 試行錯誤してよいが、**最終的に成功した最短の操作列**だけを `seqs` に `pms act` の連番で示す(失敗した試行は `notes` に要点だけ書く)
 - **[R-EXP-4]** 外部操作は 00 ■外部操作 に従い、skill の実行体を `pms act ext` で呼ぶ。**実行前に必ず禁止操作リストを参照し、迷ったら実行しない**(リストが `unfilled` / `absent` のときは、包括原則に照らして判断する)
 - **[R-EXP-5]** skill を使って新たに確立した外部操作は、ステップとして使う前に KB T05 へ登録する(KB T05 の索引で同等の操作を先に探す → 禁止操作リストとの適合を確かめる → コードから呼べる実行体が同梱されていることを確かめる → 引数・前提条件・完了判定・所要時間を確立する(`vocab.default.investigation_limit` 回まで)→ KB T05 に登録する → `tests/external/` にラッパを書く → 需要リストの行を `確立済` にする。00 ■外部操作 操作の資産化)。登録した操作IDを `ops_registered` に書く。skill がない・実行体がない・確立できないときは、確立を試みず `blocked`(`操作手段なし`)で提出する
-- **[R-EXP-6]** 詰まったらまず KB(該当画面・`kb/gotchas/`)を参照する。自力で見つけた攻略法はその場で KB へ反映し、KB に無く自分で調べた事項は発見ログへ記録する
+- **[R-EXP-6]** 詰まったらまず KB(該当画面 T01・部品の型 T13・`kb/gotchas/`)を参照する。自力で見つけた攻略法はその場で KB へ反映し、KB に無く自分で調べた事項は発見ログへ記録する
 - **[R-EXP-7]** 新たに環境情報が要ると分かったら `node tools/env/env.mjs require --keys <キー>:<種類>` で確かめる。足りなければ値を推測せず、`cannot_proceed` で提出して、足りないキーを `notes` に書く(人間に聞くのは pms の STOP から)。出力・KB・テストコードには値ではなく `<env:キー>` を書く
 - **[R-EXP-8]** 作成データは 00 の一意化規約に従う。実値を `carried_data` に書く(探索時から一意化しておくことで、作業20のコードがそのまま再実行耐性を持つ)
 - **[R-EXP-9]** 指定された検証手段で確認する。`両方` は画面(`pms act assert`)と DB(SELECT)の両方を必ず実施する。`画面` に DB を足すのはよい。`両方` で画面に露出しないと判明したら `DB` に変え、理由を `verification.reason` に書き、DISC の候補とする
@@ -355,7 +355,7 @@ metadata:
 シナリオの終わり(`explore.close`)
 
 - **[R-EXP-16]** シナリオ末尾の DB不変条件の検査を行う(00 ■DB不変条件 のシナリオ末尾検査。当該シナリオが作成・変更したデータに限定し、SELECT のみ。検査の前に非同期書き込みの完了を待つ)。`vocab.invariant` の全キーに `pass` / `fail` / `未実施(理由)` を書き、違反は判定と独立に `violations` に書く。`vocab.invariant` に定義がなければ検査しない(`invariants` は `{}`。R-INV-4)
-- **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(該当画面・T05・`kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
+- **[R-EXP-17]** 探索中に確立した操作は、シナリオが `blocked` でも捨てない。前提状態を作るものは fixture とシナリオ部品へ、2つ以上のシナリオ(過去フロー含む)に現れる操作列はシナリオ部品へ、解決した安定ロケータはページオブジェクトへ、それ以外は KB(画面ごとの事実は該当画面 T01、外部操作は T05、部品の型による操作のコツは T13、どれにも入らないものは `kb/gotchas/`)へ反映し、反映先を `reflections` に書く(反映するものがなければ `none`)
 - **[R-EXP-18]** マニュアルに、このシナリオの操作手順の記載がなかったら `manual_gap` を true にする
 
 探索セッションの終わり(`explore.session_close`)

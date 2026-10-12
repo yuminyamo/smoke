@@ -1,0 +1,26 @@
+stage: "40"
+improvement_run: IR-002
+procedure_version: proc-v031
+procedure_version_before: proc-v030
+procedure_version_after: proc-v031
+outcome: success
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 18
+  signals_routed: { 手順: 8, KB: 1, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 8, 見送り: 1 }
+  imp_opened: { A: 0, B: 4, C: 0 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: []
+  imp_revert_recommended: []
+  imp_pending_human: [IMP-003, IMP-004, IMP-005]
+  imp_by_instruction: [IMP-002]
+  guard_alert: none
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-002/report.md
+  diffs: work/_improve/IR-002/diffs/IMP-002.diff
+  ledger: work/_common/procedure-improvement.md
+  metrics: work/_improve/metrics.md
+notes: 人間の指示による改訂(IMP-002。KB T13 UI操作知見の新設)と、未処理のシグナル SIG-0001〜0008・0010〜0019 の振り分けを行った。実行中のフローはない(F-001 は suspended で閉じた)。lint の ERROR 1件(procedure_version_present。F-001 の作業10と作業20の版の食い違い)は改訂前からあり、手順書ではなく F-001 の成果物に対するもの。

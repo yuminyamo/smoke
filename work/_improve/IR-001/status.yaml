@@ -1,0 +1,26 @@
+stage: "40"
+improvement_run: IR-001
+procedure_version: proc-v028
+procedure_version_before: proc-v028
+procedure_version_after: proc-v029
+outcome: partial_success
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 1
+  signals_routed: { 手順: 1, KB: 0, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 0, 見送り: 0 }
+  imp_opened: { A: 0, B: 1, C: 0 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: []
+  imp_revert_recommended: []
+  imp_pending_human: []
+  imp_by_instruction: [IMP-001]
+  guard_alert: none
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-001/report.md
+  diffs: work/_improve/IR-001/diffs/IMP-001.diff
+  ledger: work/_common/procedure-improvement.md
+  metrics: work/_improve/metrics.md
+notes: 人間の指示(SIG-0009 の改善)による改訂だけを行った。未処理シグナル SIG-0001〜0008 は振り分けていない(partial_success)。実行中のフロー F-001 の最中に配備した(指示による)。

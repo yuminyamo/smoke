@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { timestamp, today, blank, readText, TIMESTAMP_RE } from './util.mjs';
-import { skipCard, stopCard, chainStop, kbPages, list, mdTable, isDone } from './queue.mjs';
+import { skipCard, stopCard, chainStop, kbPages, uiTipsList, list, mdTable, isDone } from './queue.mjs';
 import { scenarioDefs } from './scenarios.mjs';
 import { readEntries } from './setup-log.mjs';
 import { upsertScenario, readScenarios, scenarioVerdict, orderStep, sameTag } from './exploration-log.mjs';
@@ -209,6 +209,7 @@ export function exploreVars(ctx, q, c, acts) {
         }).join('\n') || 'なし'
         : '前のステップのあとの画面から続ける(画面がずれていたら snapshot で確かめる)',
       kb_pages: list(kbPages(root, c.scenario, c.step_id, ...ops)),
+      ui_tips: uiTipsList(root),
       ledger_refs: refs.length ? refs.map((h) => `- ${h.ID}(${h['理由コード']}): ${h['対象']}${h['想定手段'] ? ` / 想定手段 ${h['想定手段']}` : ''}`).join('\n') : 'なし',
       nd_catalog: fs.existsSync(paths.abs(paths.ndCatalog())) ? `\`${paths.ndCatalog()}\`` : 'なし(ファイルがない。値はすべて 未登録 として追加候補にする)',
     });
@@ -222,6 +223,7 @@ export function exploreVars(ctx, q, c, acts) {
       steps_summary: (sc?.steps ?? []).map((s) => `- ${s.step_id}: ${s.verdict}。操作: ${(s.actions ?? []).map(actionText).join(' → ') || 'なし'}`).join('\n') || 'なし',
       carried_data: sc && Object.keys(sc.carried_data ?? {}).length ? '```json\n' + JSON.stringify(sc.carried_data, null, 2) + '\n```' : 'なし(データを作っていない)',
       existing_code: list([...ls('tests/flows'), ...ls('tests/fixtures'), ...ls('tests/pages')]),
+      ui_tips: uiTipsList(root),
       invariant_note: proc.vocab.invariant_note ?? '',
     });
   } else if (c.kind === 'explore.session_close') {

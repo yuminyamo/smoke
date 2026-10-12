@@ -273,6 +273,38 @@ test('explore: カードの入力に、前のステップの記録の抜粋・�
   assert.match(n2.json.body, /前のステップのあとの画面から続ける/);
 });
 
+test('カードの入力「UI操作知見」: KB T13 の全ファイルのパスと索引の主題を、setup.build・explore.step・explore.close に載せる(ID の一致では選ばない)。setup.reuse・report.findings には載せない', async () => {
+  const root = repo({
+    'kb/00_索引.md': '# KB 索引\n\n| ID | カテゴリ | ファイル | 主題 | review_status | 更新日 |\n|---|---|---|---|---|---|\n'
+      + '| UIT-0001 | T13 UI操作知見 | ui-tips/UIT-0001_遅れて描画される一覧.md | 遅れて描画される一覧: 開いた直後は行がない | unreviewed | 2026-10-12 |\n',
+    'kb/ui-tips/UIT-0001_遅れて描画される一覧.md': '# UIT-0001\n',
+    'kb/ui-tips/UIT-0002_一過性のメニュー.md': '# UIT-0002\n',
+  });
+  build(root);
+  const bodies = {};
+  for (let i = 0; i < 30; i++) {
+    const n = await doNext(root);
+    if (n.json?.state !== 'card') break;
+    bodies[n.json.kind] ??= n.json.body;
+  }
+  for (const kind of ['setup.build', 'explore.step', 'explore.close']) {
+    assert.ok(bodies[kind], `${kind} のカードが出ていない`);
+    assert.match(bodies[kind], /- kb\/ui-tips\/UIT-0001_遅れて描画される一覧\.md — 遅れて描画される一覧: 開いた直後は行がない/, kind);
+    assert.match(bodies[kind], /- kb\/ui-tips\/UIT-0002_一過性のメニュー\.md — \(索引に行がない\)/, kind);
+    assert.match(bodies[kind], /- \[R-LOC-6\] 部品の型による操作のコツを新しく見つけたら/, kind);
+  }
+  assert.match(bodies['explore.step'], /- \[R-LOC-5\] 画面の部品の型/);
+  for (const kind of ['setup.reuse', 'report.findings']) {
+    assert.ok(bodies[kind], `${kind} のカードが出ていない`);
+    assert.ok(!bodies[kind].includes('kb/ui-tips/'), kind);
+  }
+  // kb/ui-tips/ がなければ「なし」
+  const empty = repo();
+  build(empty);
+  await doNext(empty); // setup.reuse
+  assert.match(pms(empty, ['next', '--flow', 'F-003']).json.body, /なし\(kb\/ui-tips\/ にファイルがない\)/);
+});
+
 test('explore.step の検査: 期待結果の書き換え・証跡なし・健全性シグナルの時刻・blocked の参照・別のカードの連番・検証手段の欠け', async () => {
   const root = repo({}, { config: { max_rejections: 10 } });
   build(root);

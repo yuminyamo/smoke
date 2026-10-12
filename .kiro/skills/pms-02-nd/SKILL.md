@@ -2,12 +2,12 @@
 name: pms-02-nd
 description: "PMS回帰テスト作成の作業02(非決定値カタログ抽出)。初回フロー前の初期作成、または作業10が増分実施を求めたとき(nd_needed=yes)に使う。同じ操作を繰り返して、画面・DBの値ごとの検証強度を観測で決める。"
 metadata:
-  procedure_version: proc-v030
+  procedure_version: proc-v031
   generated_from: "procedure/stages.md §02"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §02 / 手順版: proc-v030 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §02 / 手順版: proc-v031 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業02 非決定値カタログ抽出(手順版 proc-v030)
+# 作業02 非決定値カタログ抽出(手順版 proc-v031)
 
 この skill は、手順書の正本の `stages.md` §02 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -35,7 +35,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v030` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v031` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -89,7 +89,7 @@ metadata:
 | `ext-demand` | `work/_common/external-op-demand.md`(外部操作需要リスト) |
 | 外部操作 skill | skills の機構で確認する(00 ■外部操作) |
 | 既存資産 | `tests/fixtures/`・`tests/flows/`(観測の反復に使う前提状態・操作列) |
-| `kb` | `kb/00_索引.md` 経由。T01画面 / T03 DB / T06非同期 / T09環境 |
+| `kb` | `kb/00_索引.md` 経由。T01画面 / T03 DB / T06非同期 / T09環境 / T13 UI操作知見(操作が素直に通らない部品があれば、型の合うファイルを読む。00 [R-LOC-5]) |
 | 環境情報 | `node tools/env/env.mjs`(接続先・アカウント。開始時に `require` で確かめ、足りなければまとめて人間に聞く。00 ■検証環境の情報) |
 | 環境 | ゴールデンイメージ復元手段 |
 
@@ -144,7 +144,7 @@ metadata:
 - 操作に成功した画面ごとに、操作列と安定ロケータを `kb/screens/` へ
 - 非同期完了を待った箇所は、待機条件と実測所要時間を `kb/async/` へ
 - 値がDBのどの列に入るかを `kb/db/` へ
-- 素直に操作できなかった要素の攻略法を `kb/gotchas/` へ
+- 素直に操作できなかった要素の攻略法を、部品の型ごとに `kb/ui-tips/`(T13。00 [R-LOC-6])へ
 
 ### 増分実施の規約
 

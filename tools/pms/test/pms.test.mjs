@@ -396,6 +396,9 @@ test('submit: 合格すると setup-log に付録Bの形の built-by-ui を書�
   const next = pms(root, ['next', '--flow', 'F-003']);
   assert.equal(next.json.kind, 'setup.code');
   assert.match(next.json.body, /getByLabel\('ユーザーID'\)\.fill\(envValue\('pms\.admin\.user'\)\)/);
+  // KB T13 の一覧(kb/ui-tips/ がなければ「なし」)と、コードでの扱いの規則
+  assert.match(next.json.body, /UI操作知見\(KB T13。[^\n]*\nなし\(kb\/ui-tips\/ にファイルがない\)/);
+  assert.match(next.json.body, /- \[R-LOC-5\] 画面の部品の型/);
   codeFiles(root);
   const c = submitOut(root, 'C-0002', CODED);
   assert.equal(c.code, 0, c.stdout);

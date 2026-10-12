@@ -2,12 +2,12 @@
 name: pms-20-codegen
 description: "PMS回帰テスト作成の作業20(回帰テストコード生成)。通常は入口skill pms-regression から使う。作業10の探索記録と status.yaml から、実行時にAIを使わない Playwright の回帰テストを生成し、実行確認と突合表の更新を行う。"
 metadata:
-  procedure_version: proc-v030
+  procedure_version: proc-v031
   generated_from: "procedure/stages.md §20"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v030 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v031 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業20 回帰テストコード生成(手順版 proc-v030)
+# 作業20 回帰テストコード生成(手順版 proc-v031)
 
 この skill は、手順書の正本の `stages.md` §20 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -38,7 +38,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v030` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v031` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -95,7 +95,7 @@ metadata:
 | `exploration-log` / `setup-log` | `work/<feature_code>/exploration/` |
 | 実装済み資産 | `tests/fixtures/`, `tests/flows/`, `tests/pages/`, `tests/external/`, `tests/helpers/` |
 | `nd-catalog` | `work/_common/nondeterministic-catalog.md` |
-| `kb` | **待機条件とタイムアウト根拠は `kb/async/`(T06)を正として参照する。** DB列の意味は T03、セレクタは T01、外部操作の skill名と実行体の呼び出し方は T05 |
+| `kb` | **待機条件とタイムアウト根拠は `kb/async/`(T06)を正として参照する。** DB列の意味は T03、セレクタは T01、外部操作の skill名と実行体の呼び出し方は T05、部品の型ごとのコードでの扱い(表示の確認を挟む・強制クリック 等)は T13 の「コードでの扱い」(00 [R-LOC-5]) |
 | 外部操作 skill | skills の機構で確認する(T05 の skill名を手がかりにする) |
 | `ext-demand` | `work/_common/external-op-demand.md`(外部操作 skill に不備があった場合に更新) |
 | `scenarios` | 期待結果・検証手段の参照元。レビュー状況を問わず参照してよい |
@@ -239,7 +239,7 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 
 <!-- /protected:NO_AI_AT_RUNTIME -->
 
-- 作業10の `actions` に無い操作をコードに追加しない。どうしても必要な場合(スクロール等)はコード内コメントと報告書の両方に逸脱として記録する
+- 作業10の `actions` に無い操作をコードに追加しない。どうしても必要な場合(スクロール・表示の確認等)は、KB T13 に操作する部品の型のファイルがあればその「コードでの扱い」に従って足し、コード内コメントと報告書の両方に逸脱として記録する(T13 に従った場合も逸脱である)
 - **禁止操作リストの照合を省略しない。** 照合スクリプトの終了コードが 0 以外のときに作業を始めない。「関係のない変更だ」と自分で判断して進めない
 - **作業10・15の成果物の lint を省略しない。** ランナーの終了コードが 0 以外のときに作業を始めない
 - **lint の ERROR が残ったまま、報告書 §6 に書かずに完了報告を出さない。** lint の指摘を消すために、突合表の行を消す・記録を事実と違えて書くことをしない

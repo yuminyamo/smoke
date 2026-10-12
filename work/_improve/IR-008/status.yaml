@@ -1,0 +1,25 @@
+stage: "40"
+improvement_run: IR-008
+procedure_version: proc-v038
+procedure_version_before: proc-v038
+procedure_version_after: proc-v038   # 手順書は変えていない(全件 承認待ち)
+model: claude-opus-5-5
+outcome: partial_success             # 依頼の範囲(CND-001 の対応案)だけを行った。F-003 の metrics.md の行、SIG-0026〜0030、判定期限に達した改訂の判定は次の作業40に回した
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 0
+  signals_routed: { 手順: 0, KB: 0, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 0, 見送り: 0 }
+  imp_opened: { A: 0, B: 3, C: 0 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: []
+  imp_revert_recommended: []
+  imp_pending_human: [IMP-034, IMP-035, IMP-036]
+  imp_by_instruction: []
+  guard_alert: none                  # 試行中の改訂なし
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-008/report.md
+  ledger: work/_common/procedure-improvement.md
+notes: 利用者の依頼により、根本の改訂の候補 CND-001 の対応案として IMP-034〜036(全件区分B・承認待ち)を起票した。確認内容の「操作の方法」を scenarios.md の列に出し、照合を pms submit(探索)と Playwright の実行の記録(作業20)に移す案。手順書は変えていない。

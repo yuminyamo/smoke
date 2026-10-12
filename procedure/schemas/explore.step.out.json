@@ -6,7 +6,7 @@
   "properties": {
     "result": { "enum": ["explored", "cannot_proceed"], "description": "explored = ステップを探索して判定した(blocked を含む)/ cannot_proceed = カードの範囲で判断できない(人間へ回る。理由を notes に書く)" },
     "verdict": { "type": ["string", "null"], "x-vocab": "verdict", "description": "このステップの判定。cannot_proceed のときは null" },
-    "seqs": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true, "description": "このステップの操作の連番(pms act の seq。成功した最短の列を順に。snapshot・assert・screenshot は入れない)。操作がなければ []" },
+    "seqs": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true, "description": "このステップの操作の連番(pms act の seq。期待結果の確認のための操作(開き直し・再読込)を含め、判定までに要った成功した操作を順に。失敗した操作・やり直しで不要になった操作と、snapshot・assert・screenshot は入れない)。操作がなければ []" },
     "fragile": {
       "type": "array", "description": "CSS の暫定ロケータを使った連番と理由(00 ■ロケータ規約の6。なければ [])",
       "items": { "type": "object", "additionalProperties": false, "required": ["seq", "reason"], "properties": {

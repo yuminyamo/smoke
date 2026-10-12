@@ -1,5 +1,6 @@
 // status.mjs — status.yaml の契約の検査(status_yaml_valid / procedure_version_present)
 
+import fs from 'node:fs';
 import { STAGES, flowNumber } from '../lib/repo.mjs';
 
 // 分岐に使うキーのうち、あとの手順版で追加したもの(それより前の版で始めたフローでは求めない)
@@ -186,10 +187,27 @@ export function procedure_version_present(repo) {
     const list = repo.statusFiles.filter((s) => s.flow === f && FLOW_STAGES.includes(s.stage) && s.data?.procedure_version);
     const versions = [...new Set(list.map((s) => String(s.data.procedure_version)))];
     if (versions.length > 1) {
-      add(list.map((s) => s.rel).join(', '), `${f} の作業10・15・20で procedure_version が一致しません(${list.map((s) => `作業${s.stage}: ${s.data.procedure_version}`).join(' / ')})。1フローは1つの版で実行する`);
+      // 一致しないときは、flow.md のメモ欄に隣り合う版の「手順版の切り替え」の記録があればよい(stages.md §20 手順版の確認)
+      const missing = unrecordedSwitches(repo, f, versions);
+      if (missing.length) {
+        add(list.map((s) => s.rel).join(', '), `${f} の作業10・15・20で procedure_version が一致しません(${list.map((s) => `作業${s.stage}: ${s.data.procedure_version}`).join(' / ')})。flow.md のメモ欄に「手順版の切り替え: ${missing.join('」「')}」の記録がありません(stages.md §20 手順版の確認)`);
+      }
     }
   }
   return { findings };
+}
+
+/** flow.md にない「手順版の切り替え: <版> → <版>」(版の昇順で隣り合う組)を返す */
+function unrecordedSwitches(repo, flow, versions) {
+  const file = repo.abs(`work/_flows/${flow}/flow.md`);
+  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const sorted = [...versions].sort();
+  const out = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const re = new RegExp(String.raw`手順版の切り替え[:：]\s*${sorted[i - 1]}\s*(→|->)\s*${sorted[i]}(?!\d)`);
+    if (!re.test(text)) out.push(`${sorted[i - 1]} → ${sorted[i]}`);
+  }
+  return out;
 }
 
 function fmt(v) {

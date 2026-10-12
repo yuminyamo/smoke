@@ -2,12 +2,12 @@
 name: pms-20-codegen
 description: "PMS回帰テスト作成の作業20(回帰テストコード生成)。通常は入口skill pms-regression から使う。作業10の探索記録と status.yaml から、実行時にAIを使わない Playwright の回帰テストを生成し、実行確認と突合表の更新を行う。"
 metadata:
-  procedure_version: proc-v032
+  procedure_version: proc-v033
   generated_from: "procedure/stages.md §20"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v032 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v033 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業20 回帰テストコード生成(手順版 proc-v032)
+# 作業20 回帰テストコード生成(手順版 proc-v033)
 
 この skill は、手順書の正本の `stages.md` §20 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -38,7 +38,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v032` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v033` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -111,7 +111,13 @@ metadata:
 
 ### 手順版の確認(開始時)
 
-flow.md に記録された開始時の手順版と、`vocab.meta.procedure_version` が一致することを確認する(00 ■手順書の版と配備)。食い違ったら報告書に書き、手順改善シグナル(種別 `実行不能`)として記録する。
+flow.md に記録された開始時の手順版と、`vocab.meta.procedure_version` が一致することを確認する(00 ■手順書の版と配備)。食い違ったら、作業20は現在の版で行い、次をする。
+
+1. flow.md のメモ欄に「手順版の切り替え: <開始時の版> → <現在の版>」と、その間の改訂の 000 改訂履歴の章番号を書く(版はフロー台帳の手順版の欄にも「<開始時の版> → <現在の版>」と書く)
+2. 000 改訂履歴で、その間の改訂が作業10の成果物の書式・判定に関わるかを見て、関わるものを報告書 §6 に挙げる(関わるものがなければ「なし」)
+3. 手順改善シグナル(種別 `実行不能`)を記録する(フローの途中で配備された事実を作業40が数えるため)
+
+作業10をやり直さない。作業10の成果物を新しい版の書式に書き直さない。
 
 ### 禁止操作リストの照合(開始時。工程0より前)
 
@@ -301,6 +307,7 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 - [ ] `afterEach` の INV 検査が自データスコープである(グローバルスキャンを含まない)
 - [ ] 外部操作が `tests/external/` のラッパ経由で呼ばれ、ラッパは skill 同梱の実行体を呼び、KB T05 の操作IDと1対1である
 - [ ] 外部操作を含むテストに `@external` タグが付き、同時実行不可の操作対象を使うテストは `@serial-<対象略号>` の project で直列実行される構成になっている
+- [ ] `tests/global-setup.ts` があり、`playwright.config.ts` の `globalSetup` に登録されている(付録F)
 - [ ] 工程0の前に `node tools/env/env.mjs require` で環境情報が揃っていることを確かめ、status.yaml の `environment` に環境IDを記録した
 - [ ] 生成コードに接続先・アカウント・秘密情報の値を直接書いておらず、`envValue` で読んでいる(lint `env_value_leak` / `env_value_hardcoded`)
 - [ ] 工程0で環境を復元し、status.yaml の `env_restore` に restore_id・purpose(`work20`)・readiness を記録した(lint `env_restored`)

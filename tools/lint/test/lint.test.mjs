@@ -423,7 +423,13 @@ test('status_yaml_valid: 対象フローの作業10の status.yaml がない・�
 
 test('procedure_version_present: 作業10と作業20で版が違う・書式の誤り', () => {
   const root = makeRepo({ ...edit('work/PRT/codegen/status.yaml', 'procedure_version: proc-v005', 'procedure_version: proc-v006') });
-  assertHas(findings(lint(root), 'procedure_version_present'), /F-001 の作業10・15・20で procedure_version が一致しません/);
+  assertHas(findings(lint(root), 'procedure_version_present'), /F-001 の作業10・15・20で procedure_version が一致しません.*手順版の切り替え: proc-v005 → proc-v006/);
+  // flow.md のメモ欄に切り替えの記録があれば通る(stages.md §20 手順版の確認)
+  const recorded = makeRepo({
+    ...edit('work/PRT/codegen/status.yaml', 'procedure_version: proc-v005', 'procedure_version: proc-v006'),
+    'work/_flows/F-001/flow.md': '# F-001\n\n## メモ\n\n- 手順版の切り替え: proc-v005 → proc-v006(000 改訂履歴 43章)\n',
+  });
+  assert.deepEqual(findings(lint(recorded), 'procedure_version_present'), []);
   const root2 = makeRepo({ ...edit('work/PRT/exploration/status.yaml', 'procedure_version: proc-v005', 'procedure_version: v5') });
   assertHas(findings(lint(root2), 'procedure_version_present'), /書式\(proc-v<3桁>\)に合いません\(v5\)/);
 });

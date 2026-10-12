@@ -21,7 +21,7 @@
 // 規則の一覧・重大度は procedure/00_common.md の lint 表を正とする(このスクリプトは表を読んで動く)。
 // 実装した規則:
 //   status_yaml_valid          status.yaml の最上位・context_updates を vocab.context_key と stages.md のスロット8で検査
-//   procedure_version_present  全 status.yaml の procedure_version と、同一フローの作業10・15・20の一致
+//   procedure_version_present  全 status.yaml の procedure_version と、同一フローの作業10・15・20の一致(違えば flow.md の「手順版の切り替え」の記録)
 //   verdict_enum               探索記録の判定値
 //   reason_code_enum           申し送り台帳・blocked_by の理由コード
 //   no_temp_locator            探索記録・セットアップ記録の locator に snapshot の一時IDがない

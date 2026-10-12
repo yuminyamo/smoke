@@ -1,0 +1,21 @@
+# IMP-003(承認待ち・未適用)ST/10/付録A — IR-004 で具体化した差分案
+# 根拠: SIG-0013, SIG-0014
+# 調べて分かったこと(IR-004):
+#  - SIG-0013 の原因は、カードの出力 schema の seqs の説明「成功した最短の列を順に」。確認のための開き直し(act-log seq 48・50)は
+#    「最短」から外れるため、AIが seqs から落とした。付録A だけでなく schema の説明も直さないと再発する
+#  - SIG-0014 は記録の食い違いではなかった。verified_by.screen は screen_seqs の assert(seq 54、getByRole('group', { name: '場所' }))と一致している。
+#    作業20が見た CSS の assert(seq 52)は、screen_seqs に入らなかった試行。→ 「一致させる規定」を足すのではなく、
+#    「判定の根拠は screen_seqs の assert だけ」と書く(規定の追加より小さい)
+
+--- a/procedure/stages.md(付録A 補足ルール)
++++ b/procedure/stages.md(付録A 補足ルール)
+@@
+ - `actions[].locator` は**安定ロケータ(またはページオブジェクト/部品のメソッド参照)のみ**。snapshot の一時IDを書かない
++- `actions` には、期待結果の確認のために行った操作(保存後に画面を開き直す・一覧を再読込して検索し直す など)も含める。作業20はこの列だけを再現するため、確認の前の操作が抜けると同じ確認ができない
++- 画面の判定の根拠は `act.screen_seqs` の assert(= `verified_by.screen`)だけである。操作の記録(`act-log.jsonl`)にあって `screen_seqs` にない assert は、判定に使わなかった試行であり、作業20はコードにしない
+ - `assertion_hint` は**必ず書く**(`blocked` のステップを除く)。…
+
+--- a/procedure/schemas/explore.step.out.json(seqs の description)
++++ b/procedure/schemas/explore.step.out.json(seqs の description)
+-"description": "このステップの操作の連番(pms act の seq。成功した最短の列を順に。snapshot・assert・screenshot は入れない)。操作がなければ []"
++"description": "このステップの操作の連番(pms act の seq。期待結果の確認のための操作(開き直し・再読込)を含め、判定までに要った成功した操作を順に。失敗した操作・やり直しで不要になった操作と、snapshot・assert・screenshot は入れない)。操作がなければ []"

@@ -126,6 +126,7 @@ export function envValue(key: string): string {
 - **ゴールデンイメージ復元は回帰テストセットの実行開始前に1回のみ。** 環境がクリーンであることに依存したアサーション(全体件数等)を書いてはならない
 - **テストが前提とするデータ・設定は、すべてテストコード(fixture・シナリオ部品・テスト本体)が作る。** ゴールデンイメージにないもの(探索時に作られて環境に残っていたデータ、手作業で作ったデータ)に依存しない。依存していると、復元のあとの回帰実行で失敗する
 - 復元は `tests/global-setup.ts` が環境変数 `PMS_RESTORE=1` のときだけ行う。**globalSetup を書き換えて復元を既定にしない。テスト本体・fixture・`afterAll` から復元を呼ばない**
+- `tests/global-setup.ts` がなければ、作業20が作り、`playwright.config.ts` の `globalSetup` に登録する。中身は、`PMS_RESTORE=1` のときだけ skill `restore-golden-image` の実行体を `-Purpose regression -SkipReadiness` で呼ぶことだけとする(起動確認は setup project `readiness` が行う)。作業20の実行確認では `PMS_RESTORE` を付けないので、作っても実行確認では動かない
 - 起動確認テスト(`tests/readiness/`)は setup project `readiness` とし、**全 project の `dependencies` に `readiness` を入れる**。ほかの project の対象から `tests/readiness/` を外す
 - 各テストは**復元なしの再実行に耐えること**。作成データは一意化し、アサーションは自テストのデータにスコープする
 - シナリオ間の並列実行を前提に書く

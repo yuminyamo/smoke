@@ -3,7 +3,7 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-12 / 版: v31(KB カテゴリ T13 UI操作知見の新設: ■ロケータ規約 の操作のコツの記録先を kb/gotchas/ から T13 に変え、R-LOC-5(読む)・R-LOC-6(書く)にした。■ディレクトリ構成 に kb/ui-tips/ を加えた(proc-v031)。人間の指示による改訂。前版 v30 は 2026-10-11 の DB不変条件の定義の撤回)
+改訂: 2026-10-12 / 版: v32(作業40 IR-004 の改善案の適用: ■ディレクトリ構成 に機能一覧 feature-list.md・作業02の nd/・作業20の codegen/ を加え(IMP-004)、■lint の procedure_version_present を「版が違えば flow.md の手順版の切り替えの記録を見る」にした(IMP-005)(proc-v033)。人間の指示による改訂。前版 v31 は同日の KB カテゴリ T13 UI操作知見の新設)
 
 手順書一式の版は `vocab.meta.procedure_version` を正とする(■手順書の版と配備)。
 
@@ -1063,7 +1063,9 @@ work/
     F-001/queue.json / cards/ / out/ / submit-log.jsonl   # 進行役のタスクキュー・出したカード・カードの出力・提出の検査の結果(■進行役と記録の道具)
     F-001/runs/ / stage10-context.json / report-draft-<機能>.md  # pms run のセッションの出力・作業10の開始時の事実・所見のカードに載せた報告書の下書き
   _common/                            # 機能横断の資産(フロー横断で累積)
+    feature-list.md                   # 機能一覧と機能コード(初回フローの作業10 A2 で確定。以後は追記)
     nondeterministic-catalog.md       # 非決定値カタログ(作業02)
+    nd/                               # 作業02の報告書・status.yaml・evidence/(初期作成・増分実施のたびに上書きせず、報告書に実施日を書く)
     prohibited-operations.md          # 禁止操作リスト(人間が記入。テンプレート90。未記入のものを初期配置)
     handoff-register.md               # 申し送り台帳(テンプレート91)
     external-op-demand.md             # 外部操作需要リスト(テンプレート93)
@@ -1088,6 +1090,9 @@ work/
     health/                           # 作業15(健全性の是正)の成果物。健全性シグナルが出たフローのみ
       inquiries/<シナリオID>-<回>.md  # 問い合わせの入力と回答の全文
       inquiries/<シナリオID>-<回>-logs/ # 問い合わせに添付したログ一式(ログ収集 skill の出力。AIは本文を読まない)
+      report.md
+      status.yaml
+    codegen/                          # 作業20(回帰テストコード生成)の報告書と status.yaml
       report.md
       status.yaml
   _catalog/                           # 作業30の成果物
@@ -1219,7 +1224,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `select_only` | ERROR | 生成コード・実行SQLに `SELECT` 以外がない |
 | `status_yaml_valid` | ERROR | status.yaml が存在し、`context_updates` のキーが `vocab.context_key` と当該作業のスロット8の定義に収まる(分岐に使うキーの有無と値、作業10・20の `env_restore`・`pre_stage`(proc-v008 以降)・作業10・15・20の `environment`(proc-v010 以降)・作業10の `scenario_source`(proc-v011 以降)・作業10の `prohibited_ops`・`handoff_by_reason`・`health_signal_items`、作業15の `stage10_restore_id`・`codeable_items` の形も見る。分岐に使うキーのうち手順版より後に追加したもの(`health_signal` は proc-v007、作業15の `escalation` は proc-v008)は、それより前の版で始めたフローでは求めない)。実装: `tools/lint/lint.mjs` |
 | `no_temp_locator` | ERROR | `actions[].locator` に snapshot の一時IDが含まれない(setup-log の `steps[].locator` を含む)。実装: `tools/lint/lint.mjs` |
-| `procedure_version_present` | ERROR | 全 status.yaml に `procedure_version` があり、同一フローの作業10・15・20で一致する。実装: `tools/lint/lint.mjs` |
+| `procedure_version_present` | ERROR | 全 status.yaml に `procedure_version` があり、同一フローの作業10・15・20で一致する。一致しないときは、flow.md のメモ欄に、その2つの版の「手順版の切り替え」の記録がある(`stages.md` §20 手順版の確認)。実装: `tools/lint/lint.mjs` |
 | `procedure_untouched_by_flow` | ERROR | 作業01 / 02 / 10 / 15 / 20 / 30 の成果物の変更に、手順書(`procedure/` 配下・生成した skills)の変更が含まれない |
 | `protected_unchanged` | ERROR | 保護ブロックの内容のハッシュが `lint/protected-baseline.yaml` と一致する。基準の更新は、人間の直接改訂または明示的な指示による改訂(000 改訂履歴に記録があるもの)に限る |
 | `imp_tier_valid` | ERROR | 作業40が自律的に適用した差分について、位置と文言から再計算した区分が区分Aであり、手順改善台帳の記録と一致する(解禁前は、人間の採用がない差分がない) |

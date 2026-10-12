@@ -1,0 +1,22 @@
+# IMP-005(承認待ち・未適用)ST/20/4 — IR-004 で具体化した差分案
+# 根拠: SIG-0010(lint procedure_version_present の ERROR が F-001 に残り、フローを done にできず suspended で閉じた)
+# 原因: 00 ■手順書の版と配備 は「配備はフローの境界でのみ」とするが、人間の指示による改訂(proc-v029・v030)は skills の再生成と同じコミットで入るため、
+#       実行中のフローにも即座に配備される。「配備しない」手段が今の仕組みにない
+# 案: 版の食い違いを禁止のままにせず、「記録された切り替え」として扱う(作業10をやり直すより安く、どの版で何を作ったかの追跡は保てる)
+# 注意: 1 IMP = 1 手順箇所だが、IMP-005 は起票時から lint procedure_version_present を含む。採用時は 00 ■lint の行と tools/lint/lint.mjs を同時に直す(下の2つ目の差分)
+
+--- a/procedure/stages.md(§20 4. 固有手順 手順版の確認)
++++ b/procedure/stages.md(§20 4. 固有手順 手順版の確認)
+-flow.md に記録された開始時の手順版と、`vocab.meta.procedure_version` が一致することを確認する(00 ■手順書の版と配備)。食い違ったら報告書に書き、手順改善シグナル(種別 `実行不能`)として記録する。
++flow.md に記録された開始時の手順版と、`vocab.meta.procedure_version` が一致することを確認する(00 ■手順書の版と配備)。食い違ったら、作業20は現在の版で行い、次をする。
++
++1. flow.md のメモ欄に「手順版の切り替え: <開始時の版> → <現在の版>」と、その間の改訂の 000 改訂履歴の章番号を書く(版はフロー台帳の手順版の欄にも「<開始時の版> → <現在の版>」と書く)
++2. 000 改訂履歴で、その間の改訂が作業10の成果物の書式・判定に関わるかを見て、関わるものを報告書 §6 に挙げる(関わるものがなければ「なし」)
++3. 手順改善シグナル(種別 `実行不能`)を記録する(フローの途中で配備された事実を作業40が数えるため)
++
++作業10をやり直さない。作業10の成果物を新しい版の書式に書き直さない。
+
+--- a/procedure/00_common.md(■lint の表 procedure_version_present の行)
++++ b/procedure/00_common.md(■lint の表 procedure_version_present の行)
+-| `procedure_version_present` | ERROR | 全 status.yaml に `procedure_version` があり、同一フローの作業10・15・20で一致する。実装: `tools/lint/lint.mjs` |
++| `procedure_version_present` | ERROR | 全 status.yaml に `procedure_version` があり、同一フローの作業10・15・20で一致する。一致しないときは、flow.md のメモ欄に、その2つの版の「手順版の切り替え」の記録がある(§20 手順版の確認)。実装: `tools/lint/lint.mjs` |

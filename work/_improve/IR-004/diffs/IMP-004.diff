@@ -1,0 +1,21 @@
+# IMP-004(承認待ち・未適用)CM/ディレクトリ構成 — IR-004 で具体化した差分案
+# 根拠: SIG-0001, SIG-0007, SIG-0018。F-001 で実際に置いた場所(work/_common/nd/・work/_common/feature-list.md・work/USR/codegen/)をそのまま規定にする
+# 合わせて §02 スロット6・§20 スロット6 の「当該作業ディレクトリ」「当該フローの作業ディレクトリ」は、この構成を指すと読める(本文は変えない)
+
+--- a/procedure/00_common.md(■ディレクトリ構成)
++++ b/procedure/00_common.md(■ディレクトリ構成)
+@@
+   _common/                            # 機能横断の資産(フロー横断で累積)
++    feature-list.md                   # 機能一覧と機能コード(初回フローの作業10 A2 で確定。以後は追記)
+     nondeterministic-catalog.md       # 非決定値カタログ(作業02)
++    nd/                               # 作業02の報告書・status.yaml・evidence/(初期作成・増分実施のたびに上書きせず、報告書に実施日を書く)
+     prohibited-operations.md          # 禁止操作リスト(人間が記入。テンプレート90。未記入のものを初期配置)
+@@
+     health/                           # 作業15(健全性の是正)の成果物。健全性シグナルが出たフローのみ
+       inquiries/<シナリオID>-<回>.md  # 問い合わせの入力と回答の全文
+       inquiries/<シナリオID>-<回>-logs/ # 問い合わせに添付したログ一式(ログ収集 skill の出力。AIは本文を読まない)
+       report.md
+       status.yaml
++    codegen/                          # 作業20(回帰テストコード生成)の報告書と status.yaml
++      report.md
++      status.yaml

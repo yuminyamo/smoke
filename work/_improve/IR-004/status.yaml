@@ -1,0 +1,26 @@
+stage: "40"
+improvement_run: IR-004
+procedure_version: proc-v032
+procedure_version_before: proc-v032
+procedure_version_after: proc-v033
+outcome: success
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 8
+  signals_routed: { 手順: 4, KB: 1, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 3, 見送り: 0 }
+  imp_opened: { A: 0, B: 3, C: 0 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: []
+  imp_revert_recommended: []
+  imp_pending_human: []
+  imp_by_instruction: [IMP-003, IMP-004, IMP-005, IMP-007, IMP-008, IMP-009]
+  guard_alert: none
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-004/report.md
+  diffs: work/_improve/IR-004/diffs/
+  ledger: work/_common/procedure-improvement.md
+  metrics: work/_improve/metrics.md
+notes: 利用者の依頼「未対応の改善事項の検討と改善案」により、様子見8件を確かめ直し(手順4・KB1・様子見のまま3)、承認待ちの IMP-003〜005 に具体的な差分案を付け、IMP-007〜009 を起票した。その後、利用者の指示「その他の改善案IR-004は提案通り修正してください」により6件を指示適用し、proc-v033 にした(000 改訂履歴 43章)。SIG-0005 は手順書の外(見本の設定・利用説明書)で解消した。signals_processed は確かめ直した様子見の件数。

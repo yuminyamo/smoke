@@ -1,0 +1,18 @@
+# IMP-009(承認待ち・未適用)ST/20/付録F — IR-004 で起票
+# 根拠: SIG-0016(不足)
+# 裏付け(IR-004): 付録F・00 ■回帰実行の環境前提・■ディレクトリ構成 は tests/global-setup.ts(PMS_RESTORE=1 のときだけ復元)を前提にしているが、
+#   どの作業がいつ作るかが書かれていない。F-001 は作業20まで終えたが tests/global-setup.ts はなく、playwright.config.ts に globalSetup もない。
+#   復元の実行体には globalSetup 用の -Purpose regression と -SkipReadiness が既にある(restore-golden-image.ps1)ので、足りないのは「誰が作るか」だけ
+# 付随: 採用するなら §20 の DoD に1行足す(区分Aの形。下の2つ目の差分)
+
+--- a/procedure/stages.md(付録F 並列実行・再実行耐性とデータ分離)
++++ b/procedure/stages.md(付録F 並列実行・再実行耐性とデータ分離)
+@@
+ - 復元は `tests/global-setup.ts` が環境変数 `PMS_RESTORE=1` のときだけ行う。**globalSetup を書き換えて復元を既定にしない。テスト本体・fixture・`afterAll` から復元を呼ばない**
++- `tests/global-setup.ts` がなければ、作業20が作り、`playwright.config.ts` の `globalSetup` に登録する。中身は、`PMS_RESTORE=1` のときだけ skill `restore-golden-image` の実行体を `-Purpose regression -SkipReadiness` で呼ぶことだけとする(起動確認は setup project `readiness` が行う)。作業20の実行確認では `PMS_RESTORE` を付けないので、作っても実行確認では動かない
+ 
+--- a/procedure/stages.md(§20 7. 完了条件)
++++ b/procedure/stages.md(§20 7. 完了条件)
+@@
+ - [ ] 外部操作を含むテストに `@external` タグが付き、…
++- [ ] `tests/global-setup.ts` があり、`playwright.config.ts` の `globalSetup` に登録されている(付録F)

@@ -126,8 +126,23 @@ test('退避済み・作業中・同じ機能の他のフローが残る場合�
   r = run(root, '--flow', 'F-003');
   assert.equal(r.code, 2);
   assert.match(r.err, /作業中/);
-  const done = repo([row('F-001', 'USR', 'done', 'new', '成果物は再実行のため work/.archive/x/ に退避した')]);
+  const done = repo([row('F-001', 'USR', 'done', 'new', '成果物は再実行のため work/.archive/20261012-083805-F-001/ に退避した')]);
   r = run(done, '--flow', 'F-001');
   assert.equal(r.code, 2);
   assert.match(r.err, /退避済み/);
+});
+
+test('やり直しのフローを、さらにやり直せる(備考に前のフローの退避先が書かれていても退避済みとしない)', () => {
+  const archived = '初回。成果物は再実行のため work/.archive/20261012-083805-F-001/ に退避した(2026-10-12。tools/flow-reset)。やり直しは新しいフローで行う';
+  const root = repo([row('F-001', 'USR', 'done', 'new', archived), row('F-002', 'USR', 'done', 'new', 'F-001 のやり直し(退避先 work/.archive/20261012-083805-F-001/)')]);
+  fs.renameSync(path.join(root, 'work/_flows/F-001'), path.join(root, 'work/_flows/F-002'));
+  const r = run(root, '--flow', 'F-002', '--apply');
+  assert.equal(r.code, 0, r.err);
+  assert.ok(has(root, `${archiveDir(root)}/work/_flows/F-002/flow.md`));
+  assert.ok(!has(root, 'work/USR'));
+  const ledger = text(root, 'work/_flows/00_フロー台帳.md');
+  assert.match(ledger, /\| F-002 .*成果物は再実行のため work\/\.archive\/\d{8}-\d{6}-F-002\/ に退避した/);
+  // F-001 は退避済みのまま、F-002 も退避済みになる(もう一度は退避できない)
+  assert.equal(run(root, '--flow', 'F-001').code, 2);
+  assert.equal(run(root, '--flow', 'F-002').code, 2);
 });

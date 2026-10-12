@@ -65,7 +65,11 @@ if (!exists(LEDGER)) bail(`${LEDGER} がありません`);
 const ledgerText = read(LEDGER);
 const ledgerTable = tables(ledgerText.split('\n')).find((t) => t.header.includes('フローID'));
 if (!ledgerTable) bail(`${LEDGER} にフローの表がありません`);
-const archivedRow = (r) => (r.obj['備考'] ?? '').includes(ARCHIVE_MARK);
+// 退避済み = このツールが備考に書いた定型の文言があり、その退避先の名前(<日時>-<フローID>[_<フローID>…])にそのフローが入っている。
+// 備考に他のフローの退避先が書かれているだけ(例: やり直しのフローの「F-001 のやり直し。退避先 work/.archive/…-F-001/」)では退避済みとしない
+const ARCHIVED_NOTE_RE = /成果物は再実行のため work\/\.archive\/([^/\s]+)\/ に退避した/g;
+const archivedRow = (r) => [...String(r.obj['備考'] ?? '').matchAll(ARCHIVED_NOTE_RE)]
+  .some((m) => m[1].replace(/^\d{8}-\d{6}-/, '').split('_').includes(r.obj['フローID']));
 const rows = ledgerTable.rows.filter((r) => FLOW_RE.test(r.obj['フローID']));
 
 const targets = [];

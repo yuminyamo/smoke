@@ -3,12 +3,15 @@
 //
 // 方式 manual_usecase のスロット2の「操作の棚卸し」の表(scenarios.md の「## 操作の棚卸し(<フローID>)」)が、
 // 全行で実在のステップID か HO-ID を指し、同一経路の申し送りが代表のステップを指しているかを見る。
+// proc-v037 以降は、「(上限)」の申し送りがあるのに、シナリオ数かステップ数が上限に達していないシナリオがあるかも見る。
 // 手順版は作業10の status.yaml の procedure_version で判定する。
 
 import { sectionLines, tables, idsIn } from '../lib/markdown.mjs';
 import { verNum } from './exploration.mjs';
 
 const INVENTORY_SINCE = 36; // proc-v036 で追加(IMP-020・024)
+const CAP_SINCE = 37;       // proc-v037 で「(上限)」の検査を追加(IMP-029)
+const MAX_STEPS = 6;        // 1シナリオのステップ数の上限(方式 manual_usecase スロット2 の 3〜6)
 const STEP_RE = /SC-[A-Za-z0-9]+-\d+-S\d+/g;
 const HO_RE = /HO-[A-Za-z0-9]+-\d{3}/g;
 
@@ -32,12 +35,31 @@ export function operation_inventory_complete(repo) {
     const title = new RegExp(`^操作の棚卸し\\s*[((]\\s*${s.flow}\\s*[))]\\s*$`);
     const sec = sectionLines(repo.read(rel), title);
     if (!sec) { add(rel, `「## 操作の棚卸し(${s.flow})」の節がありません(方式 manual_usecase のスロット2)`); continue; }
-    const t = tables(sec.lines, sec.offset).find((x) => x.header.includes('扱い'));
+    // 列名は「扱い」か「扱い(ステップID または HO-ID)」(方式ファイルの列の説明を見出しに書いた形)
+    const t = tables(sec.lines, sec.offset).find((x) => x.header.some((c) => /^扱い/.test(c)));
+    const col = t?.header.find((c) => /^扱い/.test(c));
     if (!t || t.rows.length === 0) { add(rel, `「操作の棚卸し(${s.flow})」に列「扱い」の表(行のあるもの)がありません`); continue; }
+    const flowScenarios = new Set();
+    let capRow = null;
+    for (const row of t.rows) {
+      for (const id of idsIn(row.obj[col], STEP_RE)) flowScenarios.add(id.replace(/-S\d+$/, ''));
+      for (const id of idsIn(row.obj[col], HO_RE)) {
+        if (!capRow && /^[((]上限[))]/.test(String(handoffs.get(id)?.obj['対象'] ?? '').trim())) capRow = { row, id };
+      }
+    }
+    if (v >= CAP_SINCE && capRow) {
+      const where = `${rel}:${capRow.row.line}`;
+      const maxScen = Number(String(repo.vocab.default?.scenarios_per_feature ?? '').match(/〜\s*(\d+)/)?.[1] ?? NaN);
+      if (Number.isFinite(maxScen) && flowScenarios.size < maxScen) add(where, `${capRow.id} は「(上限)」だが、${s.flow} の ${s.feature} のシナリオは ${flowScenarios.size} 本で、上限の ${maxScen} 本に達していません(方式 manual_usecase スロット2)`);
+      for (const sc of flowScenarios) {
+        const n = repo.scenarioDefs.get(sc)?.steps.length ?? 0;
+        if (n > 0 && n < MAX_STEPS) add(where, `${capRow.id} は「(上限)」だが、${sc} は ${n} ステップで、上限の ${MAX_STEPS} に達していません(方式 manual_usecase スロット2)`);
+      }
+    }
     for (const row of t.rows) {
       const where = `${rel}:${row.line}`;
       const op = String(row.obj['操作'] ?? '').trim() || '(操作なし)';
-      const cell = row.obj['扱い'];
+      const cell = row.obj[col];
       const stepIds = idsIn(cell, STEP_RE);
       const hoIds = idsIn(cell, HO_RE);
       if (stepIds.length + hoIds.length === 0) { add(where, `「${op}」の扱いにステップID も HO-ID もありません`); continue; }

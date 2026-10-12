@@ -1,0 +1,25 @@
+stage: "40"
+improvement_run: IR-007
+procedure_version: proc-v036
+procedure_version_before: proc-v036
+procedure_version_after: proc-v037   # 報告のあと、利用者の指示で IMP-028〜032 を指示適用した
+outcome: partial_success             # 依頼の範囲(SIG-0037以降)だけを振り分けた。F-003 の metrics.md の行、SIG-0026〜0030、判定期限に達した改訂の判定は次の作業40に回した
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 7               # SIG-0037〜0043
+  signals_routed: { 手順: 6, KB: 0, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 1, 見送り: 0 }
+  imp_opened: { A: 3, B: 2, C: 0 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: []
+  imp_revert_recommended: []
+  imp_pending_human: []
+  imp_by_instruction: [IMP-028, IMP-029, IMP-030, IMP-031, IMP-032]
+  guard_alert: none                  # 試行中の改訂なし。F-003 の指標は未集計(報告書 6.1)
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-007/report.md
+  revision_history: procedure/docs/000_overview.md 47章
+  ledger: work/_common/procedure-improvement.md
+notes: 利用者の依頼により、SIG-0037〜0043 を振り分け、改訂案 IMP-028〜032 を起票した(全件 承認待ち)。根本的な改訂が要るもの3件は報告書 6.8 に方向性のみ書いた。そのあと利用者の指示で IMP-028〜032 を指示適用し(proc-v037)、根本の改訂の候補 CND-001〜003 を台帳に記録した。

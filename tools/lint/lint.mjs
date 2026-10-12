@@ -41,13 +41,14 @@
 //   env_restored               skill restore-golden-image 同梱の Test-EnvRestoreMarker.ps1 を呼ぶ(PowerShell が必要)
 //   env_value_leak             秘密情報(config/environments*.json の kind: secret)の値が成果物と skills(.github/skills・.kiro/skills)に書かれていない
 //   env_value_hardcoded        接続先(kind: endpoint)の値がテストコードにそのまま書かれていない
-//   operation_inventory_complete  manual_usecase のフローの操作の棚卸しの表が、実在のステップID・HO-ID を指す(proc-v036 以降。INFO)
+//   operation_inventory_complete  manual_usecase のフローの操作の棚卸しの表が、実在のステップID・HO-ID を指す(proc-v036 以降。INFO)。proc-v037 以降は「(上限)」の申し送りの条件も見る
+//   absorbed_red_reported      作業20の clean_run の red を記録にない操作で吸収した疑い(proc-v037 以降。WARNING)
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Repo, LintSetupError, STAGES } from './lib/repo.mjs';
-import { status_yaml_valid, procedure_version_present } from './rules/status.mjs';
+import { status_yaml_valid, procedure_version_present, absorbed_red_reported } from './rules/status.mjs';
 import { requires_covered, blocked_recorded, verdict_enum, no_temp_locator, setup_steps_recorded, health_recorded } from './rules/exploration.mjs';
 import { reason_code_enum, ext_demand_linked, operation_registered, requires_in_state_set } from './rules/ledgers.mjs';
 import { skills_in_sync, prohibition_recheck, env_restored } from './rules/delegated.mjs';
@@ -59,7 +60,7 @@ const IMPLEMENTED = {
   status_yaml_valid, procedure_version_present, verdict_enum, reason_code_enum, no_temp_locator,
   requires_covered, setup_steps_recorded, blocked_recorded, health_recorded, ext_demand_linked, operation_registered, requires_in_state_set,
   skills_in_sync, prohibition_recheck, env_restored, env_value_leak, env_value_hardcoded,
-  act_log_linked, phase_a_queue_complete, explore_act_linked, operation_inventory_complete,
+  act_log_linked, phase_a_queue_complete, explore_act_linked, operation_inventory_complete, absorbed_red_reported,
 };
 // 既存のスクリプトを呼ぶ規則(--list の表示用)
 const DELEGATED = {

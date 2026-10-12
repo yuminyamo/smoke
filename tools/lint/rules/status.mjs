@@ -1,4 +1,4 @@
-// status.mjs — status.yaml の契約の検査(status_yaml_valid / procedure_version_present)
+// status.mjs — status.yaml の契約の検査(status_yaml_valid / procedure_version_present / absorbed_red_reported)
 
 import fs from 'node:fs';
 import { STAGES, flowNumber } from '../lib/repo.mjs';
@@ -215,4 +215,29 @@ function unrecordedSwitches(repo, flow, versions) {
 function fmt(v) {
   if (v === null || v === undefined) return '(なし)';
   return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+
+// absorbed_red_reported(proc-v037 以降の作業20。WARNING)
+// clean_run に red があり、作業10の actions にない操作の追加(deviations)があるのに、as_is_pending・verification_substitutions が
+// どちらも空なら、記録にない操作を足して red を green にした疑いとして指摘する(stages.md §20 生成コードの実行確認。IMP-028)
+const ABSORBED_SINCE = 37;
+export function absorbed_red_reported(repo) {
+  const findings = [];
+  const notes = [];
+  let checked = 0;
+  for (const s of statusInScope(repo)) {
+    if (s.stage !== '20' || !s.data || typeof s.data !== 'object') continue;
+    const v = versionNumber(s.data.procedure_version);
+    if (v === null || v < ABSORBED_SINCE) continue;
+    checked++;
+    const cu = s.data.context_updates ?? {};
+    const red = Number(cu.clean_run?.red ?? 0);
+    const dev = Number(cu.deviations ?? 0);
+    const empty = (x) => !Array.isArray(x) || x.length === 0;
+    if (red > 0 && dev > 0 && empty(cu.as_is_pending) && empty(cu.verification_substitutions)) {
+      findings.push({ file: s.rel, message: `clean_run の red が ${red} 件、逸脱(記録にない操作の追加)が ${dev} 件あるのに、as_is_pending・verification_substitutions が空です。記録にない操作を足して red を green にしていないか確かめてください(stages.md §20 生成コードの実行確認)` });
+    }
+  }
+  if (checked === 0) notes.push('対象の作業20(proc-v037 以降)の status.yaml はありません');
+  return { findings, notes };
 }

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseYaml, parseYamlDocs } from './yaml-lite.mjs';
 import { normalize, headings, tables, tableInSection, isBlank } from './markdown.mjs';
 
-export const STAGES = ['01', '02', '10', '15', '20', '30', '40'];
+export const STAGES = ['01', '02', '10', '15', '20', '30', '35', '40'];
 
 export class LintSetupError extends Error {}
 

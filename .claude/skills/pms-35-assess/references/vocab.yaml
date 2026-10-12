@@ -1,0 +1,657 @@
+# 統制語彙 — 単一ソース
+#
+# 本ファイルが統制語彙の正本である。00_common.md / stages.md / pipeline.dot /
+# 各記入用テンプレート(90/91/92/93/94/95/96)は、値の定義をここから参照し、再掲しない。
+# 値を増減するときは必ずここを先に変更する。
+#
+# 記入用テンプレート(90/91/92/93/94/96)は人間が使う都合で表を持っているが、
+# そちらは本ファイルの写しである。食い違ったら本ファイルを正とする(lint: vocab_sync)。
+#
+# 手順の改訂の区分(00 ■手順改訂の統制):
+#   「# <protected:ID>」〜「# </protected:ID>」で囲んだ部分は保護ブロック(区分C)であり、
+#   AIが自律的に変更しない。それ以外は区分B(人間採否)である。
+#   ただし meta.procedure_version の更新は版の刻印であり、区分判定の対象外とする。
+#
+# 改訂: 2026-10-12 / 版: v35(作業40 IR-004 の改善案の適用: 手順版を proc-v033 に更新。語彙の変更なし。人間の指示による改訂。前版 v34 は同日の付録E の T13 の記入例の差し替え)
+#       2026-10-12 / 版: v34(付録E の T13 の記入例の差し替え: 手順版を proc-v032 に更新。語彙の変更なし。人間の指示による改訂。前版 v33 は同日の KB カテゴリ T13 UI操作知見の新設)
+#       2026-10-12 / 版: v33(KB カテゴリ T13 UI操作知見の新設: 手順版を proc-v031 に更新、kb_category に T13、id_format に ui_tip、reflection_target.kb の反映先に T13 を加え、T10 の説明に T13 との分け方を書いた。人間の指示による改訂。前版 v32 は 2026-10-11 の DB不変条件の定義の撤回)
+#       2026-10-11 / 版: v32(DB不変条件の定義を撤回: 手順版を proc-v030 に更新、invariant を定義対象なし(空)にし、invariant_note を書き直した。人間の指示による改訂。前版 v31 は同日の Claude Code のエージェントの使用禁止)
+#       2026-10-11 / 版: v31(Claude Code のエージェントの使用禁止: 手順版を proc-v029 に更新。語彙の変更なし。人間の指示による改訂。前版 v30 は同日の db.auth の既定)
+#       2026-10-11 / 版: v30(db.auth の既定を sql に: 手順版を proc-v028 に更新、env_optional_keys.db.auth の default を windows から sql にした。人間の指示による改訂。前版 v29 は同日の SQL Server の参照用ユーザー)
+#       2026-10-11 / 版: v29(SQL Server の参照用ユーザー: 手順版を proc-v027 に更新、db.auth の説明に検証環境は sql(参照用ユーザー e2e_reader)を前提とすることを書いた。既定値は windows のまま。前版 v28 は 2026-10-10 の Claude Code への配備)
+#       2026-10-10 / 版: v28(Claude Code への配備: 手順版を proc-v026 に更新。前版 v27 は 2026-10-09 の pms db のパスワードの渡し方)
+#       2026-10-09 / 版: v27(pms db のパスワードの渡し方: 手順版を proc-v025 に更新、db.password の説明を標準入力で渡す形に直した。前版 v26 は 2026-10-08 の DB への接続を pms db に集約)
+#       2026-10-08 / 版: v24(台帳の書式の崩れを早く見つける: 手順版を proc-v022 に更新)
+#       2026-10-08 / 版: v23(カードを使わない作業の秘密情報の入力: 手順版を proc-v021 に更新)
+#       2026-10-08 / 版: v22(作業02の画面操作の手段と skill の資格情報: 手順版を proc-v020 に更新、external_op.skill_requirement に no_credentials を追加)
+#       2026-10-08 / 版: v21(低価格モデル対応 段3 IDE 内のループ: 手順版を proc-v019 に更新、pms_runner の b1 を IDE 内のループ(入口のエージェント pms-runner がカードごとにサブエージェントを起こす)に書き直した)
+#       2026-10-08 / 版: v20(低価格モデル対応 段2 スクリプト実行: 手順版を proc-v018 に更新、pms_card_kind に explore.step・explore.close・explore.session_close・report.findings、pms_card_status に skipped、pms_reject_kind に expected_changed・verdict_evidence・health_time・blocked_refs、pms_act_action に screenshot、pms_runner・pms_stop_reason・discrepancy_kind・discrepancy_assessment・reflection_target を追加)
+#       2026-10-07 / 版: v19(低価格モデル対応 段1 共通の土台: 手順版を proc-v017 に更新、pms_card_kind・pms_card_status・pms_reject_kind・pms_act_action・locator_class・pms_vague_words・id_format.card・id_format.rule を追加)
+#       2026-10-06 / 版: v18(setup-log の記録の強化: 手順版を proc-v016 に更新)
+#       2026-10-04 / 版: v17(リモートコマンドの整備: 手順版を proc-v015 に更新)
+#       2026-10-03 / 版: v16(ログ収集と時刻: 手順版を proc-v014 に更新、kb_category に T12 ログID知見、default.log_window_margin_sec、pre_stage_entry_kind・timestamp_format を追加、golden_image と pre_stage_state を外部操作エントリに合わせた)
+#       2026-10-03 / 版: v15(テスト環境の定義: 手順版を proc-v013 に更新、test_environment を追加、包括原則3をテスト環境の定義で書き直した(保護ブロック。人間の指示による改訂))
+#       2026-10-03 / 版: v14(ステップ1の状態の追加: 手順版を proc-v012 に更新、state_demand_status・id_format.state_demand を追加、initial_state_set の注記を基本の状態と追加の状態に分けた)
+#       2026-10-02 / 版: v13(シナリオ策定方式の分離: 手順版を proc-v011 に更新、scenario_source・default.scenario_source・コンテキストキー scenario_source・手順箇所 MT を追加)
+#       2026-09-28 / 版: v12(検証環境の情報: 手順版を proc-v010 に更新、environment_info・env_attr_kind・env_base_keys を追加)
+#       2026-09-28 / 版: v11(ゴールデンイメージの定義の拡張: 手順版を proc-v009 に更新、golden_image を追加、包括原則4と S-CLEAN-ENV を復元範囲で書き直した(包括原則4は保護ブロック。人間の指示による改訂))
+#       2026-09-28 / 版: v10(作業15の環境の変更と開始前シナリオ: 手順版を proc-v008 に更新、health_outcome に env_changed、pre_stage_state・pre_stage_on_failure を追加)
+#       2026-09-28 / 版: v9(健全性の是正: 手順版を proc-v007 に更新、health_signal_kind・health_outcome・inquiry_answer_kind・default.inquiry_limit・フロー状態 in-progress(15)・コンテキストキー health_signal を追加)
+#       2026-09-26 / 版: v8(lint の実行の契機: 手順版を proc-v006 に更新、コンテキストキー lint_error を追加)
+#       2026-09-26 / 版: v7(lint の実装: 手順版を proc-v005 に更新。語彙の変更なし)
+#       2026-09-26 / 版: v6(blocked の扱いと禁止操作リストの未記入: 手順版を proc-v004 に更新、prohibited_ops_state を追加、コンテキストキー prohibition_recheck を追加)
+#       2026-09-26 / 版: v5(ゴールデンイメージの自動復元: 手順版を proc-v003 に更新、外部操作の操作対象と禁止操作の適用対象に VM を追加、操作IDの例に OP-VM-001 を追加)
+#       2026-09-24 / 版: v4(skills 化に伴い手順版を proc-v002 に更新。語彙の変更なし)
+#       2026-09-23 / 版: v3(手順の自己改善: 手順改善シグナル・改訂・手順書の版・作業40の語彙)
+#       2026-09-23 / 版: v2(外部操作の用語統一・skills前提・外部操作需要リスト・再探索フロー)
+#       2026-09-22 / 版: v1(フェーズ0廃止・4層構成への移行に伴い新設)
+
+meta:
+  step: 1                       # 本語彙が対象とするステップ
+  revision: "2026-10-12"
+  procedure_version: proc-v034  # 手順書一式の版(00 ■手順書の版と配備)。git のタグと一致させる。全作業は status.yaml にそのまま転記する
+
+# ── テスト種別 ───────────────────────────────────────────
+test_type:
+  シナリオ型:
+    definition: 利用者が実際に行う一連の作業をなぞる、複数ステップの連続したテスト。各ステップは前のステップの結果を引き継ぐ
+    scope: ステップ1はこれのみ
+    legacy_name: 種別B
+  単発型:
+    definition: 1つの検証意図を、他のステップに依存せず独立に確認する項目。前後の文脈を持たない
+    scope: ステップ2以降
+    legacy_name: 種別A
+
+scenario_length:
+  単機能シナリオ:
+    length: 3〜6ステップ
+    definition: 1機能の中で完結する。機能をまたがない
+    scope: 現在の生成対象
+    legacy_name: 1-A
+  連結シナリオ:
+    length: 制限なし
+    definition: 複数機能をまたいで連なる
+    scope: 単機能シナリオが一巡した後
+    legacy_name: 1-B
+
+# ── 判定・状態の軸 ───────────────────────────────────────
+verdict:                        # 探索の判定(作業10)
+  passed: 期待結果を満たすことを確認した
+  failed: 期待結果を満たさないことを確認した(製品不具合疑い)
+  human-check: 実行はできたが、期待結果の正否をAIが断定できない(オラクル不能・仕様不明)
+  blocked: 前提状態が作れない、画面や操作に到達できない等で実行自体ができなかった
+
+verification:                   # 検証手段
+  画面: UI上の表示で確認した
+  DB: データベースの内容で確認した
+  両方: 画面で確認し、DBでも裏付けた(原則はこれ)
+
+review_status:                  # レビュー軸(全AI成果物)
+  unreviewed: 未レビュー。AIは常にこの値で出力する
+  reviewed: レビュー済。値を書き換えるのは人間だけ
+  needs-fix: 要修正の指摘あり
+
+progress_item:                  # 進捗軸(項目)
+  generated: 作業10で生成
+  explored: 作業10で探索・判定済
+  codified: 作業20でコード化済
+
+progress_state:                 # 進捗軸(状態カタログ。作業30)
+  proposed: 作業30で提案
+  provisioned: フィクスチャ整備済
+
+flow_kind:                      # フローの種別(フロー台帳・flow.md・context_key 共通)
+  new: 通常フロー。人間の領域指示について作業10 → 20 を1巡する
+  reexplore: 再探索フロー。人間が整備した外部操作 skill を使い、その操作が無くて blocked になったシナリオを探索し直す
+
+scenario_source:                # シナリオ策定方式(00 ■シナリオ策定方式)。値ごとに procedure/methods/<値>.md を1つ持つ(生成スクリプトが照合する)。フロー台帳・flow.md・scenarios.md・context_key 共通
+  manual_usecase: マニュアル・仕様書から、利用者が行う基本的な作業(基本ユースケース)を抽出する。既定の方式
+  legacy_script: 人間が作成した既存のテストスクリプトから、利用者の一連の作業と確認観点を抽出する。スクリプトは参考情報であり正解の根拠ではない
+  spec_new_feature: 新しく実装した機能の仕様書から、追加された基本動作を抽出する。対象の機能が検証環境に配備済みであることが前提
+
+flow_status:                    # フローの状態(フロー台帳・flow.md 共通)
+  open: flow.md 作成済・作業未着手
+  in-progress(10): 作業10(シナリオ生成と探索)実施中
+  in-progress(15): 作業15(健全性の是正)実施中
+  in-progress(20): 作業20(コード生成)実施中
+  done: 作業20の完了報告まで出力済
+  suspended: 中断中(再開点は flow.md のメモ欄)
+
+handoff_status:                 # 申し送り台帳の行の状態
+  open: 未処理
+  planned: ステップ2・3で計画済
+  done: 処理済(再探索フローで解消した場合を含む)
+  dropped: 不要と判断
+
+health_signal_kind:             # 健全性シグナルの種類(00 ■健全性シグナルと問い合わせ)。自テストのデータ・操作に関するものだけを数える
+  自データの異常状態: 自テストが作成・操作したデータ(ジョブ等)の状態・処理結果が、エラー・失敗・保留・中断を示す
+  エラー表示: 画面にエラー・警告のメッセージやダイアログが出た
+  外部操作の異常: 外部操作の実行体が異常終了した、または警告・エラーを出力した
+  関連システムのエラー: 機器の表示・ログなど、確認できる範囲で、自データに関するエラーが出た
+
+health_outcome:                 # 作業15(健全性の是正)のシナリオごとの結果
+  resolved: 操作の変更で健全性シグナルが出ない操作を編み出し、探索し直した記録を追記した
+  env_changed: 環境の変更(禁止操作リストに従って実行)で健全性シグナルが消えた。回帰テストで再現されないため、探索記録を追記せずコード化しない。環境の前提への取り込みを人間が判断する
+  unresolved: 問い合わせの上限まで行っても解消しなかった、または解消に環境の変更・製品の修正が要ると見込まれた
+  no_skill: 問い合わせ skill がないため問い合わせず、記録だけを残した
+
+inquiry_answer_kind:            # 問い合わせの回答の区分(作業15 H4)
+  操作の変更: シナリオのステップの中の操作の手段・入力値・順序を変えれば解消する見込み(scenarios.md の期待結果・requires は変えない)。AIが試す
+  環境の変更: シナリオのステップの外で、環境の設定・登録内容を変える必要がある(PMS の設定、機器の設定を含む)。禁止操作リストに従って実行し、解消するかを確かめる(解消しても env_changed としてコード化しない)
+  情報の追加依頼: 回答に追加の情報が必要とされた。読み取りだけで集め、次の問い合わせに含める
+  製品不具合の見立て: 製品の不具合と見立てられた。AIは正否を判断せず DISC に記録する
+  原因不明: 手がかりが得られなかった
+
+pre_stage_state:                # 開始前シナリオの結果(00 ■回帰実行の環境前提 開始前シナリオ)。実行体 tools/pre-stage/run-scenarios.mjs の出力の state
+  skipped: 設定ファイルがない、または hook がない・空。何もしていない
+  passed: 設定された全エントリ(シナリオ・外部操作)が成功した
+  warning: on_failure: continue のエントリだけが失敗した。作業は始める
+  failed: on_failure: stop のエントリが失敗した。作業を始めない
+
+pre_stage_entry_kind:           # 開始前シナリオのエントリの種類(00 ■回帰実行の環境前提 開始前シナリオ)。1つのエントリはどちらか一方
+  シナリオ: scenarios(シナリオIDの配列)を書いたエントリ。回帰テスト(@<シナリオID> のタグ)を Playwright で実行する
+  外部操作: op(KB T05 の操作ID)と run(実行体の呼び出し。文字列の配列)を書いたエントリ。外部操作 skill の実行体を実行し、終了コード0を成功とする(例 時刻合わせ)
+
+pre_stage_on_failure:           # 開始前シナリオのエントリの失敗時の扱い
+  stop: 失敗したら以降を実行せず、作業を始めない(既定)
+  continue: 失敗を記録し、次のエントリへ進む
+
+open_question_status:           # 要確認事項台帳の状態
+  open: 未回答
+  answered: 回答済み・手順書への反映待ち
+  closed: 回答済み・手順書へ反映済み
+
+# ── 申し送り(欠落の管理) ──────────────────────────────────
+# <protected:REASON_CODE>
+reason_code:                    # 自由記述禁止。この9語以外を使わない。AIは語彙を増やさない
+  同一経路:
+    meaning: 構造的に同じ処理経路を値違いで通るだけのため代表1件に畳んだ
+    default_dest: ステップ2
+    next_investment: 組み合わせテスト、パラメータ化
+  異常系:
+    meaning: 異常系・境界値・入力検証・権限外のため基本動作の範囲外
+    default_dest: ステップ2
+    next_investment: 単発型項目の整備
+  基本操作外:
+    meaning: 基本操作に該当しないため対象外
+    default_dest: ステップ2
+    next_investment: 単発型項目の整備
+  初期状態外:
+    meaning: 初期状態セット外の前提状態を要する(実操作では作成可能)
+    default_dest: 連結シナリオ
+    next_investment: 連結シナリオ、fixture整備
+  状態未整備:
+    meaning: 実操作で作れない前提状態を要する
+    default_dest: ステップ3
+    next_investment: データセットアップ基盤(DB投入・API)
+  操作手段なし:
+    meaning: 必要な外部操作に使える skill がない、または skill があっても操作を確立できない(内訳は ext_gap。外部操作需要リストの需要IDを必ず参照する)
+    default_dest: 要人間判断
+    next_investment: 外部操作 skill の整備(外部操作需要リストで優先度を判断)→ 再探索フロー
+    legacy_name: 語彙外操作
+  禁止操作:
+    meaning: 禁止操作リストの禁止/要許可に該当する、または包括原則でエスカレーションした
+    default_dest: 要人間判断
+    next_investment: 許可判断、または代替手段(シミュレータ等)の設計
+  E2E非効率:
+    meaning: E2Eで確認できるが手段として非効率(組み合わせ爆発等)
+    default_dest: ステップ3
+    next_investment: 下位層(HTTP/DB)への降下
+  判定不能:
+    meaning: 期待結果を確定できない
+    default_dest: 要人間判断
+    next_investment: 仕様確認、オラクルの再定義
+# </protected:REASON_CODE>
+
+handoff_dest: [連結シナリオ, ステップ2, ステップ3, 要人間判断]
+
+# 判別基準(迷ったときはここを見る)
+discrimination:
+  操作手段なし_vs_禁止操作: 手段がないのか、手段はあるが実行してはならないのか
+  初期状態外_vs_状態未整備: その前提状態を、現在のUI操作(+確立済みで禁止操作リストに抵触しない外部操作)だけで作れるか
+  操作手段なしの内訳: 理由コードは増やさず、外部操作需要リストの ext_gap(skillなし / 実行体なし / 確立不可)で区別する
+
+# ── ゴールデンイメージ(00 ■回帰実行の環境前提 ゴールデンイメージと復元範囲)──
+golden_image:
+  definition: 検証環境を戻す先の決まった基準状態。VM に限らない
+  restore: ゴールデンイメージの復元。VM の復元(skill restore-golden-image)と、開始前シナリオの復元エントリ(設定の restores を書いたエントリ。シナリオのエントリと外部操作のエントリがある)を合わせたもの
+  restore_scope: 復元範囲。VM の復元で戻る対象に、hooks.work10 と hooks.work20 の両方の復元エントリが restores に書いた対象を加えたもの。tools/pre-stage/run-scenarios.mjs --restore-scope が出す
+  restore_means:
+    VM: PMSサーバ VM(OS・IIS・サービス・DB・VM 上のシミュレータ)を戻す
+    開始前シナリオ: restores に書いた対象(機器の設定・機器の時刻など)を、回帰テストになったシナリオ、または KB T05 に登録した外部操作の実行体で戻す・揃える
+
+# ── 検証環境の情報(00 ■検証環境の情報)──────────────────────
+environment_info:
+  definition: 検証環境ごとに変わる値(接続先・アカウント・秘密情報など)。config/environments.json(共有)と config/environments.local.json(各自。git に入れない)に持ち、tools/env/env.mjs で読み書きする
+  notation: "<env:キー>"          # 成果物に値の代わりに書く参照(例 <env:pms.url>)。値そのものを成果物に書かない
+  key_format: "<対象>.<属性>(英小文字・数字・_・- を . でつなぐ。例 pms.url / mfp.a.host / ad.admin.password)"
+  env_id_format: 英数字・_・-(例 vm01 / vm-yamada)
+  require_state: [complete, missing]   # tools/env/env.mjs require の出力の state
+
+env_attr_kind:                  # 環境の属性の種類
+  endpoint: 接続先(URL・ホスト名・IP アドレス・ポート・インスタンス名・DB名)
+  account: 秘密でないアカウントの識別子(ユーザー名・ドメイン・ロール名など)
+  secret: 秘密情報(パスワード・接続文字列・トークン)。保存先の既定は environments.local.json。成果物と問い合わせの入力に値を書かない
+  other: その他の環境ごとの値(機器の型番・テスト用のプリンタキュー名など)
+
+env_base_keys:                  # 全フローで必要な基本キー。作業の開始時(工程0の前)に揃っていることを確かめる
+  pms.url:
+    kind: endpoint
+    description: PMS の Web UI の URL(ログイン画面を開く URL)
+  pms.user:
+    kind: account
+    description: 探索と回帰テストでログインするアカウント
+  pms.password:
+    kind: secret
+    description: pms.user のパスワード
+  db.server:
+    kind: endpoint
+    description: SQL Server のサーバ名(インスタンス名を含む)
+  db.name:
+    kind: endpoint
+    description: PMS のデータベース名
+
+env_optional_keys:              # 全フローで使うが、未登録なら既定値で進めるキー(require では確かめない。聞かない)。default のないキーは、そのキーを要る設定のときだけ pms db が足りないと返す(00 ■DB への接続)
+  db.trust_server_certificate:
+    kind: other
+    default: "true"
+    values: ["true", "false"]
+    description: DB への TLS 接続でサーバ証明書の検証を無効にするか(00 ■DB への接続 [R-DB-1])。true(既定)は、検証の無効化(sqlcmd -C・TrustServerCertificate=yes)を人間が承認していることを表す
+  db.auth:
+    kind: other
+    default: sql
+    values: [windows, sql]
+    description: DB へのログインの方式(00 ■DB への接続)。sql(既定)= SQL Server 認証(db.user・db.password)/ windows = 実行するアカウントの Windows 認証(sqlcmd -E)。検証環境は混合モードで、読み取りだけの参照用ユーザー e2e_reader による sql を前提とする(未登録なら既定の sql で接続し、db.user・db.password が要る)
+  db.user:
+    kind: account
+    description: db.auth が sql のときのログイン名(参照用ユーザー。既定の名前は e2e_reader。00 ■DB への接続)
+  db.password:
+    kind: secret
+    description: db.user のパスワード(db.auth が sql のとき)。pms db が標準入力で sqlcmd に渡す。AIは取り出さない
+
+# ── 外部操作 ────────────────────────────────────────────
+external_op:
+  definition: playwright-cli による Web UI 操作以外の手段で行う操作の総称。DB への SELECT は DB操作の安全規約で扱うため含めない
+  means: 外部操作 skill を介してのみ行う。どの skill があるかは skills の機構で確認し、別の一覧を持たない
+  target:                       # 操作対象の区分。禁止操作リストの適用対象(prohibition_target)と対応する
+    実機: 複合機・プリンタの実機
+    シミュレータ: 機器シミュレータ
+    CLIENT: 印刷指示を出す端末(クライアントPC・プリンタドライバ)
+    AD: Active Directory
+    SMTP: メールサーバ
+    PMS-OS: PMSサーバのOS・IIS・サービス
+    VM: 検証環境の仮想マシンと Hyper-V ホスト(ゴールデンイメージの復元。skill restore-golden-image 経由でのみ操作する)
+  skill_requirement:            # 外部操作 skill に求める条件(00 ■外部操作 skill の条件)
+    executable: コードから呼べる実行体(CLI・スクリプト)を同梱していること。非対話で起動でき、成否を機械的に判定できること
+    no_credentials: 資格情報(パスワード・接続文字列・API キーなど)の値を skill のどのファイルにも書かないこと。検証環境の情報か、リモートコマンドの資格情報の参照名から受け取る(lint env_value_leak)
+
+ext_demand_status:              # 外部操作需要リスト(テンプレート93)の行の状態
+  未整備: 回帰テストに使える skill がない(理由は ext_gap)
+  整備済: 人間が skill を整備・改修し、整備記録を記入した。操作は未確立(再探索待ち)。使えるかどうかは使用時に skills の機構で確認する
+  確立済: AI が skill を使って操作を確立し、KB T05 に登録した(操作IDを記入)
+  見送り: 人間が整備しないと判断した
+
+ext_gap:                        # 不足の区分(操作手段なし の内訳)。状態が 未整備 の行に書く
+  skillなし: skills の機構で該当する skill が見つからない
+  実行体なし: skill はあるが、コードから呼べる実行体を同梱していない(回帰テストにできない)
+  確立不可: 条件を満たす skill はあるが、調査上限まで試しても操作を確立できない
+
+ext_alternative: [なし, あり, 不明]   # Web UI・DB による代替手段の見込み(優先度の判断材料)
+
+prohibition_level:
+  禁止: いかなる場合も実行しない
+  要許可: 人間の明示許可(シナリオ単位)があれば実行可
+  条件付き許可: 「制約/許可条件」欄の範囲内であれば自律実行可。範囲を超える場合は要許可として扱う
+
+prohibition_target: [実機:ALL, "実機:<型番>", シミュレータ:ALL, "シミュレータ:<識別子>", CLIENT, AD, SMTP, PMS-OS, VM, ALL]
+
+prohibited_ops_state:           # 禁止操作リストの記入状態(00 ■外部操作 禁止操作リストが未記入・存在しないとき)。判定は tools/checks/prohibited-ops.mjs が行う
+  filled: 「## 禁止操作表」の表に、操作欄が記入された行が1行以上ある。表のとおりに扱う
+  unfilled: ファイルはあるが、その表に操作欄が記入された行がない(記入例の表は数えない)。禁止操作なしとして扱う(包括原則は適用する)
+  absent: ファイルがない。禁止操作なしとして扱う(包括原則は適用する)
+
+# <protected:PROHIBITED_OPS>
+test_environment:               # テスト環境(包括原則3の判断の基準)
+  definition: 人間がテストに使うよう指定した対象。使う環境ID(tools/env/env.mjs が決める)の環境情報に、人間の回答をもとに接続先(kind endpoint)が登録された機器・サーバーを指す。PMSサーバ VM・DB・複合機・プリンタ・プリンタキュー・クライアントPC・Active Directory・メールサーバ・連携システムを含みうる
+  partial: 対象の一部だけがテスト用のとき(例 AD のテスト用OU、メールサーバのテスト用ドメイン、テスト用のプリンタキュー)は、その一部だけがテスト環境である。範囲は人間が環境情報の description に書く
+  outside: 環境情報に登録されていない対象と、登録された対象のうちテスト用の範囲の外は、テスト環境ではない。AIは推測でテスト環境を広げない(画面・KB・過去の記録で見つけた対象も、人間に確かめて環境情報に登録するまではテスト環境の外として扱う)
+  via: テスト環境の対象を使っても、その先でテスト環境の外に作用する操作は、テスト環境の外に影響が及ぶ操作である(例 テスト環境のメールサーバからの外部宛メール送信、テスト環境の AD から信頼関係にある別ドメインのオブジェクトの変更、テスト環境の複合機からテスト環境の外の宛先へのスキャン送信・FAX送信)
+
+blanket_principle:              # 表にない操作へのセーフティネット(包括原則)
+  1: 物理資源を消費する操作の大量実行(紙・トナー・ステープル等)
+  2: 復旧に人手または長時間を要するおそれのある操作(電源・ファームウェア・恒久設定の変更等)
+  3: テスト環境(test_environment)の外に影響が及ぶおそれのある操作。テスト環境の対象を経由して外に作用する操作を含む(外部宛メール送信、テスト用OUの外の AD オブジェクトの変更、環境情報に登録されていないプリンタへの印刷指示、外部宛先へのスキャン送信・FAX送信等)。テスト環境の中の対象への状態変更はこれに当たらない(包括原則1・2・4と禁止操作リストの行は別に判断する)
+  4: ゴールデンイメージの復元で戻らない対象(復元範囲の外。golden_image.restore_scope)への状態変更
+  rule: 迷ったら実行しない
+# </protected:PROHIBITED_OPS>
+
+# ── 非決定値 ────────────────────────────────────────────
+strength:                       # 検証強度。下位に落とす前に必ず上位を検討する
+  order: [完全一致, 関係式, パターン一致, 存在のみ]
+  完全一致:
+    meaning: 期待値と厳密に一致すること
+    impl: toBe() / toHaveText()
+  関係式:
+    meaning: 他の値との整合が成り立つこと
+    impl: 関連する値を取得し、関係式で検証する
+  パターン一致:
+    meaning: 書式・型が一致すること
+    impl: toMatch(/正規表現/) / toHaveText(/正規表現/)
+  存在のみ:
+    meaning: 値が存在すること(内容は問わない)
+    impl: toBeVisible() / NOT NULL の確認のみ
+
+# ── 状態(前提条件) ──────────────────────────────────────
+initial_state_set:              # ステップ1の基本の状態。AIが勝手に追加しない。ステップ1で使える状態(初期状態セット)は、この表と、状態需要リストで人間が採用した状態を合わせたもの(00 ■状態(前提条件)の扱い)
+  S-ADMIN-LOGIN: 全権限を持つ管理者でログイン済
+  S-USER-LOGIN: 一般権限のユーザーでログイン済
+  S-DEVICE-REGISTERED: テスト用デバイスが1台以上登録済
+  S-CLEAN-ENV: ゴールデンイメージの復元(VM の復元と開始前シナリオの復元エントリ)の直後の状態
+
+state_demand_status:            # 状態需要リスト(テンプレート96)の行の状態。初期状態セットへの追加の提案と採否
+  提案: AI が、初期状態セットにない前提状態の需要を記録し、状態として追加することを提案した(人間の採否待ち。フローは止めない)
+  採用: 人間が採用した。以後のフローで requires に使える(初期状態セットに含まれる)。fixture は未整備
+  整備済: AI が実操作で fixture と established check を整備した(fixture の所在を記入)。初期状態セットに含まれる
+  不採用: 人間が採用しないと判断した(理由を備考に書く)。要求元の申し送りは元の理由コードのまま残る
+
+setup_classification:
+  provided: 既存資産を流用
+  built-by-ui: 本フローで実操作により整備
+  blocked: 整備不可
+
+state_category: [AUTH, DATA, ENTITY, CONFIG, ENV]
+
+catalog_confidence: [確認済, 文書のみ, 推測, 確認不能]
+
+provisioning: [整備済, 未整備, "未整備(実操作不可)"]
+
+# ── DB不変条件 ──────────────────────────────────────────
+invariant: {}  # 定義対象なし(2026-10-11 proc-v030)。手順書作成の初期に仮置きした INV-001〜005 は、実利用で悪影響が大きいため撤回した。適切な定義が決まったら INV-<3桁> で追加する
+invariant_note: 定義対象なし。適切な条件はまだ決めていない(初期に仮置きした INV-001〜005 は撤回した)。DB不変条件の SQL を起草・実行しない
+
+# ── 知見ベース ──────────────────────────────────────────
+kb_category:
+  T01: 画面カタログ (kb/screens/)
+  T02: 画面遷移マップ (kb/transitions/)
+  T03: DB定義と蓄積データ (kb/db/)
+  T04: ルート一覧 (kb/routes/)
+  T05: 外部操作知見 (kb/external-ops/) — 確立済み操作の台帳を兼ねる
+  T06: 非同期・待機知見 (kb/async/)
+  T07: 権限・ロール知見 (kb/roles/)
+  T08: ドメイン用語集 (kb/glossary/)
+  T09: 環境・構成知見 (kb/env/)
+  T10: 落とし穴集 (kb/gotchas/) — 他のカテゴリに入らない知見。画面の部品の型による操作のコツは T13 に書く
+  T11: 文書ポインタ集 (kb/docs/)
+  T12: ログID知見 (kb/log-ids/) — PMS がログメッセージの種別ごとに割り当てたログIDを主キーに、観測した事象・原因・対処を蓄積する
+  T13: UI操作知見 (kb/ui-tips/) — 画面の部品の型(遅れて描画される一覧・一過性のメニュー・ツリー 等)ごとに1ファイル。その型で操作が失敗する事象と、探索(pms act・pms pwcli)とコードでの扱いを書く
+
+kb_source:                      # 出所コード。優先順位 OBS > GEN > DOC
+  DOC: 文書由来
+  OBS: 観測由来
+  GEN: 機械抽出
+  HUM: 人間記入(禁止操作リストなど人間が正とする対象のみ)
+
+kb_confidence: [高, 中, 低]     # review_status とは独立した軸
+
+# ── 手順の自己改善(00 ■手順改善シグナル / ■手順改訂の統制、stages §40)──
+signal_type:                    # 手順改善シグナルの種別
+  不足: 手順に記載がなく、判断を要した
+  曖昧: 複数の解釈ができた(採った解釈を必ず書く)
+  矛盾: 2箇所以上の記述が食い違った
+  過剰: 手順どおり実施したが効果がなかった、または不要だった(再掲の発見を含む)
+  実行不能: 手順どおりに実行できなかった(環境・ツールの制約)
+  逸脱: 手順と異なる方法で実施した(理由と結果を書く)
+  検査不能: DoD・lint の項目を機械的に判定できなかった
+  後段不足: 前段の成果物の不足で困った(前段の手順箇所を指す)
+
+signal_source:                  # 手順改善シグナルの出所
+  自己申告: 実行AIがその作業の中で記録した
+  後段: 後段の作業が、前段の成果物の不足として記録した
+  lint: lint の違反から作業40が起こした
+  人間: 人間の指摘(needs-fix の review_notes・要許可操作への回答・as-is 判断)から作業40が起こした
+  回帰実行: 回帰実行の失敗の切り分けで テスト起因 とされたものから作業40が起こした
+  品質評価: 作業35(品質評価)が、発生源が手順にある指摘から起こした。作業40は件数・裏付けに関わらず様子見にしない
+
+signal_route:                   # 作業40 S2 の振り分け先
+  手順: 手順書の改訂案(IMP)を検討する
+  KB: 対象システムの事実。01 の調査候補・発見ログへ回付する
+  非決定値: 02 の増分候補へ回付する
+  外部操作需要: 外部操作需要リスト(93)と照合する(記録済みなら何もしない)
+  禁止操作: 禁止操作リスト(90)への追記提案として人間へ回付する
+  要確認: 要確認事項台帳(95)へ回付する
+  様子見: 1件のみで、後段・人間・回帰実行の裏付けもない。再発を待つ(出所 品質評価 のシグナルには使わない)
+  見送り: 一回限りの事情(環境の一時障害など)。理由を書いて閉じる
+
+signal_status:                  # 手順改善シグナルの行の状態
+  未処理: 作業40が未処理
+  振り分け済: 行き先を決め、回付または改訂案の起票を済ませた
+  様子見: 再発を待っている(同じ手順箇所に新しいシグナルが出たら合わせて再判断する)
+  見送り: 理由を書いて閉じた
+
+qa_axis:                        # 品質評価の観点(stages.md §35)
+  検出力: 期待結果の検査が段階を経て弱まり、回帰を見逃す
+  安全性: 回帰が起きたときに、自データの外のデータ・環境を変える・壊す
+  オラクル: 判定の根拠(列・値・表示)の意味が確かめられていない
+  堅牢性: 待機・ロケータ・ステップ間の依存のせいで、偶然に通る・落ちる
+  保守性: 流用・変更を妨げる書き方
+  同期: 手順の改訂が既存の成果物に追随していない
+
+qa_severity:                    # 品質評価の指摘の重大度
+  高: 回帰を見逃す、または環境を壊す筋書きが現実にありうる
+  中: 条件が重なれば、回帰を見逃す・環境を変える
+  低: 害が小さい(保守・時間の無駄)
+
+qa_confidence: [高, 中, 低]     # 静的な評価で確かめられた度合い
+
+qa_fix_route:                   # 品質評価の指摘の是正の行き先
+  作業20是正: 作業10の記録を変えずに、テストコードだけで直せる(§20 是正モード)
+  作業10: シナリオ・探索記録の変更が要る(対照データの追加・探索のし直し 等)
+  KB: 対象システムの事実の確認が要る(作業01の調査候補)
+  人間: 手順の改訂・判断が要る
+
+procedure_location:             # 手順箇所の書式。ファイル名ではなく論理的な位置で指す
+  ST: "ST/<節>/<スロット>[-<パート>] または ST/<節>/付録<X> — 作業固有の手順(stages.md)。例 ST/10/4-C、ST/10/付録A"
+  CM: "CM/<■見出し> — 共通規約(00_common.md)の該当セクション。例 CM/ポーリング契約"
+  VO: "VO/<キー> — 統制語彙(vocab.yaml)のキー。例 VO/default.timeout_sec"
+  PD: "PD/<ノードID> — パイプライン構造(pipeline.dot)のノード・辺。例 PD/cod"
+  TP: "TP/<番号> — 記入用テンプレート。例 TP/91"
+  MT: "MT/<方式ID>/<スロット> — シナリオ策定方式の方式ファイル(methods/)。例 MT/legacy_script/2"
+
+imp_tier:                       # 改訂の区分(00 ■手順改訂の統制)
+  A: 自律適用 — 作業40が試行版として適用してよい(自律適用の解禁後)
+  B: 人間採否 — 人間の採用または明示的な指示があるまで適用しない
+  C: 不可侵 — 保護ブロック。AIが自律的に変更しない。人間の直接改訂、または人間の明示的な指示によるAIの改訂のみ
+
+imp_status:                     # 改訂(IMP)の行の状態
+  提案: 起票済・未適用(試行数の上限で待機中を含む)
+  承認待ち: 区分B(および自律適用の解禁前の区分A)で、人間の採否待ち
+  採用: 人間が採用を記入した。次の作業40で試行版として適用する
+  却下: 人間が不採用とした
+  試行中: 試行版として適用済み・判定期間中
+  定着: 判定の結果、残すことにした
+  撤回: 判定の結果、取り消した(撤回も新しい版として配備する)
+  撤回推奨: 人間が採用・指示した改訂で撤回条件に該当した。撤回するかは人間が決める
+  報告のみ: 区分Cの提案。採否の対象にしない
+  指示適用: 人間の明示的な指示により適用した
+
+triage_result:                  # 回帰実行の失敗の切り分け結果(CI 導入後)
+  製品不具合: DISC・起票へ回す。手順のシグナルにしない
+  環境: 環境起因。手順のシグナルにしない
+  テスト起因: テストコードまたは生成の手順に原因がある。作業40がシグナルとして起こす
+  不明: 切り分けできなかった
+
+# ── ID書式 ──────────────────────────────────────────────
+id_format:
+  flow: "F-<3桁連番>"
+  scenario: "SC-<機能コード>-<2桁連番>"
+  step: "<シナリオID>-S<連番>"
+  handoff: "HO-<機能コード>-<3桁連番>"     # 機能横断は HO-COM-<連番>
+  prohibition: "PROH-<3桁連番>"
+  operation: "OP-<対象略号>-<3桁連番>"     # 例 OP-DEV-001 / OP-CLI-001 / OP-AD-001 / OP-SMTP-001 / OP-VM-001(ゴールデンイメージ復元)
+  ext_demand: "EXT-<3桁連番>"              # 外部操作需要リストの需要ID
+  discrepancy: "DISC-<機能コード>-<3桁連番>"  # 横断は DISC-COM-<連番>
+  nondeterministic: "ND-UI-<3桁連番> / ND-DB-<3桁連番> / ND-Q-<3桁連番>"
+  state: "S-<対象>-<状態>"
+  state_demand: "SD-<3桁連番>"             # 状態需要リストの需要ID
+  gotcha: "GOT-<4桁連番>"
+  ui_tip: "UIT-<4桁連番>"                  # KB T13 UI操作知見(部品の型ごとに1ファイル)
+  open_question: "Q-<3桁連番>"
+  test_data: "AT-<シナリオID>-<実行識別子>"
+  procedure_version: "proc-v<3桁連番>"     # 手順書一式の版。git のタグと一致させる
+  signal: "SIG-<4桁連番>"                  # 手順改善シグナル
+  improvement: "IMP-<3桁連番>"             # 手順の改訂(案)
+  improvement_run: "IR-<3桁連番>"          # 作業40の実行
+  assessment_run: "QA-<3桁連番>"           # 作業35(品質評価)の実行
+  finding: "QF-<3桁連番>"                  # 品質評価の指摘。QA の実行ごとに 001 から採番する。他の成果物から指すときは <QA-ID>/<QF-ID>
+  card: "C-<4桁連番>"                       # 進行役 pms のカード(フローごとに採番。00 ■進行役と記録の道具)
+  rule: "R-<区分>-<連番>(例 R-LOC-1)"      # 規則ID。00_common.md・stages.md の規則の行に **[R-LOC-1]** の形で付け、カードのテンプレートが {{rule:R-LOC-1}} で引用する
+id_rule: 一度採番したIDは変更しない(他成果物から参照されるため)
+
+# ── 既定値 ──────────────────────────────────────────────
+default:
+  poll_interval_sec: 2
+  timeout_sec: 60
+  timeout_sec_external: 180     # 外部操作の完了を待つ場合
+  timeout_rationale: 実測値の3倍程度を目安とする
+  observation_runs: 3           # 非決定値の反復観測回数
+  investigation_limit: 3        # 同一目的の調査回数の上限
+  inquiry_limit: 3              # 作業15の問い合わせの回数の上限(1シナリオ・1フローあたり。初回を含む)
+  log_window_margin_sec: 10     # 作業15でログを集める時間範囲の前後に足す幅(秒)。操作の記録とサーバーのログの時刻のずれを吸収する
+  scenarios_per_feature: "1〜2(3本以上になる機能は範囲を見直す)"
+  scenario_source: manual_usecase  # 依頼文に方式の手がかりがないときのシナリオ策定方式(00 ■シナリオ策定方式)
+  kb_file_lines: 200
+  improvement_interval_flows: 3    # 作業40を起動する間隔(前回の作業40から完了したフローの数)
+  signal_recurrence_threshold: 2   # 同一手順箇所の未処理シグナルがこの件数に達したら作業40を起動する
+  qa_detail_limit: 10              # 作業35の報告書で詳しく書く指摘の上限(重大度の順。残りは一覧の表だけ)
+  max_trials_per_run: 3            # 1回の作業40で試行を開始する改訂の上限
+  max_trials_per_location: 1       # 同一手順箇所で同時に試行する改訂の上限
+  max_trial_extensions: 1          # 判定期間の延長回数の上限
+
+timestamp_format: "ISO 8601 の日時。秒まで、時差付き(例 2026-10-03T13:50:12+09:00)"   # 探索記録の started_at・ended_at・health_signal.observed_at(付録A)。AI実行マシンの時計で記録する
+
+# ── 進行役 pms(00 ■進行役と記録の道具。tools/pms/)─────────────────
+pms_card_kind:                  # カードの種類(1枚1判断。テンプレートは procedure/cards/<種類>.md、出力の schema は procedure/schemas/<種類>.out.json)
+  setup.build: 状態を1つ、pms act の画面操作で作り、pms act assert で成立を確かめる(作業10フェーズA)
+  setup.code: 合格した setup.build の操作列を、シナリオ部品と fixture のコードにし、2回実行して確かめる(作業10フェーズA)
+  setup.reuse: 過去のフローの fixture を1回実行し、状態が成立するかを確かめる。再整備・再探索はしない(作業10フェーズA)
+  explore.step: シナリオの1ステップを pms act で探索し、期待結果を満たすかを判定する(作業10パートC)
+  explore.close: シナリオ1つの終わりの処理。シナリオ末尾の DB不変条件の検査と、確立した操作の反映先の決定と反映(作業10パートC)
+  explore.session_close: 探索セッションの終わりの処理。DB不変条件の全体検査を1回行う(作業10パートC)
+  report.findings: 作業10の報告書のうち、所見の欄(人間に伝えたいこと)だけを書く。数値と一覧は pms report が記録から作る(作業10)
+
+pms_card_status:                # キューの中のカードの状態(work/_flows/F-<番号>/queue.json)
+  pending: キューにあり、まだ出していない
+  issued: pms next で出した。合格する提出を待っている(提出されないまま pms next が呼ばれたら同じカードを出し直す)
+  passed: 提出が検査に合格した(記録は pms が書いた)
+  stopped: 人間の確認待ち(STOP)。出した回数・不合格の回数が上限(config/pms.json)に達した、または cannot_proceed で提出された
+  skipped: pms が記録だけを書き、AIに出さなかった(前のステップが blocked のときの後続のステップ、前提状態が blocked のシナリオのステップと終わりの処理)
+
+pms_reject_kind:                # pms submit の不合格の区分(submit-log.jsonl に残す)
+  schema: 出力が schema を満たさない(ファイルがない・JSON でない・必須の欄・許される値)
+  seq_missing: 連番が記録にない・別のカードの記録・失敗した操作・状態を作る操作でない・順序が増えていない
+  unstable_locator: 操作のロケータが安定でない(CSS・構造で、fragile と testid-requests への記載がない)、または一意でない
+  red_flag: あいまいな語、長すぎる・短すぎる欄、blocked なのに参照がない、実行の時刻がカードを出す前、など形式による異常
+  code_mismatch: 部品・fixture のファイルと名前がない、記録の各操作・established check のロケータがコードにない、起動確認テストがない
+  runs: 実行の記録の回数・終了コード・時刻の形が違う
+  reuse_source: 流用元のエントリまたは fixture のファイルがない
+  lint: 書く予定の記録(setup-log のエントリ・探索記録のステップ)が lint(setup_steps_recorded・no_temp_locator・env_value_leak)に違反する
+  expected_changed: 期待結果・判定基準を書き換えた(scenarios.md のステップの行が、キューを作ったときから変わった。出力が期待結果・判定基準を変えたと述べている)
+  verdict_evidence: failed / human-check なのに証跡(pms act screenshot の連番)がない
+  health_time: 健全性シグナルの observed_at が、そのカードの操作の時刻の範囲に入らない
+  blocked_refs: blocked の参照が台帳・禁止操作リストに実在しない、または理由コードが vocab.reason_code にない
+
+pms_act_action:                 # pms act の操作。step = setup-log の steps[].action(付録B)。step のない操作は記録に残すが steps にしない
+  open:
+    step: goto
+    meaning: ブラウザを開いて URL に移動する(セッション名はフローID。値は <env:キー> でよい)
+  goto:
+    step: goto
+    meaning: 開いているブラウザで URL に移動する
+  snapshot:
+    meaning: 画面の構造と要素参照(ref)を見る
+  click:
+    step: click
+    meaning: 要素をクリックする
+  dblclick:
+    step: dblclick
+    meaning: 要素をダブルクリックする
+  fill:
+    step: fill
+    meaning: 入力欄に値を入れる
+  type:
+    step: type
+    meaning: 要素に1文字ずつ入力する
+  select:
+    step: select
+    meaning: 選択肢を選ぶ
+  check:
+    step: check
+    meaning: チェックを入れる
+  uncheck:
+    step: uncheck
+    meaning: チェックを外す
+  hover:
+    step: hover
+    meaning: 要素にマウスを重ねる
+  press:
+    step: press
+    meaning: 要素でキーを押す(例 Enter)
+  upload:
+    step: upload
+    meaning: ファイルの入力欄にファイルを指定する
+  assert:
+    meaning: 状態の成立を確かめる(visible / hidden / text)。established check に使う
+  ext:
+    step: external
+    meaning: 外部操作 skill の実行体を呼ぶ(KB T05 の操作IDを付ける)
+  screenshot:
+    meaning: 画面のスクリーンショットを証跡として保存する(work/<機能コード>/exploration/evidence/。探索の evidence に連番で示す)
+
+locator_class:                  # pms act が generate-locator で取ったロケータの区分(00 ■ロケータ規約)
+  stable: 00 ■ロケータ規約の1〜5(getByRole・getByLabel・getByPlaceholder・getByText・getByTestId)だけをつないだもの
+  css: それ以外(locator(…) の CSS・構造セレクタ、nth・first など位置に頼るもの)。00 ■ロケータ規約の6
+
+pms_vague_words: [適宜, など, 必要に応じて, 等]   # pms submit が red_flag として検出するあいまいな語(「等」は「〜等」の形)
+
+pms_runner:                     # カードを行った実行形態(環境変数 PMS_RUNNER。submit-log.jsonl に残し、pms stats で分ける。未設定は b1)
+  b1: IDE のチャットで進める(副経路)。入口のエージェント pms-runner が、カードごとにカードの種類のエージェントをサブエージェントとして起こす(IDE でサブエージェントを使えないときは、同じ会話の中で順に行う)
+  b2: 進行役 pms run がカードごとに新しいAIのセッション(Copilot CLI / Kiro CLI)を起こす(主な経路)
+
+pms_stop_reason:                # STOP(人間の確認待ち)の理由の区分(queue.json のカードの stop.code、pms run の出力の code)
+  issue_limit: 出した回数が上限(max_issues)に達したが、合格した提出がない
+  reject_limit: 提出の不合格が上限(max_rejections)に達した
+  cannot_proceed: AIがカードの範囲で判断できないとして提出した
+  setup_unready: シナリオの前提状態が整備されていない(フェーズAのカードが人間の確認待ち)
+  lint_error: pms run が報告書を作ったあとの lint に ERROR が残った(lint 止まり。チャットの作業10が直す)
+
+discrepancy_kind: [実画面≠仕様書, 実画面≠マニュアル, 仕様書≠マニュアル, 実画面≠既存テスト, 三者不一致]   # 不整合(DISC)の種別(00 ■不整合レポート(DISC)規約)
+discrepancy_assessment: [製品不具合疑い, ドキュメント不備疑い, 判断不能]   # DISC の分類(AIの見立て)
+
+reflection_target:              # 探索で確立した操作の反映先(explore.close。§10 パートC blocked にするときに残すもの)
+  fixture: 前提状態を作る操作 → fixture とシナリオ部品(tests/fixtures/・tests/flows/)
+  flow: 2つ以上のシナリオで使う操作列 → シナリオ部品(tests/flows/)
+  page: ロケータ → ページオブジェクト(tests/pages/)
+  kb: それ以外 → KB(画面ごとの事実は該当画面 T01、外部操作は T05、部品の型による操作のコツは T13、どれにも入らないものは T10)
+  none: 反映するものがない
+
+# ── pipeline.dot が参照するコンテキストキー ──────────────────
+# 各段階は status.yaml の context_updates にこれらを出力する(00の status.yaml 契約)
+# ただし prohibition_recheck と lint_error だけは、作業の status.yaml ではなく、入口 skill が行う検査の終了コードが決める
+# (prohibition_recheck は tools/checks/prohibited-ops.mjs --compare、lint_error は tools/lint/lint.mjs。00 ■lint 実行の契機)
+context_key:
+  flow_id: "F-<3桁連番>"
+  flow_kind: [new, reexplore]           # reexplore = 再探索フロー(作業10がパートRで動く)
+  flow_seq: [first, subsequent]         # first = F-001(機能一覧の確定を伴う)
+  scenario_source: [manual_usecase, legacy_script, spec_new_feature, none]   # 作業10のシナリオ策定方式(flow.md の写し。値の意味は scenario_source)。none = 再探索フロー(シナリオを作らない)。辺の条件には使わず、作業10の中で手順を切り替える
+  improvement_due: [yes, no]            # 作業40(手順改善)を起動するか。lint が判定する(未実装の間は人間の指示)
+  kb_requested: [yes, no]               # 人間が知見蓄積(01)を指示したか
+  nd_needed: [yes, no]                  # 非決定値カタログの初期作成/増分実施が必要か
+  escalation: [none, permission_required, knowledge_gap]
+  invariant_violation: [none, found]
+  health_signal: [found, none]          # found = 作業10の探索で健全性シグナルが出たシナリオがある(最新の記録に残っている)。作業15(健全性の是正)を経て作業20へ進む
+  prohibition_recheck: [yes, no]        # yes = 作業10が「禁止操作」で blocked にしたステップがあり、その後に禁止操作リストが変わった(照合の終了コード3)。作業10がパートPで判定し直す
+  lint_error: [yes, no]                 # yes = 作業20の前(作業10の成果物)またはフロー完了の前(作業20の成果物)の lint に ERROR がある(ランナーの終了コード1)。その成果物を作った作業へ差し戻す
+  rework_required: [yes, no]            # 作業20で「コード化不能・要差し戻し」が出たか
+  state_catalog_requested: [yes, no]    # 人間が状態カタログ(30)を指示したか
+  quality_assessment_requested: [yes, no]   # 人間が品質評価(35)を指示したか
+  outcome: [success, partial_success, retry, fail]

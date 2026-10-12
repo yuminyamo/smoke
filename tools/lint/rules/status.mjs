@@ -181,10 +181,12 @@ export function procedure_version_present(repo) {
     if (!re.test(String(d.procedure_version ?? ''))) add(s.rel, `procedure_version がない、または書式(proc-v<3桁>)に合いません(${d.procedure_version ?? 'なし'})`);
   }
   // 同一フローの作業10・15・20で一致すること(フローごとに、範囲の stage 指定によらず全部を見る)
+  // 作業20の是正モード(mode: fix)は、フローを開き直さずに現在の版で行うので比べない(stages.md §20 是正モード)
   const FLOW_STAGES = ['10', '15', '20'];
-  const flows = new Set(repo.statusFiles.filter((s) => FLOW_STAGES.includes(s.stage) && s.flow && repo.inFlow(s.flow)).map((s) => s.flow));
+  const inFlowRun = (s) => FLOW_STAGES.includes(s.stage) && s.data?.mode !== 'fix';
+  const flows = new Set(repo.statusFiles.filter((s) => inFlowRun(s) && s.flow && repo.inFlow(s.flow)).map((s) => s.flow));
   for (const f of [...flows].sort()) {
-    const list = repo.statusFiles.filter((s) => s.flow === f && FLOW_STAGES.includes(s.stage) && s.data?.procedure_version);
+    const list = repo.statusFiles.filter((s) => s.flow === f && inFlowRun(s) && s.data?.procedure_version);
     const versions = [...new Set(list.map((s) => String(s.data.procedure_version)))];
     if (versions.length > 1) {
       // 一致しないときは、flow.md のメモ欄に隣り合う版の「手順版の切り替え」の記録があればよい(stages.md §20 手順版の確認)

@@ -1,0 +1,253 @@
+# 品質評価 QA-001 の指摘一覧。手順書に作業35を定める前の試行として行い、proc-v034 で正式化した(stages.md §35)。
+# 並びは重大度の順(rank)。severity: 高 / 中 / 低、confidence: 高 / 中 / 低(静的な評価で確かめられた度合い)
+# known: 既存の成果物(報告書・SIG)で既に挙がっていたか
+# fix.route: 作業20是正(作業20を是正モードで再実行)/ 作業10(シナリオ・探索記録の変更が要る)/ KB / 人間
+# signal: 記録した(または既出の)手順改善シグナル。sig_candidate はシグナルにした内容
+review_status: unreviewed
+generated_by: 作業35(QA-001。正式化前の試行)
+generated_at: 2026-10-12
+target_flow: F-001
+level: L1(静的評価。検証環境は使っていない)
+
+findings:
+  - id: QF-001
+    signal: SIG-0020
+    rank: 1
+    axis: 安全性
+    severity: 高
+    confidence: 高
+    target:
+      - tests/specs/usr/usr-user-management.spec.ts:82-85   # S4 statusCombobox.click()
+      - tests/specs/usr/usr-user-management.spec.ts:99-101  # S5 firstRowCell → 削除
+      - tests/pages/UserListPage.ts:38                      # combobox description '有効'(ページ全体)
+      - tests/pages/UserListPage.ts:41                      # getByRole('cell').first()(ページ全体)
+    summary: 状態の切り替え(S4)と削除(S5)の操作対象を、自分のユーザーの行に絞っていない。検索で一覧が絞られていることを確かめないまま、ページ全体で最初に見つかる要素を操作している
+    evidence: |
+      - S4 は search(userId) の直後に statusCombobox(ページ全体の description '有効')を押す。一覧の行は非同期で読み込まれる(KB SCR-0003・async/ユーザー一覧の読み込み)が、絞り込み後の表示を待つアサーションがない
+      - S5 は S4 の検索状態に暗黙に依存し、検索し直さずにページの先頭のセルを選んで削除を確定する
+      - 環境には残留ユーザーがある(作業20報告書 §6: AT-SC-USR-01-* 3件、AT-SC-USR-02-* 6件。SC-USR-02 は実行ごとに1件残す)。組込みユーザーは一覧に出ない(SCR-0003)ので、検索が効かない・遅れると、先頭は他のテストのユーザーか実データになる
+      - 行に絞る手段は KB に既にある: SCR-0003 の「ユーザーの行」getByRole('row').filter({ has: getByRole('link', { name: <ユーザーID> }) })
+    failure_scenario: 検索の回帰(絞り込みが効かない)または一覧の描画の遅れで、別のユーザーを無効化し、別のユーザーを削除する。S5 の「表示する項目がありません」で落ちるのは削除の後なので、環境の破壊は止まらない
+    known: 一部(FRAGILE として注記済み。壊れやすさとしてで、誤操作の危険としては挙がっていない)
+    fix:
+      route: 作業20是正(KB の更新を伴う)
+      summary: 操作の前に絞り込みの結果を確かめる(自分のユーザーのリンクが表示され、表の本体の行が1行)。状態のコンボボックスと行選択のセルは、自分のユーザーの行の中で取る。S5 の前に検索し直す。行の中で取るロケータは作業20の実行確認で確かめる
+    origin:
+      stage: 作業02・作業10(KB T13 の記述)→ 作業20(コード化)
+      procedure_location: CM/回帰実行の環境前提とテストデータ規約
+      why_not_prevented: テストデータ規約の2(自データスコープ)はアサーションと DB の検証だけを対象にしており、状態を変える操作・破壊的な操作の対象を自データに絞る規定がない。KB UIT-0007・UIT-0008 の「コードでの扱い」が、ページ全体のロケータを標準の書き方として定着させている
+    sig_candidate:
+      type: 不足
+      location: CM/回帰実行の環境前提とテストデータ規約
+      note: 「状態を変える・破壊的な操作の対象ロケータは、自データの行・要素に絞る(先に絞り込みの結果を確かめる)」を規約に加える案。KB UIT-0007・0008 の「コードでの扱い」の更新は KB への回付
+    lint_candidate: 生成コードで .first()/.nth() やページ全体の role ロケータを、削除・状態変更のボタンを押す直前の操作に使っていたら WARNING
+
+  - id: QF-002
+    signal: SIG-0022
+    rank: 2
+    axis: 検出力の連鎖
+    severity: 高
+    confidence: 高
+    target:
+      - work/USR/scenarios.md(SC-USR-01-S2)
+      - work/USR/exploration/exploration-log.yaml:79-107
+      - tests/specs/usr/usr-user-management.spec.ts:60-65
+    summary: SC-USR-01-S2 の期待結果「他のユーザーの行は表示されない」を判別できる形で確かめた段階がない。作業10は判別できないと書きながら passed にし、作業20はさらに恒真の検査に置き換えた
+    evidence: |
+      - 作業10の notes: 「絞り込み前から一覧にはこのユーザーの1行しかなく、他ユーザー行の非表示は絞り込み前後で差が出ない」。それでも verdict: passed(R-JDG-2「正否を断定できないものを無理に passed にしない」に当たる)
+      - 作業10の assertion_hint は「テーブル本体の行数が 1」。作業20はこれを userLink(userId).toHaveCount(1) に代えた。ユーザーIDは実行ごとに一意なので、絞り込みが壊れていても常に成り立つ
+      - シナリオに対照データ(絞り込みで消えるべき別のユーザー)がない
+    failure_scenario: 検索ボックスが何も絞り込まなくなる回帰が起きても、SC-USR-01-S2 は合格する
+    known: 一部(作業20報告書 §6「検証の代替」・§7-2 に自己申告。SIG・status.yaml には出ておらず、作業40にも届いていない)
+    fix:
+      route: 作業10
+      summary: シナリオに対照データ(例: 同じ実行識別子から作る別のユーザー)を加え、絞り込みの後にそのユーザーが表示されないことを確かめるよう探索し直す。作業20だけで行数の検査に戻しても、対照データがなければ判別力は環境の残留データ次第になる
+    origin:
+      stage: 作業10(パートB のシナリオ設計とパートC の判定)
+      procedure_location: ST/10/4-C
+      why_not_prevented: 期待結果の否定側(表示されない・変わらない)を、差が出る状態で観測したかを確かめる手順がない。R-JDG-2 はあるが、カードの判定で自分の notes と照らす確認がない
+    sig_candidate:
+      type: 不足
+      location: ST/10/4-C
+      note: 否定の期待結果は、差が出る対照データがあるときだけ passed にできる(なければ human-check にしてシナリオに対照データを足す)と書く案。パートB(ST/10/4-B)の持ち回るデータの設計にも関わる
+
+  - id: QF-003
+    signal: SIG-0023
+    rank: 3
+    axis: 検出力の連鎖
+    severity: 高
+    confidence: 高
+    target:
+      - procedure(§20 の DoD・status.yaml 契約)
+      - work/USR/codegen/report.md(§6「検証の代替」)
+      - work/USR/codegen/status.yaml
+    summary: 作業20が期待結果の検査を弱めた(検証の代替)ことが、報告書の文章にしか残らない。SIG にも status.yaml にも出ないため、作業40とガード指標に届かない
+    evidence: |
+      - 作業20の DoD が SIG として記録を求めるのは「コード化不能・要差し戻し」と「逸脱」だけ。S2 の弱化は「逸脱ではなく、検証の内容を代えたもの」と分類され、SIG-0010〜0018 のどれにもならなかった
+      - 検出力ガード指標(期待結果の変更件数・存在のみ比率・両方比率 など)はどれも scenarios.md と非決定値カタログから計算する。作業20のコードでの弱化はどの指標にも現れない
+    failure_scenario: 作業20が期待結果の検査を弱めても、green で、ガード異常もなしとして通る。人間が報告書を読まない限り見つからない(F-001 の報告書は unreviewed のまま)
+    known: なし
+    fix:
+      route: 人間(手順の改訂の判断)
+      summary: 成果物の是正ではなく、手順の改訂が要る
+    origin:
+      stage: 作業20
+      procedure_location: ST/20/7
+      why_not_prevented: 弱化を数える欄(status.yaml の context_updates)と、SIG にする義務がない
+    sig_candidate:
+      type: 不足
+      location: ST/20/7
+      note: 「検証の代替」を status.yaml に件数とステップIDで出し、後段シグナル(作業10の手順箇所を指す)としても記録する案。ガード指標に「作業20での検証の代替の件数」を足すのは保護ブロック(IMPROVEMENT_GOVERNANCE)の変更になるので、人間の判断(区分C)
+
+  - id: QF-004
+    signal: SIG-0021
+    rank: 4
+    axis: 検出力の連鎖
+    severity: 中
+    confidence: 中
+    target:
+      - tests/specs/usr/usr-group-management.spec.ts:33-34
+      - tests/specs/usr/usr-group-management.spec.ts:70   # S3 users.groupCell(groupName)
+      - tests/specs/usr/usr-group-management.spec.ts:83   # S4 cell { name: userId }
+      - work/USR/scenarios.md(SC-USR-02 の持ち回るデータ)
+    summary: SC-USR-02 はユーザーグループ名とユーザーIDに同じ文字列を使っている。S3・S4 の画面の検査は、その文字列のセルがあるかを見るだけなので、グループの値とユーザーの値のどちらで合格したかを区別できない
+    evidence: |
+      - const userId = groupName(実行識別子から1つの値を作り、両方に使う。記録どおり)
+      - S3 の期待結果は「ユーザーグループ列に作成したグループが表示される」だが、検査は page.getByRole('cell', { name: groupName, exact: true })。同じ行のユーザーIDのセルも同じ文字列になる
+      - S4 の期待結果は「関連づけタブに作成したユーザーが表示される」だが、検査は cell { name: userId }。グループ名と同じ文字列
+      - 3回 green のため、実際にはどちらか一方のセルにだけ一致していると考えられる。どちらに一致しているかは静的には決められない
+    failure_scenario: ユーザーの作成で親グループの指定が効かない回帰が起きても、ユーザーIDのセルに一致して S3 の画面の検査が合格しうる(DB の検査では落ちる)
+    known: なし
+    fix:
+      route: 作業20是正(scenarios.md の持ち回るデータの記述は作業10)
+      summary: グループ名とユーザーIDを別の値にする(同じ実行識別子に、役割を表す部分を足す)。S3 の検査は自分のユーザーの行の「ユーザーグループ」列で、S4 の検査は関連づけタブの表の中で行う
+    origin:
+      stage: 作業10(パートB の持ち回るデータの設計)
+      procedure_location: CM/回帰実行の環境前提とテストデータ規約
+      why_not_prevented: R-DAT-1 は一意化だけを定め、役割の違うデータに同じ値を使わないことを定めていない
+    sig_candidate:
+      type: 不足
+      location: CM/回帰実行の環境前提とテストデータ規約
+      note: 「役割の違う作成データ(グループ名とユーザーID など)には、画面で区別できる別の値を使う」を R-DAT-1 に足す案(QF-001 と同じ手順箇所)
+    lint_candidate: scenarios.md・exploration-log の carried_data で、役割の違うキーが同じ値を持っていたら WARNING
+
+  - id: QF-005
+    signal: SIG-0020
+    rank: 5
+    axis: 検出力の連鎖
+    severity: 中
+    confidence: 中
+    target:
+      - tests/specs/usr/usr-user-management.spec.ts:86
+      - tests/specs/usr/usr-user-management.spec.ts:90
+    summary: SC-USR-01-S4 の画面の検査(無効の表示)が自分の行に絞られていない。ページ上のどの行のコンボボックスが無効でも合格する
+    evidence: |
+      - page.getByRole('combobox', { description: '無効', exact: true }) をページ全体で取っている(KB UIT-0008 の「コードでの扱い」のまま)
+      - 再読込のあとの検査(90行目)も同じ。検索が効かなければ、残留ユーザーのうち無効のものに一致しうる
+    failure_scenario: 無効化が保存されない回帰と、検索の不具合が重なると、他のユーザーの無効の表示で合格する
+    known: なし
+    fix:
+      route: 作業20是正
+      summary: QF-001 と同じく、自分のユーザーの行の中でコンボボックスを取り、その行の値が無効であることを確かめる
+    origin:
+      stage: 作業02・作業10(KB T13)→ 作業20
+      procedure_location: CM/回帰実行の環境前提とテストデータ規約
+      why_not_prevented: テストデータ規約の2はアサーションの自データスコープを定めているが、作業20の DoD と lint(self_scoped_assertion)が見るのは assertion_hint の文と DB の WHERE 句だけで、コードの画面のロケータは見ない
+    sig_candidate: null   # QF-001 の SIG にまとめる(同じ手順箇所・同じ原因)
+
+  - id: QF-006
+    signal: SIG-0024
+    rank: 6
+    axis: 成果物と手順の同期
+    severity: 中
+    confidence: 高
+    target:
+      - tests/global-setup.ts(存在しない)
+      - playwright.config.ts(globalSetup の登録がない)
+    summary: proc-v033 の改訂(IMP-009: globalSetup、IMP-003: 確認の操作の記録)が手順書にだけ入り、F-001 の成果物には反映されていない
+    evidence: |
+      - IMP-009 は「tests/global-setup.ts がなければ作業20が作る」と定めたが、F-001 は proc-v030 で作業20を終えているため、ファイルがない
+      - 一括実行の前の復元がないため、残留データが実行ごとに増える(QF-001 の危険を大きくする)
+    failure_scenario: 回帰テストを一括実行するたびに AT-SC-USR-02-* のユーザーが1件ずつ残り、一覧・検索の前提が実行ごとに変わる
+    known: 一部(SIG-0016 で手順側は解決済み。成果物への追随は誰の作業でもない)
+    fix:
+      route: 作業20是正
+      summary: proc-v033 の付録F に従って tests/global-setup.ts を作り、playwright.config.ts に登録する
+    origin:
+      stage: 手順の改訂と配備
+      procedure_location: CM/手順書の版と配備
+      why_not_prevented: 手順の改訂のあと、既に完了したフローの成果物を新しい版に追随させるかどうか・誰が行うかの定めがない
+    sig_candidate:
+      type: 不足
+      location: CM/手順書の版と配備
+      note: 改訂(IMP)ごとに「既存の成果物への追随の要否」を書き、要るなら対象フローを作業20の是正モードに回す案
+
+  - id: QF-007
+    signal: SIG-0015   # 既出(新しく起こしていない)
+    rank: 7
+    axis: オラクルの根拠
+    severity: 中
+    confidence: 高
+    target:
+      - tests/specs/usr/usr-user-management.spec.ts:91-95
+      - kb/db/ユーザー管理.md(無効にしたユーザーの行)
+    summary: 無効化の DB の検査が、意味の確かめられていない列(NIM_LOCK_ON_ATACK)に依存したまま止まっている
+    evidence: |
+      - SIG-0015 で KB(T03)へ回付済みだが、作業01は実行されておらず、KB には「無効にする前の値は未観測」が残る
+      - 列の名前は「攻撃によるロック」と読め、無効の状態そのものを表すかは未確認
+    failure_scenario: 列の意味が違えば、無効化の正しさを検査していない(偶然の相関に依存している)
+    known: あり(作業20報告書 §6-1・§7-1、SIG-0015)。止まっていることの確認として挙げる
+    fix:
+      route: KB
+      summary: 作業01で、無効にする前後と有効に戻したあと(HO-USR-013)の値を観測し、列の意味を KB T03 に記録する。結果によって作業20是正で検査の列を直す
+    origin:
+      stage: 作業10(パートC)
+      procedure_location: ST/10/4-C
+      why_not_prevented: 回付先の KB の調査が人間の指示待ちのままで、回付の後を追う仕組みがない(作業40は回付の事実だけを記録する)
+    sig_candidate: null   # SIG-0015 で既出
+
+  - id: QF-008
+    signal: SIG-0025
+    rank: 8
+    axis: 堅牢性
+    severity: 低
+    confidence: 高
+    target:
+      - tests/specs/usr/usr-user-management.spec.ts:33-34
+      - tests/specs/usr/usr-group-management.spec.ts:28-29
+    summary: テスト全体の上限が実測の約15倍(5分)で、コメントの根拠が手順の「実測の3倍程度」と合わない
+    evidence: 付録F の「実測値の3倍程度」は非同期待機(wait.measured_seconds)についての規定で、テスト全体の上限についての規定はない。作業20の DoD はこれを満たしたと記録している
+    failure_scenario: 画面が応答しなくなる回帰で、1本あたり最大5分止まる。害は小さい
+    known: なし
+    fix:
+      route: 作業20是正
+      summary: テスト全体の上限の決め方が手順で決まってから直す(それまでは変えない)
+    origin:
+      stage: 作業20
+      procedure_location: ST/20/付録F
+      why_not_prevented: テスト全体の上限(test.setTimeout)の決め方がない
+    sig_candidate:
+      type: 曖昧
+      location: ST/20/付録F
+      note: 「実測の3倍」が非同期待機だけか、テスト全体にも当てるかを書く案
+
+  - id: QF-009
+    signal: null
+    rank: 9
+    axis: 保守性
+    severity: 低
+    confidence: 高
+    target:
+      - tests/pages/UserGroupListPage.ts:57-60
+    summary: ページオブジェクトの descriptionText() が、SC-USR-02 のテストデータの書式(/^desc-AT-SC-USR-02-/)を直に持っている
+    evidence: 説明の入力欄を、作成時の説明の文字列の先頭で指している。別のシナリオがこのページオブジェクトで説明を編集すると一致しない
+    failure_scenario: 次のフローでユーザーグループの説明を扱うシナリオが、このロケータを流用できない
+    known: なし
+    fix:
+      route: 作業20是正
+      summary: 現在の説明の値を引数で受け取る形にする(R-DAT-2)
+    origin:
+      stage: 作業20
+      procedure_location: CM/ページオブジェクト規約
+      why_not_prevented: 単発。手順の不足とまでは言えない
+    sig_candidate: null

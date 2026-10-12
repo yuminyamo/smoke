@@ -2,12 +2,12 @@
 name: pms-20-codegen
 description: "PMS回帰テスト作成の作業20(回帰テストコード生成)。通常は入口skill pms-regression から使う。作業10の探索記録と status.yaml から、実行時にAIを使わない Playwright の回帰テストを生成し、実行確認と突合表の更新を行う。"
 metadata:
-  procedure_version: proc-v033
+  procedure_version: proc-v034
   generated_from: "procedure/stages.md §20"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v033 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §20 / 手順版: proc-v034 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業20 回帰テストコード生成(手順版 proc-v033)
+# 作業20 回帰テストコード生成(手順版 proc-v034)
 
 この skill は、手順書の正本の `stages.md` §20 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -38,7 +38,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v033` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v034` をそのまま転記する。
 
 ## 8スロット規約(本文の読み方)
 
@@ -85,6 +85,7 @@ metadata:
 | 1回の実行範囲 | 1フロー分 |
 | 環境 | **開始時に1回、ゴールデンイメージを復元し、開始前シナリオを実行する**(工程0。lint の指摘による差し戻しを含む)。中断・起動確認待ちからの再開では復元しない |
 | 退出 | 突合で未対応が残れば `context.rework_required=yes` を出力し `exp` へ差し戻す |
+| 是正モード | 人間が、品質評価(作業35)の指摘のうち是正の行き先が `作業20是正` のものを QA-ID と QF-ID で指定して指示したとき。フローを開き直さず、対象フローのテストコードを直す(固有手順「是正モード」) |
 
 ## 3. 入力
 
@@ -106,6 +107,7 @@ metadata:
 | 禁止操作リストの照合 | `tools/checks/prohibited-ops.mjs`(`--compare` に作業10の status.yaml を渡す) |
 | 作業15の status.yaml | `work/<feature_code>/health/status.yaml`(作業10が `health_signal=found` のとき) |
 | lint | `tools/lint/lint.mjs`(開始時は `--stage 10`、作業15を実施したフローでは続けて `--stage 15`。完了前は `--stage 20`)。lint の指摘による差し戻しのときは、入口 skill から渡された指摘 |
+| 品質評価の指摘 | `work/_assess/QA-<nnn>/findings.yaml`(是正モードのとき。指定された QF だけを読む) |
 
 ## 4. 固有手順
 
@@ -236,6 +238,24 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 
 **lint の指摘による差し戻し**(`context.lint_error=yes`。フロー完了の前の lint で ERROR が出た)で起動したときは、工程0のあと、入口 skill から渡された指摘を上の規約どおりに直す。生成コード・fixture を直した場合は、生成コードの実行確認(`clean_run` を含む)をやり直す。報告書は直した箇所を更新し、§8 に修正の内容を書き、status.yaml を出し直して(`env_restore` は今回の復元)、この lint を実行する。
 
+### 是正モード(品質評価の指摘による再実行)
+
+人間が品質評価(作業35)の指摘のうち、是正の行き先が `作業20是正` のものを QA-ID と QF-ID で指定して指示したときに行う。**対象フローを開き直さない**(フロー台帳・flow.md の状態は `done` のまま。flow.md のメモ欄に是正を行ったことを1行書く)。
+
+1. **開始時の確認と工程0**: 禁止操作リストの照合・作業10・15の成果物の lint・環境情報の確認・工程0(`-Purpose work20 -FlowId <対象フロー>` の復元と開始前シナリオ)は、通常の作業20と同じに行う。手順版の確認は行わず、現在の版で行う(status.yaml に現在の版を書く。flow.md に手順版の切り替えを書かない)
+2. **範囲**: 指定された QF だけを直す。ほかに気づいた点は直さず、報告書に書く
+3. **直し方**:
+   - 作業10の記録(シナリオ・期待結果・判定・操作列)を変えない。**期待結果の検査を弱めない**(強めるのはよい)
+   - 新しく使うロケータは、KB T01 の出所 `OBS` のロケータか、作業10の記録にあるロケータの組み合わせ(行の中に絞る 等)に限る。実行確認で一意に解決することを確かめる
+   - 記録にない操作・確認(検索し直す・絞り込みの結果を確かめる 等)は逸脱として、コード内のコメント `// 是正 <QA-ID>/<QF-ID>: <理由>` と報告書の逸脱一覧に書く。是正の逸脱は後段シグナルとして記録しない(指摘のシグナルが既にあるため)
+   - 直したテストに注釈 `{ type: 'fixed-by', description: '<QA-ID> / <手順版>' }` を足す。`generated-by` は変えない
+   - コードだけでは直せない(シナリオ・探索記録の変更が要る)と分かったら、直さずに `not_fixable` にし、理由と必要な作業を報告書に書く
+4. **実行確認**: 「生成コードの実行確認」と同じ(`clean_run`・復元を挟まない3回連続・実行時間)。直した共通資産(ページオブジェクト・シナリオ部品)に依存する既存のテストも対象に加える
+5. **KB**: 是正で KB T13 の「コードでの扱い」が誤り・不十分と分かったら、T13 を直す(00 [R-LOC-6])
+6. **突合表**: 直したシナリオの行の備考に「是正 <QA-ID>(<QF-ID>, …)」を追記する
+7. **出力**: 報告書と status.yaml を `work/<feature_code>/codegen/fix-<QA-ID>/` に出す。**通常の作業20の報告書・status.yaml は書き換えない。** 報告書の固有セクションは、指摘ごとの是正の内容と結果(直した / 直せなかった)・逸脱一覧・実行結果(`clean_run` と3回連続)・実行時間・KB の更新
+8. **完了前の lint**: 通常と同じ(`--flow <対象フロー> --stage 20 --skip skills_in_sync`)
+
 ## 5. 固有の禁止事項
 
 <!-- protected:NO_AI_AT_RUNTIME -->
@@ -267,6 +287,7 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 | 手順改善シグナル | `work/_common/procedure-improvement.md` | 00 ■手順改善シグナル / テンプレート94 |
 | 報告書 | 当該フローの作業ディレクトリ | 00の共通骨格 + 下記 |
 | status.yaml | 同上 | スロット8 |
+| 是正モードの報告書・status.yaml | `work/<feature_code>/codegen/fix-<QA-ID>/` | 固有手順「是正モード」7・スロット8 |
 
 報告書の固有セクション:
 
@@ -322,6 +343,8 @@ Playwright のコード規約は**付録F**を正とする。本節では規約�
 - [ ] status.yaml を出力した
 - [ ] status.yaml の出力後に `node tools/lint/lint.mjs --flow <フローID> --stage 20 --skip skills_in_sync` を実行し、ERROR が0件である(直せない ERROR は報告書 §6 に理由を書き、手順改善シグナルを記録した)
 - [ ] lint の指摘による差し戻し(`context.lint_error=yes`)で起動した場合、渡された指摘を全件直し(直せないものは報告書 §6 に理由を書いた)、指摘を消すために記録を削ったり事実と違えて書いたりしていない
+- [ ] 是正モードで起動した場合、指定された QF だけを直し、作業10の記録を変えず、期待結果の検査を弱めていない。直した箇所に `// 是正 <QA-ID>/<QF-ID>:` のコメントがあり、直したテストに注釈 `fixed-by` がある
+- [ ] 是正モードで起動した場合、報告書と status.yaml を `work/<feature_code>/codegen/fix-<QA-ID>/` に出力し、通常の作業20の報告書・status.yaml を書き換えていない
 
 ## 8. status.yaml 契約
 
@@ -339,6 +362,8 @@ pre_stage:                                # 工程0の開始前シナリオ(実�
   state: skipped | passed | warning       # vocab.pre_stage_state
   run_id: PRE-<日時>-<識別子>
 prohibition_check: ok                     # 工程0より前の禁止操作リストの照合(終了コード 0 のときだけ開始するので常に ok)
+mode: fix                                 # 是正モードのときだけ書く(通常は書かない)
+assessment_ref: QA-001                    # 是正モードのとき。指摘の出どころの品質評価
 context_updates:
   rework_required: yes | no               # 「コード化不能・要差し戻し」が1件でもあれば yes(前提状態の欠落を含む)
   traceability_unmatched: <n>             # 一意性・完全性の違反件数。0 でなければ rework_required=yes
@@ -356,4 +381,6 @@ context_updates:
   nd_review_proposed: [<カタログID>, ...] # 強度の見直し提案
   state_catalog_requested: yes | no       # 人間の指示があれば yes
   env_keys_added: [<キー>, ...]           # 人間に聞いて新たに保存した環境情報のキー(値は書かない。なければ [])
+  fixed: [<QF-ID>, ...]                   # 是正モードのとき。直した指摘
+  not_fixable: [<QF-ID>, ...]             # 是正モードのとき。コードだけでは直せなかった指摘(作業10などが要る)
 ```

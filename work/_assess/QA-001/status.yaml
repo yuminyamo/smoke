@@ -1,0 +1,11 @@
+stage: "35"
+assessment_run: QA-001
+target_flows: [F-001]
+procedure_version: proc-v034   # 評価は proc-v033 の時点で試行として行い、proc-v034 の正式化のあとにシグナルを記録してこのファイルを出した
+outcome: success
+context_updates:
+  findings: { 高: 3, 中: 4, 低: 2 }
+  findings_new: 5
+  fix_routes: { 作業20是正: [QF-001, QF-004, QF-005, QF-006, QF-008, QF-009], 作業10: [QF-002], KB: [QF-007], 人間: [QF-003] }
+  signals_recorded: [SIG-0020, SIG-0021, SIG-0022, SIG-0023, SIG-0024, SIG-0025]
+  lint_candidates: 2

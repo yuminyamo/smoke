@@ -3,12 +3,12 @@ name: pms-40-improve
 description: "PMS回帰テスト作成の作業40(手順改善)。管理者が指示したときだけ、回帰テストを作ったセッションとは別の新しいセッションで使う。手順改善シグナルを集約し、手順書の正本(procedure/)を差分で改訂して skills を再生成する。"
 disable-model-invocation: true
 metadata:
-  procedure_version: proc-v033
+  procedure_version: proc-v034
   generated_from: "procedure/stages.md §40"
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §40 / 手順版: proc-v033 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/stages.md §40 / 手順版: proc-v034 / 生成: tools/build-skills/build-skills.mjs -->
 
-# 作業40 手順改善(手順版 proc-v033)
+# 作業40 手順改善(手順版 proc-v034)
 
 この skill は、手順書の正本の `stages.md` §40 を本文とし、作業に必要な規約・語彙・付録・記入用テンプレートを `references/` に同梱したものである。本文(下の「---」以降)が指示である。
 
@@ -32,7 +32,7 @@ metadata:
 
 ## 手順書を書き換えない
 
-この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v033` をそのまま転記する。
+この skill と `references/` は、正本(`procedure/`)から生成したものである。手順について迷った・矛盾を見つけた・実行できなかった・手順と違う方法で実施した場合は、書き換えずに手順改善シグナルとして記録する(00 ■手順改善シグナル)。status.yaml の `procedure_version` には `proc-v034` をそのまま転記する。
 
 ## この作業に固有の注意
 
@@ -98,6 +98,7 @@ metadata:
 | 人間の指摘 | `needs-fix` の成果物の `review_notes`、要許可操作への回答、as-is 判断 |
 | `regression-triage` | `work/_common/regression-triage.md`(CI 導入後) |
 | `metrics` | `work/_improve/metrics.md`(前回までの推移) |
+| 品質評価 | `work/_assess/QA-<nnn>/`(前回の作業40以降の findings.yaml・report.md。シグナルの根拠の確認に使う) |
 | 手順書 | **00 ■手順改訂の統制 は必ず読む。** それ以外は改訂対象の手順箇所を含む節のみ(丸ごと読まない) |
 
 ## 4. 固有手順
@@ -106,6 +107,7 @@ metadata:
 
 - 前回以降の全フローについて、効率指標(下表)とガード指標(00 ■手順改訂の統制)を**成果物から機械計算**し、`metrics.md` に「フロー × 手順版」の行を追記する
 - 次をシグナルとして台帳に起こす: lint の違反(出所 `lint`)/ `needs-fix` の `review_notes`・要許可操作への回答・as-is 判断(出所 `人間`)/ 回帰実行の切り分けで `テスト起因` とされたもの(出所 `回帰実行`。テストの生成元の注釈から生成フローと手順版を辿り、手順箇所を特定する)
+- 作業35(品質評価)が記録したシグナル(出所 `品質評価`)は、作業35が台帳に起こし済みである。そのまま S2 の対象にする
 
 効率指標(改善の対象):
 
@@ -127,7 +129,7 @@ metadata:
 
 - 未処理シグナルを全件 `vocab.signal_route` に振り分ける。**手順に来るのは一部である**
 - 手順以外の行き先は、該当台帳へ回付した事実だけを記録する(回付先の内容は書き換えない)
-- 1件だけのシグナルで、後段・人間・回帰実行の裏付けもないものは `様子見` にする
+- 1件だけのシグナルで、後段・人間・回帰実行の裏付けもないものは `様子見` にする。**ただし出所 `品質評価` のシグナルは、件数・裏付けに関わらず `様子見` にせず、見直しの対象にする**(内容で 手順 / KB / 見送り 等に振り分ける。手順行きなら S3 で改訂案を起こす)
 
 ### S3 改訂案
 

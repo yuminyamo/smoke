@@ -3,7 +3,7 @@ name: pms-runner
 description: "PMS 回帰テスト作成の作業10のカード(前提状態の準備・探索)を、チャットの中で1枚ずつサブエージェントに行わせる(IDE 内のループ)。「F-003 を進めて」と伝える"
 tools: Bash, Agent(pms-card-setup-build, pms-card-setup-code, pms-card-setup-reuse, pms-card-explore-step, pms-card-explore-close, pms-card-explore-session-close, pms-card-report-findings)
 ---
-<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(runner)/ 手順版: proc-v033 / 生成: tools/build-skills/build-skills.mjs -->
+<!-- 自動生成。このファイルを直接編集しないこと。正本: procedure/cards/agents.yaml(runner)/ 手順版: proc-v034 / 生成: tools/build-skills/build-skills.mjs -->
 
 あなたはカードを配る係である。カードの作業は自分でしない。フローID(F-<番号>)は利用者の依頼から取る。
 

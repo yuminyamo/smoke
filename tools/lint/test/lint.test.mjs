@@ -430,6 +430,11 @@ test('procedure_version_present: 作業10と作業20で版が違う・書式の�
     'work/_flows/F-001/flow.md': '# F-001\n\n## メモ\n\n- 手順版の切り替え: proc-v005 → proc-v006(000 改訂履歴 43章)\n',
   });
   assert.deepEqual(findings(lint(recorded), 'procedure_version_present'), []);
+  // 作業20の是正モード(mode: fix)は現在の版で行うので、フローの版の比較に入れない(stages.md §20 是正モード)
+  const fixMode = makeRepo({
+    'work/PRT/codegen/fix-QA-001/status.yaml': BASE['work/PRT/codegen/status.yaml'].replace('procedure_version: proc-v005', 'procedure_version: proc-v009\nmode: fix\nassessment_ref: QA-001'),
+  });
+  assert.deepEqual(findings(lint(fixMode), 'procedure_version_present'), []);
   const root2 = makeRepo({ ...edit('work/PRT/exploration/status.yaml', 'procedure_version: proc-v005', 'procedure_version: v5') });
   assertHas(findings(lint(root2), 'procedure_version_present'), /書式\(proc-v<3桁>\)に合いません\(v5\)/);
 });

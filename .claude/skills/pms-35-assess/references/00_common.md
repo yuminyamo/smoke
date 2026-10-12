@@ -3,7 +3,8 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-12 / 版: v36(作業40 IR-007 の改善案の適用: ■回帰実行の環境前提とテストデータ規約 の [R-DAT-3] に自データの行が複数のときの確かめ方と削除の確認ダイアログの確認を加えた(IMP-032)、■lint に absorbed_red_reported(WARNING。IMP-028)を加え operation_inventory_complete に上限の検査を足した(IMP-029)(proc-v037)。人間の指示による改訂。前版 v35 は同日の IR-006 の適用)
+改訂: 2026-10-12 / 版: v37(■lint の operation_inventory_complete の上限のステップ数を `vocab.scenario_length` から読むことにした(ステップ数の上限を6から10に上げたため。暫定。CND-003。IMP-033)(proc-v038)。人間の指示による改訂。前版 v36 は同日の IR-007 の適用)
+       2026-10-12 / 版: v36(作業40 IR-007 の改善案の適用: ■回帰実行の環境前提とテストデータ規約 の [R-DAT-3] に自データの行が複数のときの確かめ方と削除の確認ダイアログの確認を加えた(IMP-032)、■lint に absorbed_red_reported(WARNING。IMP-028)を加え operation_inventory_complete に上限の検査を足した(IMP-029)(proc-v037)。人間の指示による改訂。前版 v35 は同日の IR-006 の適用)
        2026-10-12 / 版: v35(作業40 IR-006 の改善案の適用: ■status.yaml 契約 に規約10(最上位の model。IMP-025)、■lint に operation_inventory_complete(INFO。IMP-024)を加えた(proc-v036)。人間の指示による改訂。前版 v34 は同日の IR-005 の適用)
        2026-10-12 / 版: v34(作業40 IR-005 の改善案の適用: ■回帰実行の環境前提とテストデータ規約 に [R-DAT-3](状態の変更・削除の対象を自データの行に絞る)を加え、規約2・[R-DAT-1] を補った(IMP-013)。■手順書の版と配備 に既存の成果物への追随の記録を加えた(IMP-018)。■手順改訂の統制(保護ブロック IMPROVEMENT_GOVERNANCE)の検出力ガード指標に品質評価の 検出力・高 の指摘の件数を加えた(IMP-017)(proc-v035)。人間の指示による改訂。前版 v33 は同日の作業35 品質評価の新設)
        2026-10-12 / 版: v33(作業35 品質評価の新設: ■文書の5層構成・■AIへの渡し方 の skill の表・■手順改善シグナル(出所 品質評価)・■ディレクトリ構成(work/_assess/ と作業20の是正モードの codegen/fix-<QA-ID>/)(proc-v034)。人間の指示による改訂。前版 v32 は同日の作業40 IR-004 の改善案の適用)
@@ -1262,7 +1263,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `signal_location_valid` | WARNING | 手順改善台帳の手順箇所が `vocab.procedure_location` の書式に従い、実在する箇所を指す |
 | `signal_section_present` | WARNING | 報告書の §8 に、手順改善シグナルのID列挙または「なし」がある |
 | `pipeline_graph` | ERROR | `pipeline.dot` の開始/終了ノードが各1つ、全ノードが到達可能、辺の参照先が存在、条件式が構文を満たす |
-| `operation_inventory_complete` | INFO | 方式 `manual_usecase` のフロー(この規則を加えた版以降)の作業10で、scenarios.md に「## 操作の棚卸し(<フローID>)」の表があり(`methods/manual_usecase.md` スロット2)、全行の扱いが scenarios.md にあるステップID か申し送り台帳にある HO-ID である。扱いが HO-ID で理由コードが `同一経路` の行は、その申し送りの想定手段が同じフローのステップIDを含む(`vocab.discrimination` の 同一経路の代表)。proc-v037 以降は、対象欄が「(上限)」で始まる申し送りを扱いに持つ行があるのに、そのフローの同じ機能のシナリオ数が `vocab.default.scenarios_per_feature` の上限に達していない、またはステップ数が上限(6)に達していないシナリオがあれば指摘する(方式 manual_usecase スロット2)。効果を見て WARNING に上げる。実装: `tools/lint/lint.mjs` |
+| `operation_inventory_complete` | INFO | 方式 `manual_usecase` のフロー(この規則を加えた版以降)の作業10で、scenarios.md に「## 操作の棚卸し(<フローID>)」の表があり(`methods/manual_usecase.md` スロット2)、全行の扱いが scenarios.md にあるステップID か申し送り台帳にある HO-ID である。扱いが HO-ID で理由コードが `同一経路` の行は、その申し送りの想定手段が同じフローのステップIDを含む(`vocab.discrimination` の 同一経路の代表)。proc-v037 以降は、対象欄が「(上限)」で始まる申し送りを扱いに持つ行があるのに、そのフローの同じ機能のシナリオ数が `vocab.default.scenarios_per_feature` の上限に達していない、またはステップ数が上限(`vocab.scenario_length` の単機能シナリオの上限)に達していないシナリオがあれば指摘する(方式 manual_usecase スロット2)。効果を見て WARNING に上げる。実装: `tools/lint/lint.mjs` |
 | `absorbed_red_reported` | WARNING | 作業20(proc-v037 以降)の status.yaml で、`clean_run` に red があり、`deviations`(作業10の actions にない操作の追加)が1件以上あるのに、`as_is_pending` と `verification_substitutions` がどちらも空である(記録にない操作を足して red を green にした疑い。`stages.md` §20 生成コードの実行確認)。実装: `tools/lint/lint.mjs` |
 | `rediscovery_rate` | INFO | 再発見率を出力(次の作業01の対象選定に使う) |
 | `improvement_due` | INFO | 作業40の起動要否を判定し、`context.improvement_due` を出力する(`stages.md` §40 起動条件) |

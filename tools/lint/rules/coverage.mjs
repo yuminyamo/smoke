@@ -11,7 +11,6 @@ import { verNum } from './exploration.mjs';
 
 const INVENTORY_SINCE = 36; // proc-v036 で追加(IMP-020・024)
 const CAP_SINCE = 37;       // proc-v037 で「(上限)」の検査を追加(IMP-029)
-const MAX_STEPS = 6;        // 1シナリオのステップ数の上限(方式 manual_usecase スロット2 の 3〜6)
 const STEP_RE = /SC-[A-Za-z0-9]+-\d+-S\d+/g;
 const HO_RE = /HO-[A-Za-z0-9]+-\d{3}/g;
 
@@ -51,9 +50,11 @@ export function operation_inventory_complete(repo) {
       const where = `${rel}:${capRow.row.line}`;
       const maxScen = Number(String(repo.vocab.default?.scenarios_per_feature ?? '').match(/〜\s*(\d+)/)?.[1] ?? NaN);
       if (Number.isFinite(maxScen) && flowScenarios.size < maxScen) add(where, `${capRow.id} は「(上限)」だが、${s.flow} の ${s.feature} のシナリオは ${flowScenarios.size} 本で、上限の ${maxScen} 本に達していません(方式 manual_usecase スロット2)`);
+      // 1シナリオのステップ数の上限は vocab.scenario_length の単機能シナリオ(「3〜10ステップ」の上の値)。読めなければ検査しない
+      const maxSteps = Number(String(repo.vocab.scenario_length?.['単機能シナリオ']?.length ?? '').match(/〜\s*(\d+)/)?.[1] ?? NaN);
       for (const sc of flowScenarios) {
         const n = repo.scenarioDefs.get(sc)?.steps.length ?? 0;
-        if (n > 0 && n < MAX_STEPS) add(where, `${capRow.id} は「(上限)」だが、${sc} は ${n} ステップで、上限の ${MAX_STEPS} に達していません(方式 manual_usecase スロット2)`);
+        if (Number.isFinite(maxSteps) && n > 0 && n < maxSteps) add(where, `${capRow.id} は「(上限)」だが、${sc} は ${n} ステップで、上限の ${maxSteps} に達していません(方式 manual_usecase スロット2)`);
       }
     }
     for (const row of t.rows) {

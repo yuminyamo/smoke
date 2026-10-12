@@ -3,7 +3,8 @@
 本ファイルは全作業に適用される**既定**である。**各作業のAIには本ファイルを必ず一緒に渡すこと。**
 「■」で始まるセクションがAIへの指示本文、「◆」で始まるセクションが人間向けの補足。
 
-改訂: 2026-10-12 / 版: v34(作業40 IR-005 の改善案の適用: ■回帰実行の環境前提とテストデータ規約 に [R-DAT-3](状態の変更・削除の対象を自データの行に絞る)を加え、規約2・[R-DAT-1] を補った(IMP-013)。■手順書の版と配備 に既存の成果物への追随の記録を加えた(IMP-018)。■手順改訂の統制(保護ブロック IMPROVEMENT_GOVERNANCE)の検出力ガード指標に品質評価の 検出力・高 の指摘の件数を加えた(IMP-017)(proc-v035)。人間の指示による改訂。前版 v33 は同日の作業35 品質評価の新設)
+改訂: 2026-10-12 / 版: v35(作業40 IR-006 の改善案の適用: ■status.yaml 契約 に規約10(最上位の model。IMP-025)、■lint に operation_inventory_complete(INFO。IMP-024)を加えた(proc-v036)。人間の指示による改訂。前版 v34 は同日の IR-005 の適用)
+       2026-10-12 / 版: v34(作業40 IR-005 の改善案の適用: ■回帰実行の環境前提とテストデータ規約 に [R-DAT-3](状態の変更・削除の対象を自データの行に絞る)を加え、規約2・[R-DAT-1] を補った(IMP-013)。■手順書の版と配備 に既存の成果物への追随の記録を加えた(IMP-018)。■手順改訂の統制(保護ブロック IMPROVEMENT_GOVERNANCE)の検出力ガード指標に品質評価の 検出力・高 の指摘の件数を加えた(IMP-017)(proc-v035)。人間の指示による改訂。前版 v33 は同日の作業35 品質評価の新設)
        2026-10-12 / 版: v33(作業35 品質評価の新設: ■文書の5層構成・■AIへの渡し方 の skill の表・■手順改善シグナル(出所 品質評価)・■ディレクトリ構成(work/_assess/ と作業20の是正モードの codegen/fix-<QA-ID>/)(proc-v034)。人間の指示による改訂。前版 v32 は同日の作業40 IR-004 の改善案の適用)
        2026-10-12 / 版: v32(作業40 IR-004 の改善案の適用: ■ディレクトリ構成 に機能一覧 feature-list.md・作業02の nd/・作業20の codegen/ を加え(IMP-004)、■lint の procedure_version_present を「版が違えば flow.md の手順版の切り替えの記録を見る」にした(IMP-005)(proc-v033)。人間の指示による改訂。前版 v31 は同日の KB カテゴリ T13 UI操作知見の新設)
 
@@ -1161,6 +1162,7 @@ flow_id: F-002
 feature_code: PRT                # 複数機能にまたがる場合はリスト
 procedure_version: proc-v001     # vocab.meta.procedure_version をそのまま転記する(推測しない)
 environment: vm01                # 使った検証環境の環境ID(作業10・15・20。規約9)
+model: claude-haiku-5-5          # この作業をチャットで行ったAIのモデルID。分からなければ unknown(規約10)
 outcome: partial_success         # vocab.context_key.outcome
 review_status: unreviewed
 
@@ -1209,6 +1211,7 @@ notes: <1〜3行>
 7. **作業10は最上位に `prohibited_ops`(読んだ禁止操作リストの記入状態と版)を持つ。** 値は照合スクリプトの出力から転記する。作業20の開始前の照合に使う(■外部操作 禁止操作リストの版と blocked の再判定。書式は §10 のスロット8)
 8. **作業15は最上位に `stage10_restore_id`(どの作業10のあとに実施したか。作業10の `env_restore.restore_id` の写し)を持つ。** 作業15を実施済みかどうかの判定と、作業20の入力の選択に使う(`pipeline.dot` 注記11。書式は §15 のスロット8)
 9. **作業10・15・20は最上位に `environment`(使った検証環境の環境ID)を持つ。** 値は `node tools/env/env.mjs require` の出力の `env` から転記する(■検証環境の情報)。proc-v010 以降のフローで求める
+10. **全作業は最上位に `model`(その作業をチャットで行ったAIのモデルID)を持つ。** AIが自分の実行環境から知らされているモデルIDを書き、知らされていなければ `unknown` と書く(推測しない)。作業10の status.yaml は `pms report` が作るので、工程0〜パートBを行ったチャットのモデルIDを `stage10-context.json` の `model` に書き、`pms report` が写す。カードのセッションのモデルは `pms run` の記録(`runs/*.jsonl`)に残るので書かない。品質評価・作業40が、モデルの差と手順の改訂の効果を分けて見るために使う
 
 ## ■ lint(実行前検証)
 
@@ -1258,6 +1261,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
 | `signal_location_valid` | WARNING | 手順改善台帳の手順箇所が `vocab.procedure_location` の書式に従い、実在する箇所を指す |
 | `signal_section_present` | WARNING | 報告書の §8 に、手順改善シグナルのID列挙または「なし」がある |
 | `pipeline_graph` | ERROR | `pipeline.dot` の開始/終了ノードが各1つ、全ノードが到達可能、辺の参照先が存在、条件式が構文を満たす |
+| `operation_inventory_complete` | INFO | 方式 `manual_usecase` のフロー(この規則を加えた版以降)の作業10で、scenarios.md に「## 操作の棚卸し(<フローID>)」の表があり(`methods/manual_usecase.md` スロット2)、全行の扱いが scenarios.md にあるステップID か申し送り台帳にある HO-ID である。扱いが HO-ID で理由コードが `同一経路` の行は、その申し送りの想定手段が同じフローのステップIDを含む(`vocab.discrimination` の 同一経路の代表)。効果を見て WARNING に上げる。実装: `tools/lint/lint.mjs` |
 | `rediscovery_rate` | INFO | 再発見率を出力(次の作業01の対象選定に使う) |
 | `improvement_due` | INFO | 作業40の起動要否を判定し、`context.improvement_due` を出力する(`stages.md` §40 起動条件) |
 

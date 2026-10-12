@@ -41,6 +41,7 @@
 //   env_restored               skill restore-golden-image 同梱の Test-EnvRestoreMarker.ps1 を呼ぶ(PowerShell が必要)
 //   env_value_leak             秘密情報(config/environments*.json の kind: secret)の値が成果物と skills(.github/skills・.kiro/skills)に書かれていない
 //   env_value_hardcoded        接続先(kind: endpoint)の値がテストコードにそのまま書かれていない
+//   operation_inventory_complete  manual_usecase のフローの操作の棚卸しの表が、実在のステップID・HO-ID を指す(proc-v036 以降。INFO)
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,12 +53,13 @@ import { reason_code_enum, ext_demand_linked, operation_registered, requires_in_
 import { skills_in_sync, prohibition_recheck, env_restored } from './rules/delegated.mjs';
 import { env_value_leak, env_value_hardcoded } from './rules/environment.mjs';
 import { act_log_linked, phase_a_queue_complete, explore_act_linked } from './rules/pms.mjs';
+import { operation_inventory_complete } from './rules/coverage.mjs';
 
 const IMPLEMENTED = {
   status_yaml_valid, procedure_version_present, verdict_enum, reason_code_enum, no_temp_locator,
   requires_covered, setup_steps_recorded, blocked_recorded, health_recorded, ext_demand_linked, operation_registered, requires_in_state_set,
   skills_in_sync, prohibition_recheck, env_restored, env_value_leak, env_value_hardcoded,
-  act_log_linked, phase_a_queue_complete, explore_act_linked,
+  act_log_linked, phase_a_queue_complete, explore_act_linked, operation_inventory_complete,
 };
 // 既存のスクリプトを呼ぶ規則(--list の表示用)
 const DELEGATED = {

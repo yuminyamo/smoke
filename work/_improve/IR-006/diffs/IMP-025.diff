@@ -1,0 +1,20 @@
+diff --git a/procedure/00_common.md b/procedure/00_common.md
+index 2a09b63..8421e63 100644
+--- a/procedure/00_common.md
++++ b/procedure/00_common.md
+@@ -1161,6 +1161,7 @@ flow_id: F-002
+ feature_code: PRT                # 複数機能にまたがる場合はリスト
+ procedure_version: proc-v001     # vocab.meta.procedure_version をそのまま転記する(推測しない)
+ environment: vm01                # 使った検証環境の環境ID(作業10・15・20。規約9)
++model: claude-haiku-5-5          # この作業をチャットで行ったAIのモデルID。分からなければ unknown(規約10)
+ outcome: partial_success         # vocab.context_key.outcome
+ review_status: unreviewed
+ 
+@@ -1209,6 +1210,7 @@ notes: <1〜3行>
+ 7. **作業10は最上位に `prohibited_ops`(読んだ禁止操作リストの記入状態と版)を持つ。** 値は照合スクリプトの出力から転記する。作業20の開始前の照合に使う(■外部操作 禁止操作リストの版と blocked の再判定。書式は §10 のスロット8)
+ 8. **作業15は最上位に `stage10_restore_id`(どの作業10のあとに実施したか。作業10の `env_restore.restore_id` の写し)を持つ。** 作業15を実施済みかどうかの判定と、作業20の入力の選択に使う(`pipeline.dot` 注記11。書式は §15 のスロット8)
+ 9. **作業10・15・20は最上位に `environment`(使った検証環境の環境ID)を持つ。** 値は `node tools/env/env.mjs require` の出力の `env` から転記する(■検証環境の情報)。proc-v010 以降のフローで求める
++10. **全作業は最上位に `model`(その作業をチャットで行ったAIのモデルID)を持つ。** AIが自分の実行環境から知らされているモデルIDを書き、知らされていなければ `unknown` と書く(推測しない)。作業10の status.yaml は `pms report` が作るので、工程0〜パートBを行ったチャットのモデルIDを `stage10-context.json` の `model` に書き、`pms report` が写す。カードのセッションのモデルは `pms run` の記録(`runs/*.jsonl`)に残るので書かない。品質評価・作業40が、モデルの差と手順の改訂の効果を分けて見るために使う
+ 
+ ## ■ lint(実行前検証)
+ 

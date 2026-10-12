@@ -71,6 +71,7 @@ DB の接続: {{db_connection}}
 {{rule:R-EXP-14}}
 {{rule:R-EXP-15}}
 {{rule:R-EXP-20}}
+{{rule:R-EXP-21}}
 {{rule:R-JDG-1}}
 {{rule:R-JDG-2}}
 {{rule:R-JDG-3}}

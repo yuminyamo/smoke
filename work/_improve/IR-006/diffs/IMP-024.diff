@@ -1,0 +1,24 @@
+diff --git a/procedure/00_common.md b/procedure/00_common.md
+index 2a09b63..ae3522b 100644
+--- a/procedure/00_common.md
++++ b/procedure/00_common.md
+@@ -1258,6 +1258,7 @@ DoD と lint は同じ内容を2度書かない。**DoD を書けば lint の仕
+ | `signal_location_valid` | WARNING | 手順改善台帳の手順箇所が `vocab.procedure_location` の書式に従い、実在する箇所を指す |
+ | `signal_section_present` | WARNING | 報告書の §8 に、手順改善シグナルのID列挙または「なし」がある |
+ | `pipeline_graph` | ERROR | `pipeline.dot` の開始/終了ノードが各1つ、全ノードが到達可能、辺の参照先が存在、条件式が構文を満たす |
++| `operation_inventory_complete` | INFO | 方式 `manual_usecase` のフロー(この規則を加えた版以降)の作業10で、scenarios.md に「## 操作の棚卸し(<フローID>)」の表があり(`methods/manual_usecase.md` スロット2)、全行の扱いが scenarios.md にあるステップID か申し送り台帳にある HO-ID である。扱いが HO-ID で理由コードが `同一経路` の行は、その申し送りの想定手段が同じフローのステップIDを含む(`vocab.discrimination` の 同一経路の代表)。効果を見て WARNING に上げる |
+ | `rediscovery_rate` | INFO | 再発見率を出力(次の作業01の対象選定に使う) |
+ | `improvement_due` | INFO | 作業40の起動要否を判定し、`context.improvement_due` を出力する(`stages.md` §40 起動条件) |
+ 
+diff --git a/procedure/methods/manual_usecase.md b/procedure/methods/manual_usecase.md
+index 57189c3..6f418a3 100644
+--- a/procedure/methods/manual_usecase.md
++++ b/procedure/methods/manual_usecase.md
+@@ -42,6 +42,7 @@
+ ## 6. 方式固有のDoD
+ 
+ - [ ] 全シナリオで、少なくとも1つのステップの根拠が文書名+章番号である(対象機能にマニュアル・仕様書の記載がない場合は、その旨を報告書 §6 に書いた)
++- [ ] scenarios.md に「## 操作の棚卸し(<フローID>)」の表があり、全行の扱いにステップID か HO-ID がある(lint `operation_inventory_complete`)
+ 
+ ## 7. 方式固有のKB・DISC
+ 

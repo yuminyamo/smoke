@@ -974,3 +974,34 @@ ${provided}  - state_id: S-CLEAN-ENV
   // proc-v016 のフローでは求めない(provided の流用元・act・キュー)
   assert.deepEqual(all(ver('proc-v016', { 'work/PRT/exploration/setup-log.yaml': SETUP('', ''), 'work/_flows/F-001/queue.json': null })), []);
 });
+
+test('operation_inventory_complete: proc-v036 以降の manual_usecase のフローは、操作の棚卸しの表の扱いが実在のステップID・HO-ID を指す(INFO。それより前の版・他の方式では求めない)', () => {
+  const INV = (rows) => `\n## 操作の棚卸し(F-001)\n\n| 操作 | 根拠 | 扱い |\n|---|---|---|\n${rows}\n`;
+  const repoWith = (v, rows, { source = 'manual_usecase', ho = null } = {}) => {
+    const files = {};
+    if (rows !== null) files['work/PRT/scenarios.md'] = BASE['work/PRT/scenarios.md'] + INV(rows);
+    if (ho) files['work/_common/handoff-register.md'] = BASE['work/_common/handoff-register.md'].replace('| HO-PRT-002 |', `${ho}\n| HO-PRT-002 |`);
+    const root = makeRepo(files);
+    const p = path.join(root, 'work/PRT/exploration/status.yaml');
+    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('procedure_version: proc-v005', `procedure_version: ${v}`).replace('  flow_kind: new\n', `  flow_kind: new\n  scenario_source: ${source}\n`));
+    return root;
+  };
+  const run = (root) => findings(lint(root, '--flow', 'F-001', '--stage', '10'), 'operation_inventory_complete');
+
+  // 全行が実在のステップID・HO-ID を指せば指摘なし
+  assert.deepEqual(run(repoWith('proc-v036', '| 印刷する | 4-2 | SC-PRT-01-S1 |\n| スキャンする | 4-3 | HO-PRT-001 |')), []);
+  // 節がない・扱いが空・存在しないID
+  assertHas(run(repoWith('proc-v036', null)), /操作の棚卸し\(F-001\)」の節がありません/);
+  assertHas(run(repoWith('proc-v036', '| 削除する | 4-5 |  |')), /「削除する」の扱いにステップID も HO-ID もありません/);
+  assertHas(run(repoWith('proc-v036', '| 編集する | 4-4 | SC-PRT-01-S9 |')), /SC-PRT-01-S9 が scenarios\.md のステップにありません/);
+  assertHas(run(repoWith('proc-v036', '| 編集する | 4-4 | HO-PRT-099 |')), /HO-PRT-099 が申し送り台帳にありません/);
+  // 同一経路の申し送りは、想定手段に代表のステップIDを求める
+  const HO = (means) => `| HO-PRT-003 | 絞り込み | 同一経路 | ステップ2 | ${means} | F-001 / 作業10 / SC-PRT-01 | 2026-09-26 | open |`;
+  assertHas(run(repoWith('proc-v036', '| 絞り込む | 4-6 | HO-PRT-003 |', { ho: HO('検索条件の値違い') })), /同一経路 だが、想定手段に代表のステップIDがありません/);
+  assert.deepEqual(run(repoWith('proc-v036', '| 絞り込む | 4-6 | HO-PRT-003 |', { ho: HO('SC-PRT-01-S3 の値違い') })), []);
+  // INFO なので終了コードに効かない
+  assert.equal(lint(repoWith('proc-v036', null), '--flow', 'F-001', '--stage', '10', '--rule', 'operation_inventory_complete').code, 0);
+  // proc-v035 のフロー・他の方式では求めない
+  assert.deepEqual(run(repoWith('proc-v035', null)), []);
+  assert.deepEqual(run(repoWith('proc-v036', null, { source: 'legacy_script' })), []);
+});

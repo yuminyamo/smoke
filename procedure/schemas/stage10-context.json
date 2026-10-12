@@ -5,6 +5,7 @@
   "required": ["environment", "env_restore", "pre_stage", "prohibited_ops", "flow_kind", "flow_seq", "scenario_source", "env_keys_added", "kb_t05_registered", "kb_t05_reused", "ext_demand_added", "ext_demand_appended", "ext_demand_established", "ext_demand_unresolved", "state_demand_added", "state_demand_appended", "signals_recorded", "recheck_of", "reexplore_of"],
   "properties": {
     "environment": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$", "description": "使った検証環境の環境ID(env.mjs require の出力の env)" },
+    "model": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$", "description": "工程0〜パートBをチャットで行ったAIのモデルID(実行環境から知らされているもの。知らされていなければ unknown。00 ■status.yaml 契約 規約10)。proc-v036 で追加。なければ pms report は unknown と書く" },
     "env_restore": { "type": "object", "additionalProperties": false, "required": ["restore_id", "purpose", "readiness"], "description": "工程0の復元(復元の実行体の出力とメモ欄から)",
       "properties": { "restore_id": { "type": "string", "minLength": 4 }, "purpose": { "const": "work10" }, "readiness": { "enum": ["auto", "human"] } } },
     "pre_stage": { "type": "object", "additionalProperties": false, "required": ["state", "run_id"], "description": "工程0の開始前シナリオ(実行体の出力の JSON から)",

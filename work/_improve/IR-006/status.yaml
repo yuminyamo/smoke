@@ -1,0 +1,26 @@
+stage: "40"
+improvement_run: IR-006
+procedure_version: proc-v035
+procedure_version_before: proc-v035
+procedure_version_after: proc-v036   # 報告のあと、利用者の指示で IMP-020〜026 を指示適用した(IMP-027 は見送り)
+outcome: partial_success             # 依頼の範囲(SIG-0031〜0036)だけを振り分けた。SIG-0026〜0030 と、判定期間に達した指示適用の改訂(IMP-001・002・003・009・013)の判定は次の作業40に回した
+review_status: unreviewed
+context_updates:
+  improvement_due: no
+  signals_processed: 7               # SIG-0031〜0036 と、様子見から再判断した SIG-0008
+  signals_routed: { 手順: 7, KB: 0, 非決定値: 0, 外部操作需要: 0, 禁止操作: 0, 要確認: 0, 様子見: 0, 見送り: 0 }
+  imp_opened: { A: 1, B: 6, C: 1 }
+  imp_trial_started: []
+  imp_adopted: []
+  imp_reverted: [IMP-019]            # 撤回推奨にしたあと、IMP-023 の指示適用で文を置き換えた
+  imp_revert_recommended: []
+  imp_pending_human: []
+  imp_by_instruction: [IMP-020, IMP-021, IMP-022, IMP-023, IMP-024, IMP-025, IMP-026]
+  guard_alert: found                 # F-002 の検証手段 両方 の比率 0.90 → 0.50。主な原因は範囲の縮小(SIG-0031)。指示適用の改訂の判定は次の作業40(報告書 6.1・6.5)
+signals_recorded: []
+artifacts:
+  report: work/_improve/IR-006/report.md
+  diffs: work/_improve/IR-006/diffs/
+  ledger: work/_common/procedure-improvement.md
+  metrics: work/_improve/metrics.md
+notes: 利用者の依頼により、品質評価 QA-002 のシグナル SIG-0031〜0036(と SIG-0008)を振り分け、改訂案 IMP-020〜027 を起票した。IMP-019 は SIG-0034 で撤回条件に当たり撤回推奨(IMP-023 での置き換えを勧める)。そのあと利用者の指示で IMP-020〜026 を指示適用した(proc-v036)。IMP-027 は利用者の指示で見送り。

@@ -1,0 +1,24 @@
+diff --git a/procedure/stages.md b/procedure/stages.md
+index 9883119..72c0302 100644
+--- a/procedure/stages.md
++++ b/procedure/stages.md
+@@ -661,6 +661,7 @@ context_updates:
+ - **[R-EXP-14]** `assertion_hint` は必ず書く(`blocked` を除く)。作業20への引き継ぎとして、決定的に検証できる形で、**自シナリオのデータにスコープして**書く(環境全体の件数を基準にしない)。決定的な手段がなければ「決定的な検証手段が見つからない」と正直に書く
+ - **[R-EXP-15]** 非同期待機を行ったら、`wait` に待機条件・実測秒数・使ったタイムアウトを書く
+ - **[R-EXP-20]** 否定の期待結果(表示されない・含まれない・変わらない 等)は、**操作の前後で差が出る対照を観測できたときだけ** `passed` にする。対照は自テストが作ったデータに限る(環境に残っている他のデータ・実データを対照にしない)。対照がなく前後で差が出ないときは、否定の部分を確かめられていないので `human-check` とし、`notes` に「否定の期待結果の対照なし」と書く(00 [R-JDG-2])。`passed` のときの `assertion_hint` は、対照が表示されない(変わらない)ことを確かめる形で書く
++- **[R-EXP-21]** 確認内容が到達の経路を指定しているステップ(「〜のメニューから開く」「〜のリンクから開く」等)は、**その経路の操作で到達したときだけ** `passed` にする。URL への直接の移動など別の手段で到達したときは、経路を確かめていないので `human-check` とし、`notes` に「確認内容の経路で到達していない(理由)」と書く。経路の操作が、前のシナリオ・ステップで開いたままのダイアログ・メニューに妨げられたときは、それを閉じてから(閉じられなければ `<env:pms.url>` へ移動してログイン後の最初の画面から)経路の操作をやり直す。閉じる・移動するための操作は `seqs` に含めない(テストはテストごとに新しい画面から始まるため)
+ 
+ シナリオの終わり(`explore.close`)
+ 
+diff --git a/procedure/cards/explore.step.md b/procedure/cards/explore.step.md
+index ccbe491..2754727 100644
+--- a/procedure/cards/explore.step.md
++++ b/procedure/cards/explore.step.md
+@@ -71,6 +71,7 @@ DB の接続: {{db_connection}}
+ {{rule:R-EXP-14}}
+ {{rule:R-EXP-15}}
+ {{rule:R-EXP-20}}
++{{rule:R-EXP-21}}
+ {{rule:R-JDG-1}}
+ {{rule:R-JDG-2}}
+ {{rule:R-JDG-3}}

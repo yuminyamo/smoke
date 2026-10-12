@@ -140,6 +140,7 @@ function statusOf(ctx, q, d, { dodUnmet }) {
   };
   return {
     stage: '10', flow_id: q.flow_id, feature_code: d.fc, procedure_version: d.version, environment: ctxv.environment,
+    model: ctxv.model ?? 'unknown', // 工程0〜パートBのチャットのモデル(00 ■status.yaml 契約 規約10)
     outcome, review_status: 'unreviewed',
     env_restore: ctxv.env_restore, pre_stage: ctxv.pre_stage, prohibited_ops: ctxv.prohibited_ops,
     context_updates: cu,

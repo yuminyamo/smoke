@@ -46,7 +46,7 @@
 //             1 = 失敗(submit の不合格、act・pwcli の操作の失敗、db の接続・実行の失敗、run の実行の失敗(CLI が起動しない等))/
 //             2 = 使い方・設定の誤り / 3 = STOP(next・run。人間の確認待ち。run は lint の ERROR が残ったときも)/
 //             4 = run が --max-cards の枚数で止まった(まだカードが残っている)
-// 依存: Node.js 18 以上のみ(外部パッケージ不要)。playwright-cli は act と pwcli だけが、sqlcmd は db だけが、AI の CLI は run だけが呼ぶ。
+// 依存: Node.js 22 以上のみ(外部パッケージ不要)。playwright-cli は act と pwcli だけが、sqlcmd は db だけが、AI の CLI は run だけが呼ぶ。
 // テスト: node --test tools/pms/test/
 // 仕様(内部の構成・データの形): tools/pms/README.md
 

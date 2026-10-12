@@ -20,7 +20,7 @@
 // 環境の選び方(先に決まったもの): --env → 環境変数 PMS_ENV → local の default → 共有の default
 //   → 環境が1つだけならそれ。属性は環境ごとに local が共有を上書きする(value・kind・description を項目ごとに)。
 // 「_」で始まる項目は注記として読み飛ばす。
-// 依存: Node.js 18 以上のみ(vocab.yaml の読み取りに tools/lint/lib/yaml-lite.mjs を使う)。
+// 依存: Node.js 22 以上のみ(vocab.yaml の読み取りに tools/lint/lib/yaml-lite.mjs を使う)。
 
 import fs from 'node:fs';
 import path from 'node:path';

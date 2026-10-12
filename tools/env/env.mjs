@@ -19,7 +19,7 @@
 // 終了コード: 0 = 成功(require は全部揃っている)/ 1 = 足りない(require の不足、get の値がない)/ 2 = 実行できない(引数・設定の誤り)
 // 出力: get は値だけを標準出力へ。それ以外は1行の JSON を標準出力へ(人間向けの説明は標準エラー出力)。
 //       秘密情報の値は、get --reveal 以外では出力しない。
-// 依存: Node.js 18 以上のみ(外部パッケージ不要)。テスト: node --test tools/env/test/env.test.mjs
+// 依存: Node.js 22 以上のみ(外部パッケージ不要)。テスト: node --test tools/env/test/env.test.mjs
 
 import fs from 'node:fs';
 import path from 'node:path';

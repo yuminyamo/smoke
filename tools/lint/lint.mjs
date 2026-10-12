@@ -16,7 +16,7 @@
 //   --root <dir>       リポジトリのルート(既定: このスクリプトの2階層上)
 //
 // 終了コード: 0 = ERROR なし / 1 = ERROR あり(次の作業を起動しない)/ 2 = lint を実行できない(引数・正本の誤り)
-// 依存: Node.js 18 以上のみ(外部パッケージ不要)。テスト: node --test tools/lint/test/lint.test.mjs
+// 依存: Node.js 22 以上のみ(外部パッケージ不要)。テスト: node --test tools/lint/test/lint.test.mjs
 //
 // 規則の一覧・重大度は procedure/00_common.md の lint 表を正とする(このスクリプトは表を読んで動く)。
 // 実装した規則:

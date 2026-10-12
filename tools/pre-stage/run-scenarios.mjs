@@ -30,7 +30,7 @@
 //   state: skipped(設定なし)/ passed(全件成功)/ warning(on_failure: continue のエントリだけが失敗)/ failed
 // 終了コード: 0 = skipped / passed / warning、1 = failed(作業を始めない)、2 = 設定の誤り・実行できない
 // 環境変数 PMS_RESTORE は外して実行する(globalSetup による VM の復元を二重に行わないため)。
-// 依存: Node.js 18 以上のみ(Playwright は設定の command で呼ぶ)。テスト: node --test tools/pre-stage/test/run-scenarios.test.mjs
+// 依存: Node.js 22 以上のみ(Playwright は設定の command で呼ぶ)。テスト: node --test tools/pre-stage/test/run-scenarios.test.mjs
 
 import fs from 'node:fs';
 import os from 'node:os';
